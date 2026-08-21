@@ -1,0 +1,101 @@
+/* ---------------------------------------------------------------------
+   dragging a frame out, and the one sentence that goes with it.
+
+   There is no styling for the drag itself, deliberately. The figure already
+   carries its own thumbnail as the drag image, and the moment the pointer
+   leaves the window the page has no say in what the drag looks like anyway:
+   that picture belongs to macOS. All that is left is the note.
+   --------------------------------------------------------------------- */
+
+.dragout-note {
+  position: fixed;
+  left: var(--s5);
+  /* clear of footer.keys, which is the one thing that lives along the
+     bottom edge. the note sits above it rather than over it, because the
+     keyboard legend is the other sentence someone reads while learning
+     this app and covering it to explain a drag would be a poor trade. */
+  bottom: 3.6rem;
+  z-index: 40;
+
+  margin: 0;
+  max-width: 26rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raise);
+  color: var(--ink-2);
+  font: 0.72rem/1.5 var(--mono);
+  letter-spacing: 0.02em;
+
+  /* it explains a drag that is in flight, so it must never be a thing the
+     drag can land on. a drop target appearing under the pointer halfway
+     through the gesture is how a frame ends up somewhere nobody aimed. */
+  pointer-events: none;
+
+  opacity: 0;
+  transform: translateY(0.4rem);
+  transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+
+.dragout-note.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dragout-note { transition: none; transform: none; }
+}
+
+/* ---------------------------------------------------------------------
+   the export mode, in the tray footer.
+
+   These live here rather than in style.css because the control and the
+   sentence under it arrived with the drag out work and are the other half
+   of the same answer: a drag is always a copy, and this is where you say
+   you did not want one. The markup is built in tray.js, so the styles
+   travel with the file that made it.
+   --------------------------------------------------------------------- */
+
+/* the same native select with the same redrawn caret as #tray-pick above
+   it, at label size. it sits next to the folder field because the two
+   together are one sentence: what goes where, and how. */
+.tray-mode {
+  flex: none;
+  appearance: none; -webkit-appearance: none;
+  border: 0; background: none; cursor: pointer;
+  color: var(--ink-2);
+  padding: 0.22rem 1.3rem 0.22rem 0.22rem;
+  border-radius: var(--r);
+  font: 500 0.72rem/1 var(--mono);
+  text-transform: lowercase;
+  letter-spacing: 0.14em;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 5 5.5 9 1.5' fill='none' stroke='%236e6e72' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.3rem center;
+  transition: color var(--fast) var(--ease);
+}
+
+.tray-mode:hover { color: var(--ink); }
+.tray-mode:focus-visible { outline: 1px solid var(--hot); outline-offset: 0.1rem; }
+.tray-mode[disabled] { color: var(--ink-3); cursor: default; }
+
+/* one line, always present, changing with the choice. it takes the whole
+   width so it never squeezes the folder field, and it sits above the result
+   line rather than below it, because it describes the button you are about
+   to press and the result describes the one you already did. */
+.tray-mode-note {
+  flex-basis: 100%;
+  margin: 0.2rem 0 0;
+  font: 0.72rem/1.45 var(--mono);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.tray-mode-note:empty { display: none; }
+
+/* The panel gets narrower below this width, and three controls on one line
+   then leave the folder field about five visible characters of path, which
+   is a field you cannot read back what you typed into. So the path takes the
+   whole first line and the two controls share the second. It is the same
+   breakpoint style.css narrows the panel at, because it is the same event. */
+@media (max-width: 1280px) {
+  .tray-foot #tray-folder { flex-basis: 100%; }
+  .tray-mode { margin-left: auto; }
+}

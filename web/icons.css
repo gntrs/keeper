@@ -1,0 +1,35 @@
+/* ---------------------------------------------------------------------
+   Icons, from Phosphor. MIT, and the full text is in
+   web/phosphor-LICENSE.txt beside this file.
+
+   They are masks rather than markup, which is the whole reason this file
+   can exist without any javascript changing: a button stays empty, the mask
+   cuts the glyph out of `currentColor`, and the icon is therefore the same
+   colour as whatever it sits in, including on hover, without a second rule.
+
+   Only the glyphs actually used are here. An icon font would have been
+   forty kilobytes to draw two shapes.
+
+   Words beat icons nearly everywhere in this app and that has not changed.
+   These are for the two places a word cannot go: a control 26px square
+   sitting on the corner of a photograph, where "remove" spills off the tile
+   and gets clipped by its neighbour.
+   --------------------------------------------------------------------- */
+:root {
+  --ph-x: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20256%20256%22%3E%3Cpath%20d=%22M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z%22/%3E%3C/svg%3E");
+  --ph-plus: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20256%20256%22%3E%3Cpath%20d=%22M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z%22/%3E%3C/svg%3E");
+  --ph-search: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20256%20256%22%3E%3Cpath%20d=%22M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z%22/%3E%3C/svg%3E");
+  --ph-folder: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20256%20256%22%3E%3Cpath%20d=%22M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.94,51.2a16.14,16.14,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64ZM93.34,64,123.2,86.4A8,8,0,0,0,128,88h72v16H69.77a16,16,0,0,0-15.18,10.94L40,158.7V64Zm112,136H43.1l26.67-80H232Z%22/%3E%3C/svg%3E");
+  --ph-reveal: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20256%20256%22%3E%3Cpath%20d=%22M224,104a8,8,0,0,1-16,0V59.32l-66.33,66.34a8,8,0,0,1-11.32-11.32L196.68,48H152a8,8,0,0,1,0-16h64a8,8,0,0,1,8,8Zm-40,24a8,8,0,0,0-8,8v72H48V80h72a8,8,0,0,0,0-16H48A16,16,0,0,0,32,80V208a16,16,0,0,0,16,16H176a16,16,0,0,0,16-16V136A8,8,0,0,0,184,128Z%22/%3E%3C/svg%3E");
+}
+
+/* every icon in the app is this one rule plus a --ph value */
+.icon, [data-icon]::before {
+  content: "";
+  display: block;
+  width: 1em; height: 1em;
+  background: currentColor;
+  -webkit-mask: var(--ph) center / contain no-repeat;
+  mask: var(--ph) center / contain no-repeat;
+}
+

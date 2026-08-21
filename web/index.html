@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>keepers</title>
+<link rel="stylesheet" href="/icons.css">
 <link rel="stylesheet" href="/style.css">
+<!--
+  drop.css is a link rather than an @import inside style.css because an
+  @import blocks the sheet it sits in until it resolves, and the drop layer
+  is the one part of the app nobody is looking at while the page loads.
+-->
+<link rel="stylesheet" href="/drop.css">
+<link rel="stylesheet" href="/dragout.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e1062c'/></svg>">
 </head>
 <body>
@@ -17,7 +25,11 @@
   </nav>
   <span id="tally"></span>
   <span class="grow"></span>
-  <span id="root" class="dim"></span>
+  <button id="tray-toggle" type="button" aria-expanded="false">tray</button>
+  <!-- the folder you are looking at, and the control that changes it.
+       drop.js listens for [data-keepers-choose] anywhere on the page. -->
+  <button id="root" type="button" data-keepers-choose
+          title="open a different folder"></button>
 </header>
 
 <section id="shelf" class="view">
@@ -26,10 +38,24 @@
     <div class="row"><b class="label">where</b><span id="f-dir"></span></div>
     <div class="row">
       <b class="label">only</b>
-      <button class="chip" id="f-star">the good ones <i></i></button>
+      <button class="chip" id="f-star">kept <i></i></button>
       <button class="chip" id="f-untagged">untagged <i></i></button>
       <button class="chip" id="f-clear">clear</button>
       <input type="search" id="f-q" placeholder="search the path">
+      <span class="grow"></span>
+      <!--
+        how many frames across. a contact sheet is a density argument and the
+        right density is different for culling a thousand and for choosing
+        between four, so it is a control rather than a number in a
+        stylesheet. the readout counts columns rather than naming a size,
+        because how many fit is the thing you are actually deciding.
+      -->
+      <label class="size">
+        <span class="label">size</span>
+        <input type="range" id="f-size" min="120" max="380" step="4" value="208"
+               aria-label="how many frames across">
+        <output id="f-size-n" class="num"></output>
+      </label>
     </div>
   </div>
   <div id="grid"></div>
@@ -42,17 +68,50 @@
     <div id="picker-head">
       <span id="picker-label" class="label">drag onto a slot</span>
       <span class="grow"></span>
-      <button class="chip" id="p-star">good ones only</button>
+      <button class="chip" id="p-star">kept only</button>
       <input type="search" id="p-q" placeholder="search">
     </div>
     <div id="strip"></div>
   </div>
 </section>
 
-<div id="lb" hidden><img alt=""><div id="lbmeta"></div></div>
+<!--
+  The tray sits outside both views rather than inside the shelf, because it
+  is the one thing on this page that survives a change of view: a frame put
+  in it while browsing is still in it after a trip to the bench and back.
+  It is a sibling of the sections so the stylesheet can stand it beside them.
+-->
+<aside id="tray" hidden>
+  <header class="tray-head">
+    <span class="label">tray</span>
+    <select id="tray-pick"></select>
+    <span id="tray-count" class="num">0</span>
+    <button id="tray-clear" type="button">empty the tray</button>
+  </header>
+  <div id="tray-grid"></div>
+  <footer class="tray-foot">
+    <input id="tray-folder" placeholder="folder name">
+    <button id="tray-export" type="button">export</button>
+    <p id="tray-result"></p>
+  </footer>
+</aside>
+
+<div id="preview" hidden>
+  <div class="preview-card">
+    <div class="preview-stage"></div>
+    <div class="preview-meta"></div>
+  </div>
+</div>
 
 <footer class="keys">
-  <span><b>shelf</b> <kbd>arrows</kbd> move · <kbd>a-z</kbd> tag · <kbd>space</kbd> keep · <kbd>enter</kbd> open</span>
+  <!--
+    one rule holds this row together: a bare letter tags, cmd plus a key
+    commands. it is why r and f are back in the tag alphabet and why space
+    is quick look, the way it is everywhere else on this machine.
+  -->
+  <span><b>tag</b> <kbd>arrows</kbd> move · the letters above tag · <kbd>k</kbd> keep · <kbd>space</kbd> look</span>
+  <span><b>pick</b> click · <kbd>shift</kbd>+click a range · <kbd>cmd</kbd>+click one · <kbd>cmd</kbd>+drag a box · <kbd>cmd</kbd>+<kbd>a</kbd> all · <kbd>esc</kbd> none · <kbd>cmd</kbd>+<kbd>return</kbd> to the tray</span>
+  <span><b>app</b> <kbd>cmd</kbd>+<kbd>r</kbd> finder · <kbd>cmd</kbd>+<kbd>f</kbd> find · <kbd>cmd</kbd>+<kbd>o</kbd> open a folder · <kbd>1</kbd> <kbd>2</kbd> views</span>
   <span><b>bench</b> drag a frame onto a slot · drag inside to move · <kbd>alt</kbd>+wheel to punch in · <kbd>0</kbd> reset · <kbd>del</kbd> clear</span>
 </footer>
 

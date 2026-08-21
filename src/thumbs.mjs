@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { haveFfmpeg, poster, probe } from "./film.mjs";
 
 const require = createRequire(import.meta.url);
 const sharp = require("sharp");
@@ -52,6 +53,9 @@ export async function buildThumbs(root, items, thumbDir, { onProgress, concurren
   let done = 0;
   let failed = 0;
 
+  const ff = await haveFfmpeg();
+  let filmSkipped = 0;
+
   const worker = async (queue) => {
     for (;;) {
       const item = queue.shift();
@@ -59,15 +63,30 @@ export async function buildThumbs(root, items, thumbDir, { onProgress, concurren
       const abs = path.join(root, item.path);
       const dst = path.join(thumbDir, `${item.id}.webp`);
       try {
+        if (item.kind === "film") {
+          if (!ff) { filmSkipped++; meta.push({ id: item.id, path: item.path, kind: "film", w: 0, h: 0 }); onProgress?.(++done + failed, item); continue; }
+          const info = await probe(abs);
+          if (!existsSync(dst)) {
+            // ffmpeg writes the still, sharp re-encodes it to the same webp
+            // every thumbnail in the archive is, so the shelf has one format
+            const tmp = `${dst}.png`;
+            await poster(abs, tmp, { seconds: info.seconds });
+            await sharp(tmp).webp({ quality: 72 }).toFile(dst);
+            await (await import("node:fs/promises")).unlink(tmp).catch(() => {});
+          }
+          meta.push({ id: item.id, path: item.path, kind: "film", w: info.w, h: info.h, seconds: info.seconds });
+          onProgress?.(++done + failed, item);
+          continue;
+        }
         if (!existsSync(dst)) await thumbnail(abs, dst);
         const d = await dimensions(abs);
-        meta.push({ id: item.id, path: item.path, w: d.w, h: d.h });
+        meta.push({ id: item.id, path: item.path, kind: "still", w: d.w, h: d.h });
       } catch (e) {
         failed++;
         // kept in the index rather than dropped: a frame that cannot be read
         // is a fact about the archive, and silently losing it would make the
         // counts lie.
-        meta.push({ id: item.id, path: item.path, w: 0, h: 0, error: String(e.message).slice(0, 120) });
+        meta.push({ id: item.id, path: item.path, kind: item.kind ?? "still", w: 0, h: 0, error: String(e.message).slice(0, 120) });
       }
       onProgress?.(++done + failed, item);
     }
@@ -76,7 +95,7 @@ export async function buildThumbs(root, items, thumbDir, { onProgress, concurren
   const queue = items.slice();
   await Promise.all(Array.from({ length: concurrency }, () => worker(queue)));
   meta.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return { meta, failed };
+  return { meta, failed, filmSkipped, ffmpeg: ff };
 }
 
 /** re-encode one source through a crop rectangle, for `keepers export` */

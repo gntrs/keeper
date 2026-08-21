@@ -1,3 +1,5 @@
+@import "/font/geist.css";
+
 /* ---------------------------------------------------------------------
    keepers, dark and calm.
 
@@ -21,33 +23,69 @@
   --ink-2: #a3a3a6;
   --ink-3: #6e6e72;
 
-  --sans: Geist, Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* the plate a picked tile sits on. a step above --raise, so a slab of them
+     reads across a wall without being a second thing to look at. */
+  --pick: #2c2c31;
+
+  /* Geist and Geist Mono, both self hosted from web/font, so the app looks
+     the same on a plane as it does on wifi and never falls back to Times.
+
+     The mono is a real second voice here rather than a place to put code.
+     It carries the wordmark, the nav, every label, every chip and every
+     number, which is most of the interface, and the sans is left to do the
+     one thing a mono cannot: read as a sentence. Two faces, and the line
+     between them is whether the thing is a word or a control. */
+  --sans: Geist, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
-  --s5: 24px; --s6: 32px; --s7: 48px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
 
   --r: 4px;
   --ease: cubic-bezier(.22, 1, .36, 1);
   --fast: .18s; --mid: .32s;
+
+  /* the tray is a fixed column on the right rather than a flex sibling,
+     because it has to work no matter where in the document the markup ends
+     up, and because a panel that pushed the grid would reflow a thousand
+     thumbnails every time it opened. the shelf gets this much padding on
+     its right instead, so nothing ever hides underneath. */
+  --tray-w: 348px;
+
+  /* the whole tool is dark and every form control in it is a native one.
+     telling the browser so is what stops macOS drawing a white scrollbar
+     and a white search field clear button in the middle of a black app. */
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+/* The one number that sizes the app. Everything with type in it is set in
+   rem, so this is the dial: 18px root, which is the middle of the 17.5 to
+   18.5 he sets on his own sites, and which is what an ultrawide at arm's
+   length actually needs. 16 was correct on a laptop and small on a 3440. */
+html { font-size: 18px; }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 400 15px/1.5 var(--sans);
+  font: 400 1rem/1.5 var(--sans);
   -webkit-font-smoothing: antialiased;
   display: flex; flex-direction: column; overflow: hidden;
 }
 
-/* the signature: mono, uppercase, wide, muted, small. every label on the
-   page is this and nothing else is. */
+/* The signature: mono, wide, muted, small. Every label on the page is this
+   and nothing else is.
+
+   It is lowercase rather than the usual uppercase because this app is written
+   in lowercase from the command line up, and a stylesheet that shouts WHERE
+   at you over a section whose own copy says where is a stylesheet arguing
+   with the product. The tracking and the mono do the work the capitals were
+   doing. If the capitals are ever wanted back it is the same one word
+   in every rule here that carries text-transform. */
 .label {
-  font: 500 .72rem/1 var(--mono);
-  text-transform: uppercase;
+  font: 600 .72rem/1 var(--mono);
+  text-transform: lowercase;
   letter-spacing: .16em;
   color: var(--ink-3);
 }
@@ -55,9 +93,20 @@ body {
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .grow { flex: 1; }
 
-button, input { font: inherit; color: inherit; }
+button, input, select { font: inherit; color: inherit; }
 button { transition: color var(--fast) var(--ease), background var(--fast) var(--ease); }
 button:active { transform: scale(.97); }
+
+/* keepers is a keyboard tool and had no visible focus at all, which meant
+   tabbing through it was flying blind. the ring is the accent because the
+   accent is the only colour in the building, and it sits outside the
+   control so it never eats into a label. */
+:focus-visible {
+  outline: 2px solid var(--hot);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+::selection { background: var(--hot); color: #fff; }
 
 /* --- top bar ------------------------------------------------------- */
 header.bar {
@@ -65,19 +114,41 @@ header.bar {
   padding: var(--s3) var(--s5);
   flex: none;
 }
+/* the name of the tool, set as a word and not as a mark. there is no logo in
+   this app and this is not one pretending to be: it is the same size as the
+   things beside it and it is the first word on the page because it is the
+   first word on the page. */
 header.bar > strong {
-  font-size: .95rem; font-weight: 600; letter-spacing: -.01em;
+  font: 600 .95rem/1 var(--mono);
+  letter-spacing: .02em;
 }
 header.bar nav { display: flex; gap: var(--s1); }
 header.bar nav button {
   border: 0; background: none; color: var(--ink-3);
   padding: var(--s1) var(--s3); border-radius: var(--r); cursor: pointer;
-  font: 500 .72rem/1 var(--mono); text-transform: uppercase; letter-spacing: .16em;
+  font: 600 .72rem/1 var(--mono); text-transform: lowercase; letter-spacing: .16em;
 }
 header.bar nav button:hover { color: var(--ink); }
-header.bar nav button.on { background: var(--hot); color: #fff; }
-#root { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        font-family: var(--mono); font-size: .78rem; color: var(--ink-3); }
+/* the view you are looking at is already telling you which view it is, so
+   this used to be the loudest thing on the page for no reason. red in
+   keepers now means one of two things and only these: you chose this, or you
+   have to deal with this. a tab is neither. */
+header.bar nav button.on { background: #ffffff12; color: var(--ink); }
+/* the running count. numbers you glance at rather than read, so they are
+   mono and they hold their column while they change. */
+#tally { font-size: .85rem; font-variant-numeric: tabular-nums; }
+#tally .dim { color: var(--ink-3); }
+/* The folder you are in, and the way to leave it. Truncated from the left
+   because the tail is the half that identifies it: every path on a shoot
+   drive starts /Volumes/something and ends with the name you care about. */
+#root {
+  max-width: 30vw; overflow: hidden; white-space: nowrap;
+  direction: rtl; text-align: left;
+  border: 0; background: none; padding: var(--s1) var(--s2);
+  border-radius: var(--r); cursor: pointer;
+  font: 400 .78rem/1 var(--mono); color: var(--ink-3);
+}
+#root:hover { color: var(--ink); background: #ffffff12; }
 
 .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .view[hidden] { display: none; }
@@ -91,23 +162,27 @@ header.bar nav button.on { background: var(--hot); color: #fff; }
 #filters .row:last-child { margin-bottom: 0; }
 #filters .row > b { width: 52px; flex: none; }
 
+/* A chip is a control and a tag at once, and both of those are mono here.
+   It reads a size smaller than body copy because the mono runs wider, and
+   the count beside it is already mono, so the pair stopped being two
+   typefaces bolted together. */
 .chip {
   border: 0; background: none; color: var(--ink-2);
-  border-radius: var(--r); padding: var(--s1) var(--s2); cursor: pointer;
-  font-size: .82rem; white-space: nowrap;
+  border-radius: var(--r); padding: 5px var(--s2); cursor: pointer;
+  font: 500 .8rem/1.3 var(--mono); white-space: nowrap;
 }
 .chip:hover { color: var(--ink); background: var(--raise); }
 .chip.on { background: var(--hot); color: #fff; }
 .chip i {
   font-style: normal; margin-left: var(--s2);
-  font-family: var(--mono); font-size: .72rem; opacity: .6;
+  font-size: .72rem; opacity: .6;
   font-variant-numeric: tabular-nums;
 }
 
 input[type=search] {
   border: 0; border-bottom: 1px solid var(--line-strong);
   background: none; padding: var(--s1) var(--s1) 5px;
-  font-size: .82rem; width: 220px; border-radius: 0;
+  font: 400 .8rem/1.3 var(--mono); width: 240px; border-radius: 0;
   transition: border-color var(--fast) var(--ease);
 }
 input[type=search]:focus { outline: 0; border-bottom-color: var(--hot); }
@@ -116,83 +191,366 @@ input[type=search]::placeholder { color: var(--ink-3); }
 /* --- the grid ------------------------------------------------------ */
 #grid, #strip {
   flex: 1; min-height: 0; overflow-y: auto;
-  display: grid; gap: var(--s1);
-  padding: 0 var(--s5) var(--s7);
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  display: grid; gap: var(--s2);
+  padding: var(--s1) var(--s5) var(--s7);
+  grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
   align-content: start;
 }
+/* the shelf's density is a control, so the number comes off the element and
+   the stylesheet only holds the floor for the moment before the script has
+   read what was chosen last time. */
+/* relative so the marquee can be placed in the grid's own scrolling content
+   rather than against the window, which is the only frame of reference that
+   survives the pile scrolling under a held button. */
+#grid { grid-template-columns: repeat(auto-fill, minmax(var(--tile, 208px), 1fr));
+        position: relative; }
 figure { margin: 0; position: relative; background: #0f0f11; cursor: pointer; }
-figure img { display: block; width: 100%; aspect-ratio: 3/2; object-fit: cover; }
-figure.star { outline: 2px solid var(--hot); outline-offset: -2px; }
-figure.cursor { outline: 2px solid var(--ink); outline-offset: -2px; }
-figure b {
-  position: absolute; left: 0; top: 0;
-  padding: 3px var(--s2);
-  font: 500 .64rem/1 var(--mono); text-transform: uppercase; letter-spacing: .12em;
-  background: #000000b8; color: var(--ink);
+figure img {
+  display: block; width: 100%; aspect-ratio: 3/2; object-fit: cover;
+  transition: opacity var(--fast) var(--ease);
 }
+
+/* The tag word used to be printed on the corner of every thumbnail. It is
+   gone, on purpose. A contact sheet is a wall of photographs and the moment
+   you write on them you are reading a list instead of looking at pictures.
+   The tag still lives in the filter chips, where you go to ask a question,
+   and in the preview, where you have already stopped scanning. This rule
+   only exists so a stray bold tag from an older render cannot push a tile
+   out of shape while the markup catches up. */
+figure > b { display: none; }
 figcaption {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: var(--s2);
-  font: .7rem/1.3 var(--mono); color: #fff;
+  font: .78rem/1.35 var(--mono); color: #fff;
   background: linear-gradient(transparent, #000000d9);
   opacity: 0; transition: opacity var(--fast) var(--ease);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 figure:hover figcaption { opacity: 1; }
-#none { padding: var(--s7) var(--s5); color: var(--ink-3); }
+#none { padding: var(--s7) var(--s5); color: var(--ink-3); font-size: 1.05rem; }
+
+/* ---------------------------------------------------------------------
+   The four things a frame can be.
+
+   A tile can be all four at once, so each state was given a channel of its
+   own and told to stay in it. Light says untagged. A corner says
+   the machine starred it. Red says you collected it. A ring in the gutter,
+   outside the picture entirely, says the keyboard is here. Nothing shares a
+   channel with anything else, which is why a starred, untagged, collected
+   frame under the cursor still reads as all four and still shows you the
+   photograph underneath, in its own colour. Light, a corner, a mat and a
+   ring, and not one of them touches the colour of the picture.
+
+   The accent belongs to intray alone. Star used to own it, and star is
+   something a machine hands you, while the tray is something you decided.
+   The loudest colour in the room goes to the decision.
+   --------------------------------------------------------------------- */
+
+/* untagged: nothing has looked at this yet.
+
+   A scrim over the picture rather than a badge beside it, because the point
+   is to read a wall of a thousand at arm's length and count the holes. It is
+   deliberately not so dark that you cannot judge the frame, and hovering
+   lifts it almost all the way off, so the moment you are actually looking at
+   one you are looking at the photograph and not at our opinion of it. */
+figure.untagged::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: var(--bg);
+  opacity: .46;
+  transition: opacity var(--mid) var(--ease);
+}
+figure.untagged:hover::before,
+figure.untagged.cursor::before { opacity: .08; }
+/* The colour stays. It used to be pulled halfway out, on the argument that a
+   frame merely darkened could be mistaken for a frame shot at dusk. That
+   argument is about telling states apart, and it was made at the expense of
+   the only thing this screen is for: you are picking photographs by looking
+   at them, and a desaturated photograph is not the photograph. Light is a
+   wide enough channel on its own, and the scrim lifts on hover anyway.
+   Nothing on this page is allowed to change the colour of a picture. */
+figure.untagged img {
+  transition: opacity var(--fast) var(--ease);
+}
+/* a collected frame is already unmistakable, so the scrim steps back rather
+   than muddying the red it is sitting on top of. */
+figure.untagged.intray::before { opacity: .3; }
+
+/* star: the pass thought this one was worth opening.
+
+   A folded corner, in ink rather than accent, because it is a note in the
+   margin. It is drawn with borders so it costs nothing on a thousand tiles,
+   and it carries its own shadow so it survives landing on a white sky. */
+/* A bar along the bottom edge rather than a corner wedge. Kept is pressed
+   two hundred times in a sitting and it has to be readable at a glance
+   across a wall of a thousand, which a 15px triangle in the colour of a
+   white wall was not. It sits on the edge of the picture rather than in it,
+   it carries no colour, and it is the full width so a row of kept frames
+   reads as a row. */
+figure.star::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  pointer-events: none; background: var(--ink);
+  box-shadow: 0 -1px 2px #00000073;
+}
+
+/* intray: you put this one in the tray.
+
+   The picture is inset by four pixels and the accent is the mat behind it,
+   so a collected frame is a photograph mounted on red card. The picture then
+   sits just under full opacity, so the red comes up through it as a warmth
+   rather than as a filter. Two signals out of one colour, and the second one
+   survives at the size where a four pixel border alone would not. It also
+   reads in black and white, because a mounted frame is visibly smaller than
+   the ones beside it. Hovering clears the warmth, because the moment you are
+   looking at a frame you should be looking at the frame. */
+figure.intray { background: var(--hot); }
+figure.intray img { padding: 4px; }
+figure.intray:hover img { opacity: .97; }
+
+/* picked: you swept this one up.
+
+   The fifth state, and it had to find a channel nobody was in. Light, the
+   bottom edge and the mat behind the picture were taken, so it takes the
+   gutter: a flat plate under the tile, spreading into the 8px gap. Two
+   picked tiles side by side run into one another and read as a single slab,
+   which is what makes a range of forty look like a range and not like forty
+   decisions. Against an unpicked neighbour it stops and leaves clean air.
+
+   5px rather than the tidy 4 that would meet a neighbour's plate exactly at
+   the midline, because the cursor ring is 2px sitting 1px out and a 4px
+   plate leaves it a 1px sliver on either side, which at arm's length is no
+   sliver at all. At 5 the plate is still there outside the ring and the
+   frame the keyboard is standing on is still visibly one of the set.
+
+   Opaque rather than a white with alpha, because at 5px two plates do
+   overlap and an alpha would stack into a third, brighter grey on the seam.
+
+   Picked and in a tray at once is the case worth spelling out, because both
+   are mounts and they would fight if they were in the same place. They are
+   not: the tray's red is inside the border box, in the 4px the picture is
+   inset by, and this plate is outside it. A frame that is both is a
+   photograph on a red mat on a grey plate, concentric, neither hiding the
+   other, and the accent still means the tray alone. */
+figure.picked { box-shadow: 0 0 0 5px var(--pick); }
+
+/* cursor: the keyboard is standing here.
+
+   The only state drawn outside the picture. It goes in the gutter between
+   tiles so it can be laid over any combination of the other three without
+   covering a single pixel of the photograph, and it is white because white
+   is the one colour the other three do not use.
+
+   It sits inside the picked plate rather than beside it, and that is the
+   common case rather than the odd one: with a set up, the keyboard is
+   almost always standing on one of its members. A white line on a grey slab
+   is the shape it makes, and the two never say the same thing. */
+figure.cursor {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+/* the marquee.
+
+   Quiet on purpose. A finder blue wash over forty photographs is forty
+   photographs you cannot judge while you are choosing them, and choosing
+   them is what the gesture is for. A hairline and almost nothing inside it:
+   the rectangle says where your hand is, and the plates under the tiles say
+   what it has caught. */
+.marquee {
+  position: absolute; z-index: 1; pointer-events: none;
+  border: 1px solid var(--line-strong);
+  background: #ffffff08;
+}
+/* Nothing hovers while a rectangle is being dragged across it. The untagged
+   scrim lifts on hover and the caption fades in, and both firing under a
+   moving pointer turn a sweep into a strobe. The grid has the pointer
+   captured, so taking the tiles out of hit testing costs the sweep nothing
+   and stops all of it. */
+body[data-sweeping] { user-select: none; }
+body[data-sweeping] #grid figure { pointer-events: none; }
+
+/* the add button.
+
+   Hidden until the pointer arrives, because on a quiet contact sheet a
+   button on every tile is a thousand buttons. On a collected frame it stays
+   put and turns solid, so the thing you click to undo the decision is in the
+   same place as the thing you clicked to make it. The play mark on a clip
+   steps aside while the pointer is here: it lives in the same corner, and
+   between knowing it is film and being able to collect it, collecting wins. */
+figure .add {
+  position: absolute; right: var(--s1); top: var(--s1);
+  width: 26px; height: 26px; padding: 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--r); cursor: pointer;
+  background: #000000b8; color: #fff;
+  font: 500 .8rem/1 var(--mono);
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+figure .add::before {
+  content: ""; width: 15px; height: 15px;
+  background: currentColor;
+  -webkit-mask: var(--ph) center / contain no-repeat;
+  mask: var(--ph) center / contain no-repeat;
+  --ph: var(--ph-plus);
+}
+/* in the tray already, so the control removes it. the mask swaps, the button
+   does not, and nothing in javascript has to know which state it is in. */
+figure.intray .add::before { --ph: var(--ph-x); }
+figure:hover .add, figure .add:focus-visible { opacity: 1; }
+figure .add:hover { background: var(--hot); }
+figure .film { transition: opacity var(--fast) var(--ease); }
+figure:hover .film, figure.intray .film { opacity: 0; }
+figure.intray .add {
+  opacity: 1; background: var(--hot);
+}
+/* no second red exists in this file, so the hover lift is made out of the
+   one there is rather than out of a new hex. */
+figure.intray .add:hover { filter: brightness(1.16); }
 
 /* --- bench --------------------------------------------------------- */
 #bench { flex-direction: row; }
 #slots {
   flex: 1; min-width: 0; overflow-y: auto; padding: var(--s2) var(--s5) var(--s7);
-  display: grid; gap: var(--s5); align-content: start;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+
+  /* the tallest a box may get. everything past this loses width instead of
+     height, and 30rem scales with the root the way the type does. */
+  --box-max: 30rem;
 }
-#slots > p { color: var(--ink-3); max-width: 46ch; }
+/* A grid per group, not one grid for the bench.
+
+   A 9/16 and a 3/1 in the same row leaves a crater: the row is as tall as
+   the tallest thing in it, so the letterbox floats in the middle of half a
+   screen of nothing with its label stranded at the top. Grouping already
+   puts similar heights next to each other, so a grid each is the whole fix
+   and it costs one wrapper element per group.
+
+   The gap is bigger down the page than across it because every box ends in
+   two lines of text, and those lines have to belong to the picture above
+   them rather than to the row below. */
+.rack + .rack { padding-top: var(--s7); }
+/* 48 above and 24 below, so the heading belongs to the shapes under it and
+   not to the row it just left. the slot's own label starts right after this
+   gap, and two lines of type 16px apart would have read as one block. */
+.rack-name { margin: 0; padding-bottom: var(--s5); }
+.rack-grid {
+  display: grid; gap: var(--s6) var(--s5); align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(376px, 1fr));
+}
+/* the one thing the bench cannot show, now that it is never empty */
+.rack-foot {
+  padding-top: var(--s8); margin: 0;
+  max-width: 54ch; color: var(--ink-3); font-size: .9rem;
+}
+.rack-foot code {
+  font: .85em var(--mono); background: var(--raise);
+  border-radius: 3px; padding: 1px 5px; color: var(--ink-2);
+}
+
+/* THE CAP IS A max-width, WHICH LOOKS LIKE THE WRONG AXIS.
+
+   A 9/16 in a 376px column is 668px tall and a 1/2 is 752px, which is a
+   screen and a half of one empty box. The obvious fix, max-height on the
+   box, is wrong: the width is already definite at 100% of the column, so
+   the height clamps and the width stays, and the box quietly stops being
+   the shape it is advertising. Capping the width at the ceiling times the
+   ratio reaches the same height with the ratio intact, and aspect-ratio
+   does the rest.
+
+   The whole slot carries it rather than the box, so the label and the
+   numbers keep the width of the picture they belong to instead of stranding
+   themselves out to the left of a narrow one. */
+.slot {
+  width: 100%; min-width: 0; justify-self: center;
+  max-width: calc(var(--box-max) * var(--ar, 1));
+}
 
 .slot > .head {
   display: flex; align-items: baseline; gap: var(--s3);
   padding-bottom: var(--s2);
 }
 .slot .head strong { font-weight: 500; font-size: .9rem; }
+/* the ratio and the width it wants. numbers you check, so mono, and quiet,
+   because the name of the slot is the thing you are reading the row for. */
+.slot .head em {
+  font: 500 .72rem/1 var(--mono); font-style: normal;
+  font-variant-numeric: tabular-nums; letter-spacing: .04em;
+  color: var(--ink-3);
+}
 .slot .box {
   position: relative; overflow: hidden; background: #0f0f11;
   border-radius: var(--r); cursor: grab;
-  transition: box-shadow var(--fast) var(--ease);
 }
 .slot .box:active { cursor: grabbing; }
-.slot.on .box { box-shadow: 0 0 0 2px var(--hot); }
+.slot.on .box { box-shadow: 0 0 0 2px var(--ink); }
 .slot .box img { position: absolute; max-width: none; }
+/* `hidden` is an attribute, not a display value, so any rule that sets
+   display beats it. bench.js has been hiding this correctly the whole time
+   and the stylesheet has been overruling it, which printed "drag a frame
+   here" across every filled slot on the bench. */
+.slot .empty[hidden] { display: none; }
 .slot .empty {
   position: absolute; inset: 0; display: grid; place-items: center;
   color: var(--ink-3); text-align: center; padding: var(--s4);
-  font-size: .82rem; pointer-events: none;
+  font-size: .9rem; pointer-events: none;
 }
-.slot .note { padding-top: var(--s2); color: var(--ink-2); font-size: .82rem; }
-.slot .nums { padding-top: var(--s1); font: .72rem/1.5 var(--mono); color: var(--ink-3); }
-.slot .nums code { font: inherit; color: #4ade80; }
-.slot .nums .warn { color: #f0a02b; }
+/* Eleven of the fourteen built in shapes carry a note, and at body size in
+   ink-2 that is eleven paragraphs on one page arguing with eleven
+   photographs. It is a caption, so it is set as one, and it is clamped to
+   two lines with the whole of it on the title attribute, so a slot with a
+   long reason cannot push the box beside it out of line. */
+.slot .note {
+  padding-top: var(--s2); color: var(--ink-3);
+  font-size: .84rem; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.slot .nums { padding-top: var(--s1); font: .78rem/1.6 var(--mono); color: var(--ink-3); }
+/* a number that is fine does not need a colour. it needs to be legible and
+   then to get out of the way, so the good case is plain ink and the only
+   thing that reaches for the accent is the case you have to look at. that
+   is also how the shelf works, which is the point of having one accent. */
+.slot .nums code { font: inherit; color: var(--ink); }
+.slot .nums .warn { color: var(--hot); }
 
-#picker { width: 360px; flex: none; display: flex; flex-direction: column;
+#picker { width: 400px; flex: none; display: flex; flex-direction: column;
           border-left: 1px solid var(--line); }
+/* display:flex above beats the hidden attribute, so `picker.hidden = true`
+   did nothing and an empty archive drew its blank state beside a dead 400px
+   column. Third time this file has made that mistake, so it stands with the
+   other two rather than off on its own. */
+#picker[hidden] { display: none; }
 #picker-head { display: flex; align-items: center; gap: var(--s2);
                padding: var(--s3) var(--s4) var(--s4); }
 #picker-head input { width: 100%; }
 #picker-label { flex: none; }
-#strip { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+/* the export row lines its left edge up with the head above it. */
+#bench-export-row { padding: 0 var(--s4) var(--s3); }
+/* dressed as #tray-result, because it is the same sentence in the same
+   place: how many files went where, after a button that writes to disk. */
+#bench-export-result {
+  margin: var(--s1) 0 0; font: .78rem/1.5 var(--mono);
+  color: var(--ink-3); overflow-wrap: anywhere;
+}
+#strip { grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
          padding: 0 var(--s4) var(--s7); }
 
 /* --- lightbox ------------------------------------------------------ */
+/* the older full screen viewer. it is held to the same backdrop as the
+   preview card so the two never look like two different applications. */
 #lb {
-  position: fixed; inset: 0; z-index: 50; background: #000000f2;
+  position: fixed; inset: 0; z-index: 50; background: #0b0b0ce0;
+  backdrop-filter: blur(16px) saturate(.9);
+  -webkit-backdrop-filter: blur(16px) saturate(.9);
   display: grid; grid-template-rows: 1fr auto; gap: var(--s4);
   padding: var(--s5); cursor: zoom-out;
   animation: fade var(--mid) var(--ease);
 }
 #lb[hidden] { display: none; }
-#lb img { width: 100%; height: 100%; object-fit: contain; min-height: 0; }
-#lbmeta { text-align: center; color: var(--ink-2); font-size: .85rem; }
+#lb .stage { min-height: 0; display: grid; place-items: center; }
+#lb .stage img, #lb .stage video { max-width: 100%; max-height: 100%; object-fit: contain; }
+#lbmeta { cursor: default; }
+#lbreveal { margin-top: var(--s3); background: var(--raise); }
+#lbmeta { text-align: center; color: var(--ink-2); font-size: .95rem; }
 #lbmeta code {
   font: .8rem/1 var(--mono); color: var(--ink);
   background: var(--raise); border-radius: var(--r);
@@ -201,23 +559,40 @@ figure:hover figcaption { opacity: 1; }
 @keyframes fade { from { opacity: 0 } }
 
 /* --- key hints ----------------------------------------------------- */
+footer.keys[hidden] { display: none; }
 footer.keys {
   flex: none; padding: var(--s2) var(--s5) var(--s3);
-  font: .72rem/1.6 var(--mono); color: var(--ink-3);
+  font: .78rem/1.6 var(--mono); color: var(--ink-2);
   display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5);
 }
 footer.keys b {
-  font: 500 .64rem/1.6 var(--mono); text-transform: uppercase;
-  letter-spacing: .16em; color: #4e4e52; margin-right: var(--s2);
+  font: 500 .7rem/1.6 var(--mono); text-transform: lowercase;
+  letter-spacing: .16em; color: var(--ink-3); margin-right: var(--s2);
 }
 kbd {
   font: inherit; background: var(--raise); border-radius: 3px;
   padding: 1px 5px; color: var(--ink-2);
 }
 
+/* Reduced motion means no movement, not no feedback. Everything that slid,
+   scaled or rose is turned off, and the two things that appear out of
+   nowhere, the preview and the lightbox, keep a short cross fade instead,
+   because a window that materialises with no transition at all reads as a
+   glitch rather than as a window opening. */
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-  button:active { transform: none; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  button:active, figure:active, .tray-item:active { transform: none !important; }
+  #preview, #lb { animation: fade .14s linear !important; }
+  .preview-card { animation: none !important; }
+  #preview, .preview-card, .tray-item img, figure img,
+  figure.untagged::before, figcaption, .tray-remove, figure .add {
+    transition-duration: .12s !important;
+    transition-property: opacity !important;
+  }
 }
 
 /* --- dragging a frame onto a slot ---------------------------------- */
@@ -229,3 +604,503 @@ body[data-dragging] .slot .box { box-shadow: 0 0 0 1px var(--line-strong); }
 body[data-dragging] .slot[data-over] .box { box-shadow: 0 0 0 2px var(--hot); }
 #strip figure[draggable] { cursor: grab; }
 #strip figure[draggable]:active { cursor: grabbing; }
+
+
+/* --- film ----------------------------------------------------------- */
+figure .clock {
+  position: absolute; right: var(--s1); bottom: var(--s1);
+  padding: 2px 5px; border-radius: 3px;
+  font: 500 .64rem/1.4 var(--mono); font-variant-numeric: tabular-nums;
+  background: #000000c4; color: #fff;
+}
+figure .film {
+  position: absolute; right: var(--s1); top: var(--s1);
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #000000c4; display: grid; place-items: center;
+}
+figure .film::before {
+  content: ""; border-left: 5px solid #fff;
+  border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
+  margin-left: 1px;
+}
+figure.noposter img { opacity: .12; }
+/* this label sits on ::before rather than ::after because the starred
+   corner mark took ::after, and a clip with no readable poster is already
+   dark enough that the untagged scrim on the same layer would have added
+   nothing. the words win the layer, the scrim gives it up. */
+figure.noposter::before {
+  content: "no poster"; position: absolute; inset: 0;
+  display: grid; place-items: center;
+  background: none; opacity: 1;
+  font: 500 .68rem/1 var(--mono); text-transform: lowercase;
+  letter-spacing: .14em; color: var(--ink-3);
+}
+
+/* --- empty states --------------------------------------------------- */
+.blank {
+  margin: auto; padding: var(--s7) var(--s5);
+  max-width: 52ch; text-align: left;
+}
+.blank h2 {
+  margin: 0 0 var(--s3);
+  font: 500 1.6rem/1.15 var(--sans); letter-spacing: -.02em;
+}
+.blank p { margin: 0 0 var(--s4); color: var(--ink-2); }
+.blank pre {
+  margin: 0 0 var(--s4); padding: var(--s3) var(--s4);
+  background: var(--raise); border-radius: var(--r);
+  font: .8rem/1.7 var(--mono); color: var(--ink); overflow-x: auto;
+}
+.blank .hint { color: var(--ink-2); font-size: .95rem; }
+.blank code {
+  font: .85em var(--mono); background: var(--raise);
+  border-radius: 3px; padding: 1px 5px;
+}
+
+/* ---------------------------------------------------------------------
+   The tray.
+
+   A Finder window, which is to say: the chrome shuts up and the contents
+   do the talking. One hairline down the left edge, a slightly lifted panel
+   colour so the boundary is felt rather than drawn, and every control in it
+   flat until you touch it. Nothing in here is a box inside a box.
+
+   It is fixed to the right edge rather than laid out as a flex sibling
+   because the markup can land anywhere in the document and this has to work
+   either way. The shelf is given matching padding on its right instead, so
+   the panel never covers a thumbnail. At 1280 wide that leaves the grid a
+   shade under a thousand pixels, which is five columns at the current tile
+   size, still a contact sheet and not a list.
+   --------------------------------------------------------------------- */
+#tray {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 30;
+  width: var(--tray-w);
+  display: flex; flex-direction: column;
+  background: var(--raise);
+  border-left: 1px solid var(--line);
+}
+#tray[hidden] { display: none; }
+
+/* the shelf, the bench and both bars step aside for the panel. this is a
+   :has() rule so it holds no matter where the aside sits in the document,
+   and it moves padding rather than width so nothing reflows twice. */
+body:has(#tray:not([hidden])) header.bar,
+body:has(#tray:not([hidden])) footer.keys,
+body:has(#tray:not([hidden])) #filters { padding-right: calc(var(--tray-w) + var(--s5)); }
+body:has(#tray:not([hidden])) #grid,
+body:has(#tray:not([hidden])) #slots { padding-right: calc(var(--tray-w) + var(--s5)); }
+body:has(#tray:not([hidden])) #bench #picker { margin-right: var(--tray-w); }
+body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
+
+.tray-head {
+  flex: none; display: flex; align-items: center; gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.tray-head #tray-count { margin-left: auto; color: var(--ink-3); font-size: .82rem; }
+
+/* the picker is a native select with the arrow redrawn, because the system
+   one is a blue capsule and this app has one colour. the caret is inlined
+   as a data uri: keepers has to work with the wifi off. */
+#tray-pick {
+  appearance: none; -webkit-appearance: none;
+  border: 0; background: none; cursor: pointer;
+  color: var(--ink); font-size: .9rem;
+  padding: var(--s1) var(--s5) var(--s1) 0;
+  border-radius: var(--r);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 5 5.5 9 1.5' fill='none' stroke='%236e6e72' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--s2) center;
+  max-width: 62%;
+  text-overflow: ellipsis;
+  /* The ellipsis above is inert without this. A flex item will not shrink
+     below the width of its own nowrap content, so at 1280px, where the panel
+     drops to 296px, the header wanted 333px and pushed "empty the tray" 38px
+     past the edge to read "empty the t". The tray name is the one thing here
+     that can afford to be cut, and this is what lets it be. */
+  min-width: 0;
+}
+#tray-pick:hover { color: var(--ink); }
+
+#tray-clear {
+  flex: none; border: 0; background: none; cursor: pointer;
+  color: var(--ink-3); border-radius: var(--r);
+  padding: var(--s1) var(--s2);
+  font: 500 .68rem/1 var(--mono); text-transform: lowercase; letter-spacing: .14em;
+}
+#tray-clear:hover { color: var(--hot); }
+#tray-clear[disabled] { color: #ffffff26; cursor: default; }
+
+#tray-grid {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: grid; align-content: start; gap: var(--s1);
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  padding: var(--s3) var(--s4) var(--s6);
+}
+/* an empty tray says what to do with it once, quietly. the sentence comes
+   from the tray code as a real paragraph, so it is styled here rather than
+   generated, and the generated line is kept only as the floor for the case
+   where nothing at all was written into the panel. */
+#tray-grid > p {
+  grid-column: 1 / -1; margin: 0;
+  padding: var(--s5) 0;
+  color: var(--ink-3); font-size: .95rem; line-height: 1.5;
+}
+#tray-grid:empty::before {
+  content: "drag frames in here.";
+  grid-column: 1 / -1;
+  padding: var(--s5) 0;
+  color: var(--ink-3); font-size: .95rem;
+}
+
+.tray-item {
+  margin: 0; position: relative; background: #0f0f11;
+  border-radius: 2px; overflow: hidden; cursor: grab;
+}
+.tray-item:active { cursor: grabbing; }
+.tray-item img {
+  display: block; width: 100%; aspect-ratio: 1; object-fit: cover;
+  transition: opacity var(--fast) var(--ease);
+}
+.tray-item:hover img { opacity: .55; }
+.tray-remove {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: grid; place-items: center;
+  border: 0; background: none; color: #fff; cursor: pointer;
+  opacity: 0;
+  font: 500 .95rem/1 var(--mono);
+  transition: opacity var(--fast) var(--ease);
+}
+/* the whole thumbnail is the remove target rather than a five pixel cross in
+   the corner, because at this size a corner cross is a dare. the picture
+   dims under it so the button never has to draw itself a background. */
+.tray-remove::before {
+  content: ""; width: 16px; height: 16px;
+  background: currentColor;
+  -webkit-mask: var(--ph-x) center / contain no-repeat;
+  mask: var(--ph-x) center / contain no-repeat;
+}
+.tray-item:hover .tray-remove, .tray-remove:focus-visible { opacity: 1; }
+
+/* the drop state. the accent, one hairline in from the edge, so the panel
+   lights up without the layout moving by a pixel. */
+#tray[data-over] { background: #17171a; }
+#tray[data-over]::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--hot);
+}
+
+.tray-foot {
+  flex: none; padding: var(--s3) var(--s4) var(--s4);
+  border-top: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+}
+#tray-folder {
+  flex: 1; min-width: 0;
+  border: 0; border-bottom: 1px solid var(--line-strong);
+  background: none; border-radius: 0;
+  padding: var(--s1) 2px 6px;
+  font-size: .875rem;
+  transition: border-color var(--fast) var(--ease);
+}
+#tray-folder:focus { outline: 0; border-bottom-color: var(--hot); }
+#tray-folder::placeholder { color: var(--ink-3); }
+
+/* the only filled button in the app. everything else in keepers is a
+   decision you can take back, and this one writes files to a disk, so it is
+   allowed to look like the end of the sentence. */
+#tray-export {
+  flex: none; border: 0; cursor: pointer;
+  background: var(--hot); color: #fff;
+  border-radius: var(--r); padding: 7px var(--s3);
+  font: 500 .72rem/1 var(--mono); text-transform: lowercase; letter-spacing: .14em;
+}
+#tray-export:hover { filter: brightness(1.16); }
+#tray-export[disabled] {
+  background: none; color: var(--ink-3); cursor: default; filter: none;
+}
+#tray-result {
+  flex-basis: 100%; margin: var(--s1) 0 0;
+  font: .78rem/1.5 var(--mono); color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+/* the toggle wears the same clothes as the view switcher next to it, because
+   it is the same kind of thing: a place you can be. */
+#tray-toggle {
+  flex: none; border: 0; background: none; cursor: pointer;
+  color: var(--ink-3); border-radius: var(--r);
+  padding: var(--s1) var(--s3);
+  font: 500 .72rem/1 var(--mono); text-transform: lowercase; letter-spacing: .16em;
+}
+#tray-toggle:hover { color: var(--ink); }
+#tray-toggle.on,
+#tray-toggle[aria-pressed="true"],
+#tray-toggle[aria-expanded="true"] { color: var(--ink); background: #ffffff12; }
+
+@media (max-width: 1280px) {
+  /* narrower panel and tighter shelf gutters, so five columns survive the
+     smallest screen this tool is used on. */
+  :root { --tray-w: 296px; }
+  body:has(#tray:not([hidden])) #grid { padding-left: var(--s4); }
+  body:has(#tray:not([hidden])) header.bar,
+  body:has(#tray:not([hidden])) #filters { padding-left: var(--s4); }
+}
+
+/* ---------------------------------------------------------------------
+   The preview.
+
+   Quick Look, not a lightbox. The difference is that a lightbox is a room
+   you enter and Quick Look is a card that appears over the work you were
+   already doing, which is why the backdrop is blurred rather than blacked
+   out: the shelf stays visible behind it, out of focus, still yours.
+
+   The card is sized by the picture. A portrait makes a tall narrow card, a
+   landscape makes a wide short one, and because the whole thing is centred
+   in a grid it grows from the middle in both directions and the close button
+   is the only thing that moves. The metadata strip underneath is as wide as
+   the picture and no wider, so it always reads as belonging to it.
+   --------------------------------------------------------------------- */
+#preview {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center;
+  padding: var(--s6);
+  background: #0b0b0cc4;
+  backdrop-filter: blur(16px) saturate(.9);
+  -webkit-backdrop-filter: blur(16px) saturate(.9);
+  animation: fade var(--fast) var(--ease);
+  cursor: zoom-out;
+}
+#preview[hidden] { display: none; }
+
+/* A CONTRACT WITH preview.js, WHICH MEASURES THIS CARD.
+
+   The picture is sized by subtracting the stage height from the card height
+   to learn how tall the strip underneath actually came out. That subtraction
+   is only true while the card is a plain vertical stack of exactly those two
+   boxes, so the stage and the strip stay in normal flow, neither is ever
+   positioned over the other, and the card itself carries no padding and no
+   border. Padding on the two children is invisible to the sum and therefore
+   fine. Padding on the card is not: it would inflate the measured chrome and
+   every picture would open a little smaller than it should, forever, and
+   look like a decision rather than a bug. The radius, the shadow and the
+   overflow do not enter the sum, which is why they are allowed here. */
+.preview-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  min-width: 300px;
+  max-width: min(92vw, 1600px); max-height: 92vh;
+  background: var(--raise);
+  border-radius: 6px;
+  box-shadow: 0 24px 64px #00000073;
+  overflow: hidden;
+  cursor: default;
+  animation: rise var(--mid) var(--ease);
+}
+
+/* the stage is measured in javascript, from the real dimensions of the file,
+   which is the only way the card can hug a picture whose caption wraps to two
+   lines on one frame and one line on the next. so the css here does not try to
+   size anything. it holds a floor under the whole thing for the case the
+   measurement never arrives, which is a clip whose metadata has not loaded,
+   and otherwise it gets out of the way. */
+.preview-stage {
+  flex: 0 1 auto; min-height: 0; min-width: 0;
+  display: flex; overflow: hidden;
+  background: #08080a;
+}
+.preview-stage img, .preview-stage video {
+  display: block; margin: auto;
+  max-width: 100%; max-height: 100%;
+  width: auto; height: auto;
+  object-fit: contain;
+}
+
+/* Two things are going on in this width.
+
+   The zero says: do not let anything written down here decide how wide the
+   card is. The picture decides that and nothing else does, which is the
+   whole difference between a card that hugs a portrait and a card that puts
+   black bars either side of one to make room for a file path. The hundred
+   percent then puts the strip back to the full width of whatever the picture
+   chose.
+
+   The heights below are fixed for the same reason the widths are not: the
+   strip has to come out exactly as tall on a wide frame as on a tall one, or
+   the card changes size as you arrow along a row, and the measurement in
+   preview.js reads a number that stops being true the moment the picture is
+   resized under it. */
+.preview-meta {
+  flex: none; width: 0; min-width: 100%;
+  padding: var(--s3) var(--s4) var(--s4);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+  color: var(--ink-2); font-size: .95rem;
+}
+/* the facts and the two buttons share one line, the way the toolbar of a
+   Finder window does, because they are the same kind of thing: what this is,
+   and what you can do about it. the facts give up their tail first when the
+   card is narrow, since the buttons are the half you reach for. */
+.preview-meta > p {
+  flex: 1 1 0; margin: 0; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.preview-meta .chip { order: 2; }
+.preview-meta strong { font-weight: 500; color: var(--ink); }
+/* the path is the one thing down here you copy rather than read, so it is
+   mono, selectable in one click, allowed to break anywhere, and sent to the
+   bottom of the strip with order rather than with markup, because the two
+   buttons are what a hand reaches for and a hand should not have to jump a
+   wrapped path to get to them. */
+.preview-meta code {
+  order: 3; flex-basis: 100%; min-width: 0;
+  margin-top: var(--s1);
+  height: 2.3rem; overflow: hidden;
+  font: .8rem/1.15rem var(--mono); color: var(--ink-3);
+  user-select: all; overflow-wrap: anywhere;
+}
+.preview-meta .chip {
+  flex: none;
+  background: #ffffff0d; color: var(--ink-2);
+}
+.preview-meta .chip:hover { background: #ffffff1a; color: var(--ink); }
+
+/* it says close rather than drawing a cross, because there is room for the
+   word and a word is never ambiguous. it sits on the picture rather than in
+   the strip below so it is in the same place whether the frame is a tall
+   portrait or a wide landscape. */
+.preview-close {
+  position: absolute; top: var(--s2); right: var(--s2);
+  min-width: 28px; height: 26px; padding: 0 var(--s2);
+  display: grid; place-items: center;
+  border: 0; border-radius: var(--r); cursor: pointer;
+  background: #000000a6; color: #fff;
+  font: 500 .68rem/1 var(--mono); letter-spacing: .14em;
+}
+.preview-close:empty::before { content: "x"; letter-spacing: 0; }
+.preview-close:hover { background: #ffffff26; }
+
+@keyframes rise { from { opacity: 0; transform: scale(.985); } }
+
+/* The untagged scrim exists to separate looked-at from not-looked-at. With
+   the untagged filter on there is nothing to separate: every frame on screen
+   is in the same state, and the scrim is then just a grey film over the work
+   you are trying to do. shelf.js puts this class on the grid while that
+   filter is active and the scrim stands down. */
+#grid.all-untagged figure.untagged::before { opacity: 0; }
+
+/* ---------------------------------------------------------------------
+   The trial frame.
+
+   Click a frame in the strip and every hole that is still empty wears it at
+   once, so one photograph is seen as a reel and as a thumbnail and as a
+   banner in one look. Nothing is written and nothing is saved.
+
+   So it must not read as a placement, and red is not available for it: red
+   in keepers means you chose this or you have to deal with this, and a trial
+   is neither. It is a fitting. Nor is it the shelf's scrim, which means
+   nobody has looked at this yet, and which would be dimming the only thing
+   the trial exists to show.
+
+   What is left is the mark this file already draws on a box that could take
+   a frame but has not: the hairline it wears while a drag is in the air. The
+   picture stays at full strength, the word trying goes in the numbers
+   underneath, and the caption over the bottom edge says how to keep it.
+   --------------------------------------------------------------------- */
+.slot.trying .box { box-shadow: 0 0 0 1px var(--line-strong); }
+/* both of these are declared before this block and both outrank a fitting.
+   which slot the keyboard is standing in, and which one a drag is about to
+   land in, are the more urgent facts, so they get their specificity back. */
+.slot.trying.on .box,
+.slot.trying[data-over] .box { box-shadow: 0 0 0 2px var(--hot); }
+
+/* How to keep it, on the bottom edge under a gradient, the way a caption
+   sits on a thumbnail in the shelf. Only under the pointer: nineteen boxes
+   each shouting how to keep them is nineteen boxes you cannot see past.
+
+   IT IS A PSEUDO ELEMENT AND THE ONE ALREADY THERE WOULD HAVE BEEN CHEAPER.
+   Reusing the empty layer meant one element going from "drag a frame here"
+   at full opacity to this at none, which is a real style change and gets
+   the transition applied to it, so every box on the bench fades a sentence
+   out the moment a trial starts. A pseudo element has no style to change
+   from: it is born at zero and the fade belongs to the hover alone. */
+.slot.trying .box::after {
+  content: "click to keep it here";
+  position: absolute; inset: auto 0 0 0; pointer-events: none;
+  padding: var(--s6) var(--s3) var(--s2);
+  font: 500 .68rem/1.4 var(--mono); letter-spacing: .14em; color: #fff;
+  background: linear-gradient(transparent, #000000d9);
+  opacity: 0; transition: opacity var(--fast) var(--ease);
+}
+.slot.trying .box:hover::after { opacity: 1; }
+
+/* the one word that says this is not saved, in the line that otherwise
+   reports what was. it is the brightest thing on that line because it is the
+   thing that changes what the rest of the line means. */
+.slot .nums .prov { color: var(--ink); letter-spacing: .14em; }
+
+/* The frame being tried, in the strip. White, and the same ring the shelf
+   puts under its keyboard cursor, because the two mean the same thing:
+   attention, without a decision having been made. Red here would say it had
+   been placed somewhere, and it has not been placed anywhere. */
+#strip figure.trying { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+
+/* ---------------------------------------------------------------------
+   How many frames across.
+
+   The native range is stripped to nothing and rebuilt, because the one macOS
+   draws is a chunky grooved thing from another decade and it sits two inches
+   from a wall of photographs. What replaces it is a 3px track, a filled half
+   in the one colour this app has, and a small white knob that grows under a
+   finger. The input keeps doing the work: dragging, arrow keys, the whole
+   pointer contract, all of it native and none of it reimplemented.
+
+   `--fill` is set by the script on every input, because a track cannot know
+   where its own thumb is. It is a gradient rather than a second element so
+   there is nothing to keep in sync and nothing to lay out.
+   --------------------------------------------------------------------- */
+.size {
+  display: flex; align-items: center; gap: var(--s3);
+  flex: none; cursor: pointer;
+}
+.size .label { cursor: pointer; }
+
+.size input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 8.5rem; height: 1.15rem; margin: 0;
+  background: none; cursor: pointer;
+}
+.size input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px;
+  background:
+    linear-gradient(var(--ink-3), var(--ink-3)) left / var(--fill, 50%) 100% no-repeat,
+    #ffffff1f;
+}
+.size input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; margin-top: -5.5px;
+  border: 0; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #000000a6;
+  transition: transform var(--fast) var(--ease);
+}
+/* the same instant feedback every other control in here gives, except this
+   one grows instead of shrinking: a knob that shrank would slip out from
+   under the finger that just grabbed it. */
+.size input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.1); }
+.size input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.22); }
+.size input[type="range"]:active { cursor: grabbing; }
+.size input[type="range"]:focus { outline: none; }
+.size input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--hot);
+}
+
+.size output {
+  min-width: 5.2rem;
+  font-size: .8rem; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .size input[type="range"]::-webkit-slider-thumb { transition: none; }
+}

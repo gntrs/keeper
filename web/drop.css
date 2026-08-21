@@ -1,0 +1,138 @@
+/* ---------------------------------------------------------------------
+   the drop layer.
+
+   One surface, four things to say on it: drop it here, which one did you
+   mean, this is what is happening, and this is what went wrong. They share
+   a card because they are one conversation, and the card is boxless because
+   the blurred window behind it is already the box. Nothing in here draws a
+   border to make a point that size and space were making anyway.
+
+   It sits above the preview at 60 and the lightbox at 50, because a drop
+   lands on the whole window and has to be answered on top of whatever was
+   already open.
+   --------------------------------------------------------------------- */
+.drop {
+  position: fixed; inset: 0; z-index: 80;
+  display: grid; place-items: center;
+  padding: var(--s6);
+  background: #0b0b0cc4;
+  backdrop-filter: blur(16px) saturate(.9);
+  -webkit-backdrop-filter: blur(16px) saturate(.9);
+  animation: drop-fade var(--fast) var(--ease);
+}
+.drop[hidden] { display: none; }
+
+/* while a drag is in flight the layer is scenery. it takes no pointer
+   events, so the drop is handled by the window under it exactly as it would
+   have been if nothing had appeared at all. */
+.drop[data-mode="drag"] { pointer-events: none; }
+
+/* a flex column with a gap rather than a stack of bottom margins, because
+   half of what is in here is hidden on any given panel and a margin under a
+   display:none element is a margin that still shows. the gap simply is not
+   drawn for a child that is not there. */
+.drop-card {
+  width: min(52ch, 100%);
+  max-height: 84vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--s3);
+  animation: drop-rise var(--mid) var(--ease);
+}
+
+.drop-eyebrow { margin: 0; }
+/* the same size and weight as the empty state's heading, because they are
+   the same voice: the app telling you where you are when there is nothing
+   on screen to tell you yourself. */
+.drop-line {
+  margin: 0;
+  font: 500 1.6rem/1.15 var(--sans);
+  letter-spacing: -.02em;
+}
+.drop-note {
+  margin: 0;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.drop-hint { margin: 0; color: var(--ink-3); font-size: .95rem; }
+
+/* --- the wait ------------------------------------------------------- */
+/* A hairline the width of the card, filled by a transform rather than by a
+   width, so a poll landing every 400ms costs a repaint and never a layout.
+   The accent is allowed here for the same reason it is allowed on the
+   export button: this is the app doing something to a disk, and it is the
+   one thing on screen worth looking at while it does. */
+.drop-meter {
+  height: 2px; margin: var(--s1) 0;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+.drop-meter[hidden] { display: none; }
+.drop-meter i {
+  display: block; height: 100%;
+  background: var(--hot);
+  transform: scaleX(0); transform-origin: 0 50%;
+  transition: transform var(--mid) var(--ease);
+}
+
+/* --- the candidates ------------------------------------------------- */
+.drop-picks {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 1px;
+}
+.drop-picks[hidden] { display: none; }
+/* the hover fill bleeds a step out to the left instead of indenting the
+   row, so a path lines up with the sentence above it whether the pointer is
+   on it or not. a row that shifts under the cursor is a row you click
+   twice. */
+.drop-pick {
+  width: calc(100% + var(--s2) * 2);
+  margin-left: calc(var(--s2) * -1);
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding: var(--s2);
+  border: 0; border-radius: var(--r); background: none;
+  color: var(--ink-2); text-align: left; cursor: pointer;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.drop-pick:hover { color: var(--ink); background: #ffffff0d; }
+.drop-path {
+  flex: 1; min-width: 0;
+  font: .82rem/1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+.drop-count {
+  flex: none;
+  font: 500 .7rem/1.4 var(--mono);
+  letter-spacing: .14em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+/* --- the way out ---------------------------------------------------- */
+.drop-acts {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--s2); margin-top: var(--s2);
+}
+.drop-acts[hidden] { display: none; }
+
+/* not the filled red: that belongs to export, which writes files to a disk.
+   opening a folder dialog puts nothing anywhere, so it is the loudest quiet
+   button in the app and no louder. */
+.drop-go, .drop-quit {
+  flex: none; border: 0; cursor: pointer;
+  border-radius: var(--r); padding: 7px var(--s3);
+  font: 500 .72rem/1 var(--mono);
+  text-transform: lowercase; letter-spacing: .14em;
+}
+.drop-go { background: #ffffff12; color: var(--ink); }
+.drop-go:hover { background: #ffffff1f; }
+.drop-quit { background: none; color: var(--ink-3); }
+.drop-quit:hover { color: var(--ink); }
+
+@keyframes drop-fade { from { opacity: 0 } }
+@keyframes drop-rise { from { opacity: 0; transform: scale(.985); } }
+
+/* the layer still has to appear, because a panel that materialises with no
+   transition at all reads as a glitch. it appears without moving. */
+@media (prefers-reduced-motion: reduce) {
+  .drop { animation: drop-fade .14s linear !important; }
+  .drop-card { animation: none !important; }
+}

@@ -11,6 +11,18 @@ export const STILL_EXT = new Set([
   ".heic", ".heif", ".dng",
 ]);
 
+/**
+ * Film sits in the same archive as the stills and gets judged in the same
+ * pass, so it is scanned the same way. `.mov` first because this is a mac
+ * and that is what the camera and the phone both write.
+ */
+export const FILM_EXT = new Set([
+  ".mov", ".mp4", ".m4v", ".avi", ".mkv", ".mts", ".m2ts", ".webm",
+]);
+
+export const kindOf = (ext) =>
+  STILL_EXT.has(ext) ? "still" : FILM_EXT.has(ext) ? "film" : null;
+
 /** skipped wherever they appear, at any depth */
 const SKIP_DIRS = new Set([
   ".git", "node_modules", ".keepers", ".Trashes", ".Spotlight-V100",
@@ -41,10 +53,11 @@ export async function scan(root, { onProgress } = {}) {
         if (SKIP_DIRS.has(e.name)) continue;
         await walk(full);
       } else if (e.isFile()) {
-        if (!STILL_EXT.has(path.extname(e.name).toLowerCase())) continue;
+        const kind = kindOf(path.extname(e.name).toLowerCase());
+        if (!kind) continue;
         const s = await stat(full).catch(() => null);
         if (!s || s.size < 1024) continue; // a sub-1KB "image" is not one
-        out.push({ path: path.relative(root, full), bytes: s.size });
+        out.push({ path: path.relative(root, full), bytes: s.size, kind });
         if (++seen % 250 === 0) onProgress?.(seen);
       }
     }

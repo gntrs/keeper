@@ -53,6 +53,7 @@ export function cellWidth(cols, sheetWidth = VISION_LONG_EDGE) {
  * the order a person reads and therefore the order an agent will report in.
  */
 export async function buildSheets(root, items, outDir, {
+  thumbsDir,
   cols = 6,
   rows = 4,
   sheetWidth = VISION_LONG_EDGE,
@@ -82,7 +83,15 @@ export async function buildSheets(root, items, outDir, {
         path: item.path,
       });
       try {
-        const buf = await sharp(path.join(root, item.path))
+        // film goes on the sheet through the poster keepers already cut, not
+        // through ffmpeg a second time: the poster is on disk, it is the
+        // frame a person would judge the clip by, and re-decoding a 4K mov
+        // per sheet would make a tagging pass take an hour instead of a
+        // minute.
+        const src = item.kind === "film"
+          ? path.join(thumbsDir, `${item.id}.webp`)
+          : path.join(root, item.path);
+        const buf = await sharp(src)
           .rotate()
           .resize(cw, ch, { fit: "contain", background: { r: 17, g: 17, b: 17 } })
           .toBuffer();

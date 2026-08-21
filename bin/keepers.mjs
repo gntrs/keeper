@@ -1,18 +1,17 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile, copyFile } from "node:fs/promises";
+import { readFile, copyFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { scan } from "../src/scan.mjs";
-import { buildThumbs } from "../src/thumbs.mjs";
+import { buildIndex } from "../src/open.mjs";
 import { buildSheets, GRID_ADVICE, cellWidth } from "../src/sheets.mjs";
 import { parseCompact, applyToIndex, VOCAB } from "../src/tags.mjs";
-import { idFor, paths, readIndex, writeIndex, readTags, writeTags, readPlacements } from "../src/store.mjs";
+import { paths, readIndex, readTags, writeTags } from "../src/store.mjs";
 import { loadConfig, CONFIG_NAME } from "../src/config.mjs";
-import { resolve as resolveCrop, parseAspect, isAtCover, toObjectPosition } from "../src/geometry.mjs";
-import { exportCrop } from "../src/thumbs.mjs";
+import { exportCrops } from "../src/crops.mjs";
 import { serve } from "../src/server.mjs";
+import { readTrays, trayById, exportTray, MODES } from "../src/trays.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TTY = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -46,6 +45,16 @@ function nice(p) {
   return !rel ? "." : rel.startsWith("..") ? p : rel;
 }
 
+/**
+ * Flags that are on or off and never carry a value. Without this list the
+ * next word gets eaten as the flag's argument, so `keepers --no-open ~/shoot`
+ * would set no-open to the folder and then index the current directory
+ * instead. `--open` is here although opening is the default now: it costs a
+ * line, and someone with it in their fingers should not be punished by having
+ * their archive swallowed.
+ */
+const BOOLS = new Set(["open", "no-open", "rescan", "help"]);
+
 function parseArgs(argv) {
   const flags = {};
   const rest = [];
@@ -53,6 +62,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a.startsWith("--")) {
       const [k, v] = a.slice(2).split("=");
+      if (v === undefined && BOOLS.has(k)) { flags[k] = true; continue; }
       flags[k] = v ?? (argv[i + 1] && !argv[i + 1].startsWith("-") ? argv[++i] : true);
     } else rest.push(a);
   }
@@ -66,44 +76,66 @@ ${hot("keepers")}  find the frames worth keeping, and crop them into the holes t
   keepers sheets <folder>          contact sheets for a coding agent to read
   keepers tag <folder> <file>      apply the tags that agent wrote
   keepers export <folder>          write the placed crops out
+  keepers trays <folder>           what is in the trays, and how much
   keepers init [folder]            create ${CONFIG_NAME}
 
 ${dim("options")}
   --port <n>        default 7777
   --cols <n>        cells across a contact sheet, default 6
   --rows <n>        cells down a contact sheet, default 4
-  --open            open the browser
+  --no-open         leave the browser alone. it opens by default
   --rescan          rebuild the index even if one exists
+  --export <tray>   with the trays command, copy that tray out
+  --to <folder>     with --export, where the copies go
+  --mode <how>      with --export: copy, symlink or alias. default copy.
+                    symlink and alias write nothing, they point at the originals
 
 ${dim("the grid trade, because it is the only real choice in `sheets`")}
 ${GRID_ADVICE.map(([c, d]) => `  --cols ${c}   ${String(cellWidth(c)).padStart(4)}px per frame   ${d}`).join("\n")}
 `;
 
-async function ensureIndex(root, { rescan = false } = {}) {
-  const existing = rescan ? null : await readIndex(root);
-  if (existing?.items?.length) return existing;
+/**
+ * The terminal half of buildIndex. The scan and the thumbnails live in
+ * src/open.mjs now, because the server has to run them too, and everything
+ * printed here comes back through the phase events.
+ *
+ * An index that was already on disk emits nothing but "ready", and the bar
+ * stays silent for it: a run that did no work should not draw a bar saying
+ * it did.
+ */
+async function indexWithBar(root, { rescan = false } = {}) {
+  let scanning = false;
+  let counted = false;
+  let bar = null;
 
-  process.stdout.write(dim("  scanning ... "));
-  const found = await scan(root);
-  const items = found.map((f) => ({ ...f, id: idFor(f.path) }));
-  say(`${items.length} frames`);
+  const index = await buildIndex(root, {
+    rescan,
+    onPhase(e) {
+      if (e.phase === "scanning") {
+        if (!scanning) { scanning = true; process.stdout.write(dim("  scanning ... ")); }
+        return;
+      }
+      if (!scanning) return;
+      // the frame count closes the scanning line, and it is the same line
+      // whether or not there turned out to be anything to thumbnail
+      if (!counted) { counted = true; say(`${e.frames} frames`); }
 
-  if (!items.length) {
-    say(dim("  nothing to do. that folder holds no photographs keepers can read."));
-    return { items: [], builtAt: new Date().toISOString() };
-  }
-
-  const P = paths(root);
-  const bar = progress("thumbnailing");
-  const { meta, failed } = await buildThumbs(root, items, P.thumbs, {
-    onProgress: (n) => bar.tick(`${Math.floor((n / items.length) * 100)}%`),
+      if (e.phase === "thumbnailing") {
+        if (!bar) bar = progress("thumbnailing");
+        bar.tick(`${Math.floor((e.done / e.total) * 100)}%`);
+        return;
+      }
+      if (e.phase === "ready") {
+        if (bar) bar.done(`done${e.failed ? hot(`  ${e.failed} unreadable`) : ""}`);
+        if (e.filmSkipped) {
+          say(hot(`  ! ${e.filmSkipped} clips have no poster: ffmpeg is not on PATH.`));
+          say(dim("    brew install ffmpeg, then run again with --rescan."));
+        }
+      }
+    },
   });
-  bar.done(`done${failed ? hot(`  ${failed} unreadable`) : ""}`);
 
-  const byId = new Map(meta.map((m) => [m.id, m]));
-  const merged = items.map((i) => ({ ...i, ...(byId.get(i.id) ?? {}) }));
-  const index = { items: merged, builtAt: new Date().toISOString(), root };
-  await writeIndex(root, index);
+  if (!index.items.length) say(dim("  no photographs and no film here that keepers can read."));
   return index;
 }
 
@@ -124,13 +156,18 @@ function summarise(items, tags) {
 
 async function main() {
   const { flags, rest } = parseArgs(process.argv.slice(2));
-  const known = ["sheets", "tag", "export", "init", "help"];
+  const known = ["sheets", "tag", "export", "trays", "init", "help"];
   const cmd = known.includes(rest[0]) ? rest.shift() : "shelf";
   const root = path.resolve(rest[0] ?? ".");
 
-  if (cmd === "help" || flags.help || (cmd === "shelf" && !rest.length && !existsSync(path.join(root, CONFIG_NAME)))) {
-    if (cmd === "help" || flags.help) { say(HELP); return; }
-  }
+  if (cmd === "help" || flags.help) { say(HELP); return; }
+
+  /* A bare `keepers` used to resolve to "." and start indexing it. Typed in a
+     home folder, which is where a terminal opens, that is a thumbnail of
+     every file you own and a .keepers folder written into your home, for
+     someone who was only asking what the command does. No folder is not a
+     folder, so it gets the help. */
+  if (cmd === "shelf" && !rest.length) { say(HELP); return; }
 
   if (cmd === "init") {
     const dst = path.join(root, CONFIG_NAME);
@@ -146,13 +183,14 @@ async function main() {
   say(`  ${hot("keepers")} ${dim(root)}`);
 
   if (cmd === "sheets") {
-    const index = await ensureIndex(root, { rescan: !!flags.rescan });
+    const index = await indexWithBar(root, { rescan: !!flags.rescan });
     if (!index.items.length) return;
     const cols = Number(flags.cols) || 6;
     const rows = Number(flags.rows) || 4;
     const P = paths(root);
     const bar = progress("sheets");
     const out = await buildSheets(root, index.items, P.sheets, {
+      thumbsDir: P.thumbs,
       cols, rows,
       onProgress: (n, total) => bar.tick(`${n}/${total}`),
     });
@@ -189,64 +227,128 @@ async function main() {
 
   if (cmd === "export") {
     const config = await loadConfig(process.cwd());
-    const index = await readIndex(root);
-    const placements = await readPlacements(root);
-    const outDir = path.resolve(config.out ?? "keepers-out");
-    const byId = new Map((index?.items ?? []).map((i) => [i.id, i]));
-    let n = 0;
+    // There is always something to export now, because the standard shapes
+    // are built in: someone with no config at all can still have placed a
+    // frame into the reel and want the crop. So a missing config is no longer
+    // a reason to refuse, only a thing worth saying if nothing came out.
+    if (!config.slots.length) {
+      say(hot(`  ${CONFIG_NAME} turns the standard shapes off and adds none of its own.`));
+      say(dim("  add a slot, or drop `\"formats\": false`, and the bench has something to place into."));
+      return;
+    }
+    const out = await exportCrops({ root, config });
+    for (const r of out.rows) {
+      if (r.lost) { say(hot(`  ! ${r.slot}: the frame it held is gone from the index`)); continue; }
+      if (r.failed) { say(hot(`  ! ${r.slot}: ${r.failed}`)); say(dim(`    ${r.source}`)); continue; }
+      say(`  ${r.slot.padEnd(16)} ${dim(r.source)}${r.soft ? hot("  soft: crop is narrower than the slot") : ""}`);
+    }
+    const n = out.written;
+    say("");
+    say(`  wrote ${hot(n)} ${n === 1 ? "crop" : "crops"} to ${dim(nice(out.dir))}`);
+    if (out.empty) {
+      say(dim(`  ${out.empty} of your ${out.mine} slots are still empty. run \`keepers <folder>\` and fill them.`));
+    }
+    if (!n && config.missing) {
+      say(dim(`  there is no ${CONFIG_NAME} in this folder, so keepers only knows`));
+      say(dim(`  the standard shapes. \`keepers init\` adds your own.`));
+    }
+    return;
+  }
 
-    for (const slot of config.slots) {
-      const p = placements[slot.id];
-      if (!p) continue;
-      const item = byId.get(p.id);
-      if (!item) { say(hot(`  ! ${slot.id}: the frame it held is gone from the index`)); continue; }
+  if (cmd === "trays") {
+    const doc = await readTrays(root);
 
-      const rect = resolveCrop(p.place, item.w, item.h, slot.aspect);
-      const dir = path.join(outDir, slot.id);
-      await mkdir(dir, { recursive: true });
-      const dst = path.join(dir, `${slot.id}${path.extname(item.path).toLowerCase()}`);
-      await exportCrop(path.join(root, item.path), dst, rect, slot.width);
+    if (flags.export) {
+      const tray = trayById(doc, String(flags.export));
+      if (!tray) {
+        say(hot(`  no tray called ${flags.export}`));
+        say(dim(`  the ones there are: ${doc.trays.map((t) => t.id).join(", ")}`));
+        process.exit(1);
+      }
+      const to = typeof flags.to === "string" ? flags.to : "";
+      if (!to) { say(hot("  where to? pass --to <folder>")); process.exit(1); }
 
-      await writeFile(path.join(dir, "placement.json"), JSON.stringify({
-        slot: slot.id,
-        source: item.path,
-        sourceSize: { w: item.w, h: item.h },
-        aspect: slot.aspectText,
-        crop: {
-          x: Math.round(rect.x), y: Math.round(rect.y),
-          w: Math.round(rect.w), h: Math.round(rect.h),
-        },
-        atCover: isAtCover(p.place, item.w, item.h, slot.aspect),
-        objectPosition: toObjectPosition(rect, item.w, item.h),
-        place: p.place,
-      }, null, 2));
+      // `link` because that is the word the tray panel puts on the button,
+      // and someone who learned the mode there should be able to type it
+      const asked = typeof flags.mode === "string" ? flags.mode : (tray.mode ?? "copy");
+      const mode = asked === "link" ? "symlink" : asked;
+      if (!MODES.includes(mode)) {
+        say(hot(`  no export mode called ${asked}`));
+        say(dim(`  it is one of: ${MODES.join(", ")}`));
+        process.exit(1);
+      }
 
-      const soft = slot.width && rect.w < slot.width;
-      say(`  ${slot.id.padEnd(16)} ${dim(item.path)}${soft ? hot("  soft: crop is narrower than the slot") : ""}`);
-      n++;
+      const index = await readIndex(root);
+      const verb = { copy: ["copying", "copied"], symlink: ["linking", "linked"], alias: ["aliasing", "aliased"] }[mode];
+      const bar = progress(verb[0]);
+      bar.tick(`${tray.ids.length} frames`);
+      // the refusals are all worth reading, so the bar gets closed off first
+      // rather than left hanging half drawn above the message that matters
+      let out;
+      try {
+        out = await exportTray({ root, tray, folder: to, index, mode });
+      } catch (e) {
+        bar.done(hot("refused"));
+        say(`  ${hot("!")} ${e.message}`);
+        process.exit(1);
+      }
+      bar.done(`${out.written} ${verb[1]}${out.skipped.length ? hot(`  ${out.skipped.length} skipped`) : ""}`);
+      say("");
+      say(`  ${dim("they are in")} ${nice(out.dest)}`);
+      // which mode ran, every time. a folder of symlinks and a folder of
+      // copies look identical in a terminal listing and weigh nothing alike,
+      // and finding out which one you made a week later costs an hour.
+      say(dim({
+        copy: "  the originals have not moved. this was a copy.",
+        symlink: "  the originals have not moved and nothing was copied. those are symlinks to them.",
+        alias: "  the originals have not moved and nothing was copied. those are finder aliases.",
+      }[mode]));
+      if (out.skipped.length) {
+        say(dim("  the skipped ones are either gone from the index or already in that folder."));
+      }
+      return;
+    }
+
+    say("");
+    for (const t of doc.trays) {
+      const mark = t.id === doc.active ? hot("  active") : "";
+      const n = `${t.ids.length} ${t.ids.length === 1 ? "frame" : "frames"}`;
+      say(`  ${t.name.padEnd(20)} ${n.padEnd(12)} ${dim(t.id)}${mark}`);
     }
     say("");
-    say(`  wrote ${hot(n)} of ${config.slots.length} slots to ${dim(nice(outDir))}`);
-    if (n < config.slots.length) say(dim("  the rest are still empty. run `keepers <folder>` and fill them."));
+    say(dim(`  keepers trays ${nice(root)} --export <tray> --to <folder>`));
+    say(dim(`  add --mode symlink to point at the originals instead of copying them`));
     return;
   }
 
   // default: shelf
   const config = await loadConfig(process.cwd());
-  const index = await ensureIndex(root, { rescan: !!flags.rescan });
-  if (!index.items.length) return;
+  const index = await indexWithBar(root, { rescan: !!flags.rescan });
+  // An empty archive still opens. It used to stop here with one line in the
+  // terminal, which is the least useful moment to say nothing: someone who
+  // pointed keepers at the wrong folder learns more from a page that says
+  // what it reads than from a sentence that says it found nothing. The shelf
+  // has a state for this.
   summarise(index.items, await readTags(root));
 
   const { url } = await serve({ root, config, port: Number(flags.port) || 7777 });
   say("");
   say(`  ${hot(url)}`);
-  if (config.missing) {
-    say(dim(`  no ${CONFIG_NAME} here, so the bench has no slots. \`keepers init\` makes one.`));
-  } else {
-    say(dim(`  ${config.slots.length} slots from ${CONFIG_NAME}`));
+  /* Only for someone who already wrote a config, because they are the one
+     person the count tells anything. The two lines that used to print in its
+     absence explained a file the reader had never heard of and did not need,
+     and they were half of everything on the screen at the moment the app was
+     supposed to be handing over to the browser. The bench says it, on the
+     bench, where there are shapes to point at while saying it. */
+  if (!config.missing) {
+    const mine = config.slots.filter((s) => s.group === "yours").length;
+    say(dim(`  ${mine} slots from ${CONFIG_NAME}, and ${config.slots.length - mine} standard shapes`));
   }
   say(dim("  ctrl-c to stop"));
-  if (flags.open) {
+  /* Opening is the default and staying put is the flag. A tool that prints a
+     url and waits has asked a person who ran one command to go and do a
+     second thing, and the terminal is not where any of the work happens. */
+  if (!flags["no-open"]) {
     const { spawn } = await import("node:child_process");
     const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
     spawn(cmd, [url], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref();

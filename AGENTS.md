@@ -1,22 +1,22 @@
-# Tagging an archive with a coding agent
+# tagging an archive with a coding agent
 
-keepers does not ship a tagger and does not want an API key. It ships
-contact sheets built for a machine to read, and a command that takes the
-answer back. The tagger is whatever agent you already pay for.
+keepers does not ship a tagger and does not want an api key. it ships contact
+sheets built for a machine to read, and a command that takes the answer back.
+the tagger is whatever agent you already pay for.
 
-If you are that agent, this file is the brief. Read it once, then work.
+if you are that agent, this file is the brief. read it once, then work.
 
-## The job
+## the job
 
-1. `keepers sheets <archive>` has already run. The sheets are in
+1. `keepers sheets <archive>` has already run. the sheets are in
    `<archive>/.keepers/sheets/`, numbered `sheet-001.jpg` upward, with
    `index.json` beside them.
-2. Read every sheet. One image at a time, in order.
-3. For each sheet, write one line of single letter codes, one letter per
+2. read every sheet. one image at a time, in order.
+3. for each sheet, write one line of single letter codes, one letter per
    cell, reading left to right and top to bottom.
-4. Save the lines to a file and stop. The human runs `keepers tag`.
+4. save the lines to a file and stop. the human runs `keepers tag`.
 
-## The line format
+## the line format
 
 ```
 3  PWWPSAAA TPSSLPSC ECCPFPLL NSDSSSSL  * r2c5 r3c7
@@ -24,12 +24,12 @@ If you are that agent, this file is the brief. Read it once, then work.
 
 - the sheet number first
 - then one letter per cell, left to right, top to bottom
-- whitespace inside the codes is ignored, so group them by row. Do that.
-  It is free and it makes a miscount visible before you save the file.
+- whitespace inside the codes is ignored, so group them by row. do that. it
+  is free and it makes a miscount visible before you save the file.
 - everything after `*` is the cells worth actually opening
 - lines starting with `#` are comments
 
-## The letters
+## the letters
 
 ```
 P  portrait     one person, aware of the camera
@@ -50,47 +50,48 @@ O  outdoors     street, park, a building from outside
 X  unusable     blurred, black, or a title card
 ```
 
-One letter per frame, the loudest thing in it. A frame that is both talking
-and laughing gets whichever a person would name first. Do not agonise. The
+one letter per frame, the loudest thing in it. a frame that is both talking
+and laughing gets whichever a person would name first. do not agonise. the
 tags exist to get a few thousand frames down to twenty, and a human looks at
 the twenty.
 
-## The star, and what it is for
+## the star, and what it is for
 
-A starred cell is one worth opening at full size: sharp, a real expression,
-and it still reads at thumbnail size. Aim for roughly one in ten. Starring
+a starred cell is one worth opening at full size: sharp, a real expression,
+and it still reads at thumbnail size. aim for roughly one in ten. starring
 half a sheet makes the star useless, and starring nothing wastes the only
 signal in this pass that a filter cannot recompute.
 
-Stars are not "good photographs". They are "stop scrolling and look at this
+stars are not "good photographs". they are "stop scrolling and look at this
 one".
 
-## The rule that matters more than any tag
+## the rule that matters more than any tag
 
-**Count before you write.** A sheet holds `cols x rows` cells and the last
-sheet holds the remainder. If your line has 23 codes for a 24 cell sheet,
+**count before you write.** a sheet holds `cols x rows` cells and the last
+sheet holds the remainder. if your line has 23 codes for a 24 cell sheet,
 every tag after the slip lands on the wrong photograph, and it lands
 confidently, which is worse than not tagging at all.
 
 `keepers tag` checks this and refuses a sheet whose count disagrees with the
-index. It cannot catch a line that is the right length and shifted in the
-middle. Group your codes by row.
+index. it cannot catch a line that is the right length and shifted in the
+middle. group your codes by row.
 
-## What not to do
+## what not to do
 
-- Do not guess at a cell that is too dark or too small to read. Tag it `X`.
-  An honest `unusable` beats an invented `talking`.
-- Do not open the originals. The sheets are the whole input. Reading 1,768
-  full size photographs will exhaust your context long before it improves a
-  single tag.
-- Do not invent letters. `keepers tag` rejects the whole sheet on an unknown
-  code rather than dropping the frame quietly.
-- Do not describe the photographs back to the human. The file is the output.
+- **do not guess** at a cell that is too dark or too small to read. tag it
+  `X`. an honest `unusable` beats an invented `talking`.
+- **do not open the originals.** the sheets are the whole input. reading
+  1,768 full size photographs will exhaust your context long before it
+  improves a single tag.
+- **do not invent letters.** `keepers tag` rejects the whole sheet on an
+  unknown code rather than dropping the frame quietly.
+- **do not describe the photographs back to the human.** the file is the
+  output.
 
-## Grid sizing, if you are asked to choose
+## grid sizing, if you are asked to choose
 
-Vision models resize an image to roughly 1568px on its long edge before
-looking at it, so a wider sheet is not a more detailed sheet. The only real
+vision models resize an image to roughly 1568px on its long edge before
+looking at it, so a wider sheet is not a more detailed sheet. the only real
 lever is how many cells the sheet is divided into:
 
 ```
@@ -101,6 +102,6 @@ cols   per frame   what can be judged
  4       392px     who a person is, if you know them
 ```
 
-Six is the default. Ask for `--cols 4` when the job is choosing between
-three good frames of one person, and accept that it doubles the number of
-sheets you have to read.
+six is the default. ask for `--cols 4` when the job is choosing between three
+good frames of one person, and accept that it doubles the number of sheets
+you have to read.

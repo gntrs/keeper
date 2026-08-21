@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseAspect } from "./geometry.mjs";
+import { compile } from "./places.mjs";
+import { FORMATS } from "./formats.mjs";
 
 export const CONFIG_NAME = "keepers.config.json";
 
@@ -16,7 +18,11 @@ export async function loadConfig(dir) {
   try {
     raw = await readFile(file, "utf8");
   } catch {
-    return { slots: [], file, missing: true };
+    // No config is the first run, not a failure, and it is exactly the moment
+    // the built in shapes earn their keep: there is nothing to place into yet
+    // and the question a person already has is how their photograph reads as
+    // a reel. The bench opens full of shapes and the config adds theirs later.
+    return { slots: standardSlots(new Set(), undefined), file, missing: true, places: [] };
   }
 
   let json;
@@ -39,6 +45,7 @@ export async function loadConfig(dir) {
       aspectText: String(s.aspect ?? "3/2"),
       width: Number(s.width) || 0,
       note: s.note ?? "",
+      group: "yours",
     };
   });
 
@@ -48,5 +55,36 @@ export async function loadConfig(dir) {
     ids.add(s.id);
   }
 
-  return { slots, file, missing: false, out: json.out ?? "keepers-out" };
+  return {
+    slots: [...slots, ...standardSlots(ids, json.formats)],
+    file,
+    missing: false,
+    out: json.out ?? "keepers-out",
+    places: compile(json.places ?? []),
+  };
+}
+
+/**
+ * The built in shapes, in the same form a config slot comes out in, so
+ * nothing downstream has to know which kind it is holding.
+ *
+ * A config slot of the same id wins and the built in is dropped, silently.
+ * That is the useful way round: someone who writes their own `wide` has a
+ * reason for it, and a keepers that shouted about a name collision with a
+ * list the user never wrote would be scolding them for our choices.
+ *
+ * `"formats": false` turns the whole set off, for the project that knows
+ * exactly what it wants and does not want twenty more boxes under it.
+ */
+function standardSlots(taken, want) {
+  if (want === false) return [];
+  return FORMATS.filter((f) => !taken.has(f.id)).map((f) => ({
+    id: f.id,
+    label: f.label,
+    aspect: parseAspect(f.aspect),
+    aspectText: f.aspect,
+    width: f.width,
+    note: f.note ?? "",
+    group: f.group,
+  }));
 }
