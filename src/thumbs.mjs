@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { haveFfmpeg, poster, probe } from "./film.mjs";
+import { readableSource } from "./raw.mjs";
 
 const require = createRequire(import.meta.url);
 const sharp = require("sharp");
@@ -24,6 +25,14 @@ export const THUMB_WIDTH = 400;
  *    `orientation: 6` or `8`, so the width and height have to be swapped by
  *    hand. Get this wrong and every portrait in the archive is filed with its
  *    dimensions inverted, which then puts the crop model on the wrong axis.
+ *
+ * BOTH TRAPS SURVIVE THE RAW PROXY, which is the answer to the obvious
+ * question about it. sips writes the sensor out in sensor order and copies
+ * the exif orientation tag across untouched: an upright ARW comes back as a
+ * landscape jpeg still tagged `orientation: 8`, exactly like a jpeg straight
+ * off the camera. So the proxy goes through this function unchanged and the
+ * rotate is as necessary here as it ever was. Skipping it because "sips
+ * already handled it" lays every portrait raw on its side.
  */
 export async function thumbnail(srcAbs, dstAbs) {
   await sharp(srcAbs)
@@ -78,8 +87,17 @@ export async function buildThumbs(root, items, thumbDir, { onProgress, concurren
           onProgress?.(++done + failed, item);
           continue;
         }
-        if (!existsSync(dst)) await thumbnail(abs, dst);
-        const d = await dimensions(abs);
+        /* A raw is decoded here and nowhere else in the run: readableSource
+           hands back the proxy, building it if this is the first pass, and
+           every later stage finds it already on disk. The dimensions come off
+           the proxy too, deliberately. They are the ones the browser is
+           served, the ones the bench draws its rectangle in and the ones the
+           export cuts out of, and an index quoting the 7008px negative while
+           every one of those holds 3072px would be a number that reads
+           better and lies about what a crop can deliver. */
+        const src = await readableSource(root, item);
+        if (!existsSync(dst)) await thumbnail(src, dst);
+        const d = await dimensions(src);
         meta.push({ id: item.id, path: item.path, kind: "still", w: d.w, h: d.h });
       } catch (e) {
         failed++;

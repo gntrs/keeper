@@ -45,7 +45,28 @@ const TYPES = {
   mts: "video/mp2t", m2ts: "video/mp2t",
 };
 
-const typeOf = (name) => TYPES[name.split(".").pop().toLowerCase()] ?? "application/octet-stream";
+const extOf = (name) => name.split(".").pop().toLowerCase();
+const typeOf = (name) => TYPES[extOf(name)] ?? "application/octet-stream";
+
+/**
+ * Every raw format keepers reads. It matters here for one reason: `/full/`
+ * does not serve a raw file's own bytes. macOS decodes the negative once and
+ * keepers caches a jpeg proxy, and the proxy is what the url returns,
+ * because no browser can draw an ARW.
+ *
+ * So the drag has to say jpeg and end in .jpg. Offering Finder
+ * `DSC02478.ARW` against a url that answers with jpeg bytes produces a file
+ * that lightroom and preview both refuse, named after a negative it is not.
+ * Nothing here can hand over the negative itself: a drag out of a browser
+ * is bytes over http, and the bytes on that url are the proxy's.
+ */
+const RAW = new Set(["arw", "srf", "sr2", "cr2", "cr3", "nef", "raf", "orf", "rw2", "srw", "pef", "dng"]);
+
+/** what actually arrives on the desktop, which is not always what is on the drive */
+function served(name) {
+  if (!RAW.has(extOf(name))) return { name, type: typeOf(name) };
+  return { name: `${name.replace(/\.[^.]+$/, "")}.jpg`, type: "image/jpeg" };
+}
 
 /**
  * Each segment encoded on its own, so the slashes stay slashes. A photo
@@ -80,6 +101,9 @@ document.addEventListener("dragstart", (e) => {
   if (!item) return;
 
   const name = item.path.split("/").pop();
+  /* the file:// flavour keeps naming the original, including for a raw. a
+     path is a place on the drive and the negative is what is there. only the
+     bytes that travel over http are the proxy's. */
   const abs = absOf(item);
 
   /**
@@ -94,7 +118,8 @@ document.addEventListener("dragstart", (e) => {
    * with a zip nobody asked for, so a drag out is one file and the note
    * below points at the tray export for the rest.
    */
-  dt.setData("DownloadURL", `${typeOf(name)}:${name}:${location.origin}/full/${id}`);
+  const out = served(name);
+  dt.setData("DownloadURL", `${out.type}:${out.name}:${location.origin}/full/${id}`);
 
   /* And the path itself, for the half of the time the thing you actually
      want is not a file but somewhere to type. Dropped into a terminal, an

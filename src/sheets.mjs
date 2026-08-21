@@ -2,6 +2,8 @@ import { createRequire } from "node:module";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { readableSource } from "./raw.mjs";
+
 const require = createRequire(import.meta.url);
 const sharp = require("sharp");
 
@@ -88,9 +90,13 @@ export async function buildSheets(root, items, outDir, {
         // frame a person would judge the clip by, and re-decoding a 4K mov
         // per sheet would make a tagging pass take an hour instead of a
         // minute.
+        // a raw goes on through its proxy for the same reason, one step
+        // further down: sharp cannot open the negative at all, and the proxy
+        // was already written when the thumbnail was cut, so this costs a
+        // read rather than another decode of a 36MB file.
         const src = item.kind === "film"
           ? path.join(thumbsDir, `${item.id}.webp`)
-          : path.join(root, item.path);
+          : await readableSource(root, item);
         const buf = await sharp(src)
           .rotate()
           .resize(cw, ch, { fit: "contain", background: { r: 17, g: 17, b: 17 } })

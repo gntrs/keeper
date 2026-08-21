@@ -13,6 +13,7 @@ import {
 import { VOCAB } from "./tags.mjs";
 import { placeOf } from "./places.mjs";
 import { exportCrops } from "./crops.mjs";
+import { readableSource } from "./raw.mjs";
 import { clock } from "./film.mjs";
 import { execFile } from "node:child_process";
 
@@ -35,7 +36,33 @@ const TYPES = {
   ".tiff": "image/tiff",
   ".heic": "image/heic",
   ".heif": "image/heif",
-  ".dng": "image/x-adobe-dng",
+  ".gif": "image/gif",
+
+  /* Film, because /full hands a clip straight to a <video> element, and a
+     browser refuses to play bytes it was told are an octet stream, which is
+     what everything not named in here silently becomes. The raw formats are
+     deliberately absent: they never reach this table at all, being served as
+     the jpeg proxy and taking the jpeg type with it.
+
+     `.insv` is mp4 inside, whatever the 360 camera chose to call it, and the
+     type has to describe the bytes rather than the extension or the element
+     will not touch it. */
+  ".mov": "video/quicktime",
+  ".mp4": "video/mp4",
+  ".m4v": "video/mp4",
+  ".insv": "video/mp4",
+  ".webm": "video/webm",
+  ".avi": "video/x-msvideo",
+  ".mkv": "video/x-matroska",
+  ".mts": "video/mp2t",
+  ".m2ts": "video/mp2t",
+  ".3gp": "video/3gpp",
+  ".mpg": "video/mpeg",
+  ".mpeg": "video/mpeg",
+  ".wmv": "video/x-ms-wmv",
+  ".flv": "video/x-flv",
+  ".ogv": "video/ogg",
+  ".mxf": "application/mxf",
 };
 
 const json = (res, code, body) => {
@@ -154,14 +181,32 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
         return sendFile(res, path.join(paths(root).thumbs, `${id}.webp`), { cache: "no-cache", req });
       }
 
-      // the bench needs the real negative at full size, because the whole
-      // point is judging a crop of it. deliberately not resized.
+      /**
+       * The bench needs the real negative at full size, because the whole
+       * point is judging a crop of it. Deliberately not resized.
+       *
+       * Except for raw, where the original bytes are the one thing that
+       * cannot go down this route: no browser on earth renders an ARW, and
+       * sending it would put a broken image in the preview and an empty
+       * bench under the crop rectangle. The proxy goes instead, built here
+       * if the frame was never thumbnailed, and it is served as what it
+       * actually is: a jpeg, with the jpeg content type, at the dimensions
+       * the index already reports for that frame.
+       */
       if (route.startsWith("/full/")) {
         const id = route.slice(6).replace(/[^a-f0-9]/g, "");
         const index = await readIndex(root);
         const hit = index?.items?.find((i) => i.id === id);
         if (!hit) return json(res, 404, { error: "unknown frame" });
-        return sendFile(res, path.join(root, hit.path), { cache: "max-age=3600" });
+        let file;
+        try {
+          file = await readableSource(root, hit);
+        } catch (e) {
+          // one negative macos cannot decode, said plainly, rather than a
+          // 500 that reads as the server having fallen over
+          return json(res, 415, { error: String(e.message).toLowerCase() });
+        }
+        return sendFile(res, file, { cache: "max-age=3600" });
       }
 
       if (route === "/api/state") {

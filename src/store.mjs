@@ -21,6 +21,9 @@ export const paths = (root) => ({
   placements: path.join(root, DIR, "placements.json"),
   thumbs: path.join(root, DIR, "thumbs"),
   sheets: path.join(root, DIR, "sheets"),
+  // one jpeg per raw negative, keyed by the same id as the thumbnail beside
+  // it, because nothing downstream of the scan can open an ARW itself
+  proxy: path.join(root, DIR, "proxy"),
 });
 
 async function readJson(file, fallback) {

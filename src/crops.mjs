@@ -4,6 +4,8 @@ import path from "node:path";
 import { resolve as resolveCrop, isAtCover, toObjectPosition } from "./geometry.mjs";
 import { exportCrop } from "./thumbs.mjs";
 import { readIndex, readPlacements } from "./store.mjs";
+import { needsProxy } from "./scan.mjs";
+import { PROXY_LONG_EDGE, originalSize, readableSource } from "./raw.mjs";
 
 /**
  * The float rectangle geometry hands back, as a box of whole pixels that is
@@ -64,27 +66,53 @@ export async function exportCrops({ root, config }) {
 
     const rect = resolveCrop(p.place, item.w, item.h, slot.aspect);
     const box = pixels(rect, item.w, item.h);
+    const proxied = needsProxy(path.extname(item.path).toLowerCase());
     const into = path.join(dir, slot.id);
     await mkdir(into, { recursive: true });
-    const dst = path.join(into, `${slot.id}${path.extname(item.path).toLowerCase()}`);
+    /* The crop of a raw is a jpeg and has to be called one. `wide.arw` full
+       of jpeg bytes is a file no viewer opens, no uploader accepts and every
+       tool that reads the extension gets wrong. */
+    const ext = proxied ? ".jpg" : path.extname(item.path).toLowerCase();
+    const dst = path.join(into, `${slot.id}${ext}`);
 
     /* One slot at a time, because a decoder that gives up on one negative
        must not cost the other eighteen their crops. The message goes back
        whole: it is the only thing anyone has to go on, and the frame it
        names is the one to look at. */
     try {
-      await exportCrop(path.join(root, item.path), dst, box, slot.width);
+      /* A raw is cut from its proxy, because sharp cannot decode the
+         negative and because the proxy is the picture the person was looking
+         at when they dragged the rectangle. Same pixels on the bench and in
+         the folder, which is the reason this is right and not only the
+         reason it works. A negative macOS cannot read throws here and is
+         reported as this slot failing, same as any other bad decode. */
+      await exportCrop(await readableSource(root, item), dst, box, slot.width);
     } catch (e) {
       rows.push({ slot: slot.id, source: item.path, failed: String(e.message).toLowerCase() });
       continue;
     }
+
+    /* Which pixels these actually are, in the one file that exists to say
+       so. A crop out of a 3072px proxy is not a crop out of a 7008px
+       negative, and whoever opens this to reprint the shot next spring is
+       entitled to know the negative is still on the drive holding more than
+       twice the detail of the file next to this one. */
+    const original = proxied
+      ? await originalSize(path.join(root, item.path), { w: item.w, h: item.h }).catch(() => null)
+      : null;
 
     // the numbers that made the file, next to the file. a crop nobody can
     // reproduce six months later is a crop that has to be eyeballed again.
     await writeFile(path.join(into, "placement.json"), JSON.stringify({
       slot: slot.id,
       source: item.path,
+      from: proxied ? "proxy" : "original",
       sourceSize: { w: item.w, h: item.h },
+      proxy: proxied ? {
+        longEdge: PROXY_LONG_EDGE,
+        originalSize: original ?? undefined,
+        note: "cut from the jpeg proxy macos decoded out of this file, not from the original itself",
+      } : undefined,
       aspect: slot.aspectText,
       crop: box,
       atCover: isAtCover(p.place, item.w, item.h, slot.aspect),
