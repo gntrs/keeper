@@ -86,21 +86,37 @@ for (const b of document.querySelectorAll("header nav button")) {
  * are here and the rest are there.
  */
 addEventListener("keydown", (e) => {
-  if (e.ctrlKey || e.altKey) return;
+  if (e.ctrlKey) return;
 
-  if (e.metaKey) {
-    /* The views on the numbers they already answer to, and these two run
+  /**
+   * Chrome owns cmd+r, cmd+o and cmd+1 through cmd+9 at the browser level.
+   * preventDefault runs, and the tab reloads or switches anyway, because
+   * those are accelerators resolved above the page. That is not something to
+   * be clever about, so everything the browser has claimed moved to option,
+   * which on a mac is an ordinary application modifier and which chrome
+   * claims almost nothing of. cmd keeps the ones that genuinely work: select
+   * all, return, click and drag.
+   *
+   * Option is read off `e.code` and never `e.key`, because holding option on
+   * a mac keyboard rewrites the character: option+o arrives as "ø",
+   * option+f as "ƒ", option+r as "®". The physical key is the only stable
+   * thing in the event.
+   */
+  if (e.metaKey || e.altKey) {
+    const k = e.code;
+
+    /* The views on the numbers they already answer to, and these two work
        with a card up while the bare ones do not. A bare 1 during a tagging
-       run is a slip of the hand and switching the whole app out from under
+       run is a slip of the hand, and switching the whole app out from under
        an open photograph is not what it meant. A chord is never a slip. */
-    if (e.key === "1") { setView("shelf"); return e.preventDefault(); }
-    if (e.key === "2") { setView("bench"); return e.preventDefault(); }
+    if (k === "Digit1") { setView("shelf"); return e.preventDefault(); }
+    if (k === "Digit2") { setView("bench"); return e.preventDefault(); }
 
     /* Find, which is the letter this app never had room for until tagging
-       moved off the bare letters. It goes to whichever search field the
-       view you are in actually has, and selects what is in it, so a second
-       cmd+f is a new search rather than an append. */
-    if (e.key === "f" || e.key === "F") {
+       moved off the bare letters. It goes to whichever search field the view
+       you are in actually has, and selects what is in it, so a second one is
+       a new search rather than an append. */
+    if (k === "KeyF") {
       const q = $(S.view === "bench" ? "#p-q" : "#f-q");
       if (!q) return;
       q.focus();
@@ -109,10 +125,10 @@ addEventListener("keydown", (e) => {
     }
 
     /* Open a folder, through the same click drop.js is already listening
-       for, so the finder dialog keeps exactly one way in no matter who asks
-       for it. The header button is first in the document, and on an empty
-       archive the one in the blank state answers instead. */
-    if (e.key === "o" || e.key === "O") {
+       for, so the finder dialog keeps exactly one way in no matter who asks.
+       The header button is first in the document, and on an empty archive
+       the one in the blank state answers instead. */
+    if (k === "KeyO") {
       document.querySelector("[data-keepers-choose]")?.click();
       return e.preventDefault();
     }
@@ -123,8 +139,11 @@ addEventListener("keydown", (e) => {
   /* The preview handles its own escape and its own arrows. While it is up it
      also has the bare number keys, for the reason above. */
   if (previewOpen()) return;
-  if (e.key === "1") setView("shelf");
-  if (e.key === "2") setView("bench");
+  /* The bare digits used to switch views. They tag now: the shelf's legend
+     row numbers the first nine codes and a hand running a pile reaches for
+     a digit long before it remembers that celebrating is v. The views keep
+     option+1 and option+2, which is a chord and therefore never a slip
+     halfway down a wall of photographs. */
 });
 
 const state = await (await fetch("/api/state")).json();

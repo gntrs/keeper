@@ -77,21 +77,44 @@ const filtering = () => Boolean(F.tag.size || F.dir.size || F.star || F.untagged
  * rebuilt: a rebuilt chip is a chip that has forgotten it was switched on
  * under somebody's hand.
  */
+/**
+ * Which digit tags which code, and the order is the row on screen.
+ *
+ * It is rebuilt on every render rather than fixed once, because the row is
+ * ordered by what is actually in this archive: a shoot full of portraits
+ * puts portrait on 1 for the person culling it. That does mean the mapping
+ * can move under a hand mid pass, so it only ever moves when a code crosses
+ * zero for the first time, which happens early and then stops.
+ */
+let digits = new Map();
+const digitFor = (code) => digits.get(code) ?? 0;
+export function setDigits(codes) {
+  digits = new Map(codes.slice(0, 9).map((c, i) => [c, i + 1]));
+}
+
 function chip(v, label, count, key) {
   const b = document.createElement("button");
   b.className = "chip";
   b.type = "button";
   b.dataset.v = v;
 
-  /* The letter that tags it, ahead of the word. This is the only place on
-     the page the letters appear, which makes this row the legend for the
-     keyboard as well as the filter for the mouse, and it is already where
-     the eye goes to ask what a tag is. Without it the strip at the bottom
-     says the letters above tag and points at nothing. */
+  /**
+   * What you press, ahead of the word. This row is the legend for the
+   * keyboard as well as the filter for the mouse, and it is already where
+   * the eye goes to ask what a tag is.
+   *
+   * The first nine show a number, because a number is the faster key: the
+   * digits are one row under the fingers in a fixed order, and a hand
+   * running a pile does not want to remember that celebrating is v. The
+   * ones past nine show their letter, since there is no tenth digit worth
+   * having. Both keys always work for every tag either way, so the letters
+   * the tagging agent writes never stop being typeable.
+   */
   if (key === "tag") {
     const k = document.createElement("span");
     k.className = "key";
-    k.textContent = `${v.toLowerCase()} `;
+    const n = digitFor(v);
+    k.textContent = `${n || v.toLowerCase()} `;
     b.append(k);
   }
   b.append(label(v));
@@ -102,7 +125,10 @@ function chip(v, label, count, key) {
 
   /* the full path only when the chip is not already showing it, so a
      tooltip never repeats the label it is standing on */
-  const hint = key === "tag" ? S.hints[v] : label(v) === v ? "" : v;
+  const d = key === "tag" ? digitFor(v) : 0;
+  const hint = key === "tag"
+    ? `${S.hints[v] ?? ""}${d ? `  ·  press ${d} or ${v.toLowerCase()}` : ""}`.trim()
+    : label(v) === v ? "" : v;
   if (hint) b.title = hint;
 
   b.onclick = () => {
@@ -147,6 +173,7 @@ function more(host, rest) {
 
 export function mountShelf() {
   const present = Object.keys(S.vocab).filter((c) => countTag(c) > 0);
+  setDigits(present.length ? present : Object.keys(S.vocab));
   /* Nothing is tagged on a fresh archive, so the row falls back to the whole
      vocabulary. That is the run where the letters matter most: all sixteen
      of them are on screen before the first keystroke. */
@@ -164,6 +191,20 @@ export function mountShelf() {
 
   mountSize();
   mountSweep();
+  /* Clicking the empty part of the grid lets the selection go, the way it
+     does in finder. It is on the grid rather than on the document so that a
+     click in the filter row or the tray does not throw away a pile somebody
+     spent a minute building, and it tests the target so a click that landed
+     on a photograph is left to the tile's own handler. */
+  $("#grid").addEventListener("click", (e) => {
+    if (e.target.closest("figure")) return;
+    if (!drop()) return;
+    renderShelf();
+  });
+  /* the same two presses the keyboard does, because a button that trashed on
+     one click and a key that took two would be two different promises about
+     the same irreversible thing. */
+  $("#f-bin").onclick = () => binPress();
   addEventListener("keydown", onKey);
 }
 
@@ -296,6 +337,7 @@ function mountSweep() {
   let base = null;     // what was already picked when the sweep began
   let rects = null;    // every tile, measured once
   let live = false;    // past the threshold, so this is a sweep and not a click
+  let held4drag = false; // the press was modified and began on a photograph
 
   /* The grid scrolls, so a client coordinate means nothing five hundred
      pixels down the pile. Everything in here is in the grid's own content
@@ -355,6 +397,7 @@ function mountSweep() {
     box?.remove();
     delete document.body.dataset.sweeping;
     box = null; from = null; base = null; rects = null; live = false;
+    held4drag = false;
   }
 
   grid.addEventListener("pointerdown", (e) => {
@@ -362,13 +405,29 @@ function mountSweep() {
     const held = e.metaKey || e.shiftKey;
     const onFrame = Boolean(e.target.closest("figure"));
     if (onFrame && !held) return;
-    /* only here, and only for the press that has already been taken off the
-       drag machine by its modifier. */
-    if (onFrame) e.preventDefault();
     stop();
     from = spot(e);
     base = held ? new Set(sel) : new Set();
+    held4drag = held && onFrame;
     live = false;
+  });
+
+  /**
+   * The one place the native drag is turned off, and it is here rather than
+   * on the press.
+   *
+   * preventDefault on a pointerdown suppresses the whole compatibility
+   * chain chrome builds out of it, mousedown, mouseup and **click** with it.
+   * That is what a cmd click on a photograph was hitting: the press was
+   * cancelled to keep the drag machine off it, the click never happened, and
+   * the tile's own handler, which is what does the toggling, was never
+   * called. It looked exactly like cmd click not being implemented.
+   *
+   * Cancelling the dragstart instead stops the drag just as dead and leaves
+   * the click alone, because a click is not built out of a dragstart.
+   */
+  grid.addEventListener("dragstart", (e) => {
+    if (held4drag) e.preventDefault();
   });
 
   grid.addEventListener("pointermove", (e) => {
@@ -475,6 +534,9 @@ export function renderShelf() {
   }
 
   $("#grid").replaceChildren(...visible.map((item, n) => tile(item, n)));
+  /* after the grid, because what the trash would take depends on what the
+     filters just left standing */
+  sayBin();
 }
 
 /**
@@ -497,6 +559,17 @@ function syncTags() {
       host.append(b);
     }
     b.querySelector("i").textContent = n;
+  }
+  /* A code that has just appeared has taken a digit, so the row of numbers
+     has to be told before the next keystroke lands on the old mapping. The
+     order on screen is the order of the keys and the two cannot be allowed
+     to disagree even for one frame. */
+  setDigits([...host.children].map((b) => b.dataset.v));
+  for (const b of host.children) {
+    const k = b.querySelector(".key");
+    if (!k) continue;
+    const d = digitFor(b.dataset.v);
+    k.textContent = `${d || b.dataset.v.toLowerCase()} `;
   }
 }
 
@@ -648,19 +721,72 @@ function tile(item, n) {
     } else if (e.shiftKey) {
       range(item.id);
     } else {
+      /* A plain click opens it. Selecting is what the modifiers and the
+         swept box are for, and hover already moves the cursor, so a bare
+         click had nothing left to do but the thing you meant by it. It also
+         picks the frame, so that whatever you do next is about the one you
+         are looking at. */
       sel.clear();
       sel.add(item.id);
       anchor = item.id;
+      cursor = n;
+      renderShelf();
+      return open(item);
     }
     cursor = n;
     renderShelf();
   };
 
-  /* The repaint above has already replaced this element by the time the
-     second click lands, but the handler travels with the item it closed
-     over, so the frame that opens is the frame that was hit. */
-  fig.ondblclick = (e) => { e.preventDefault(); open(item); };
+  /**
+   * The frame under the pointer is the frame the keyboard acts on.
+   *
+   * Photo mechanic and lightroom both work this way and it is the faster
+   * hand: the mouse is already pointing at the picture you are thinking
+   * about, so space looks at that one, a letter tags that one and the trash
+   * takes that one, with no click first to tell the app what you were
+   * obviously already looking at.
+   *
+   * It only moves the cursor, never the selection. A pointer crossing forty
+   * frames on its way somewhere must not pick forty frames up.
+   */
+  fig.onpointerenter = () => {
+    if (!byPointer) return;
+    /* a sweep in progress owns the pointer, and a drag to the tray or the
+       bench is a press that has already left the tile it started on. */
+    if (document.body.dataset.sweeping || cursor === n) return;
+    cursor = n;
+    paintCursor();
+  };
   return fig;
+}
+
+/**
+ * Which of the two hands is steering.
+ *
+ * Hover follows the mouse, and the arrows follow the keyboard, and they
+ * fight the moment a hand rests on the trackpad while the other hand runs
+ * the alphabet: every keystroke would jump back to whatever the cursor
+ * happens to be sitting over. So the arrows switch hover off, and the next
+ * real pointer movement switches it back on. Movement, not the enter event
+ * a repaint fires by itself when a new tile appears under a still pointer.
+ */
+let byPointer = true;
+addEventListener("pointermove", () => { byPointer = true; }, { passive: true });
+
+/**
+ * Moving the ring without rebuilding the grid.
+ *
+ * renderShelf() replaces every tile, which on a pointer crossing a wall at
+ * speed is a few hundred elements thrown away per second, and it also takes
+ * the element out from under the pointer mid-gesture. The ring is one class
+ * on two tiles, so it is moved as one class on two tiles.
+ */
+function paintCursor() {
+  const grid = $("#grid");
+  if (!grid) return;
+  grid.querySelector("figure.cursor")?.classList.remove("cursor");
+  grid.children[cursor]?.classList.add("cursor");
+  sayBin();
 }
 
 /**
@@ -670,13 +796,13 @@ function tile(item, n) {
  * person correcting a machine's pass never has to learn a second alphabet.
  */
 async function onKey(e) {
-  if (e.ctrlKey || e.altKey) return;
+  if (e.ctrlKey) return;
   /* One rule, and it is the mac one: a bare letter tags, cmd plus a key
      commands. It is not a tidiness. r was bound bare to reveal in finder and
      sat in front of the tag table, so resting, one of the sixteen, could not
      be typed at all, and putting find on f would have taken food the same
      way. The rule frees both letters and every letter after them. */
-  if (e.metaKey) return command(e);
+  if (e.metaKey || e.altKey) return command(e);
   if (S.view !== "shelf" || e.target.matches("input")) return;
 
   /**
@@ -688,6 +814,22 @@ async function onKey(e) {
    * the same thing twice. Nothing advances afterwards: the card is one
    * photograph being looked at, not a run.
    */
+  /**
+   * The trash, on the key finder puts it on, and it means what finder means:
+   * the file is moved, not removed. It goes to the macOS Trash with its Put
+   * Back record, so this is undone from finder in one keystroke.
+   *
+   * Two presses. The first arms and says what will happen and to how many,
+   * the second does it. A cull runs at a keystroke every half second and the
+   * one irreversible key in the app is not allowed to be reachable at that
+   * speed. It sits above the preview branch on purpose: a frame you have
+   * opened to look at properly is exactly the frame you decide to bin.
+   */
+  if (e.key === "Backspace" || e.key === "Delete") {
+    binPress();
+    return e.preventDefault();
+  }
+
   const shown = previewOpen() ? current() : null;
   if (shown) {
     const landed = () => { renderShelf(); tally(); return e.preventDefault(); };
@@ -706,6 +848,9 @@ async function onKey(e) {
      of what escape means everywhere else on this machine: back out of the
      thing you are inside. The preview owns it while it is open, above. */
   if (e.key === "Escape") {
+    /* the ask first: escape backs out of the innermost thing you are inside,
+       and while it is up that is the ask and not the pile it is about. */
+    if (armed) { binCancel(); return e.preventDefault(); }
     if (!drop()) return;
     renderShelf();
     return e.preventDefault();
@@ -726,6 +871,7 @@ async function onKey(e) {
   const move = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols }[e.key];
 
   if (move !== undefined) {
+    byPointer = false;
     cursor = Math.min(Math.max(cursor + move, 0), visible.length - 1);
     /* Shift walks the range out from the anchor and a bare arrow lets it
        go, both the way finder does it. Letting go is the important half: a
@@ -755,6 +901,19 @@ async function onKey(e) {
     return e.preventDefault();
   }
 
+  /* a digit is the same act as its letter, and it is the one a hand running
+     a pile actually reaches for. the mapping is whatever the legend row is
+     showing, so what you press is what you can read. */
+  if (/^[1-9]$/.test(e.key)) {
+    const hit = [...digits].find(([, d]) => d === Number(e.key));
+    if (hit) {
+      if (picked()) { await markAll([...sel], hit[0]); return e.preventDefault(); }
+      await mark(item, hit[0]);
+      step();
+      return e.preventDefault();
+    }
+  }
+
   const code = e.key.toUpperCase();
   if (S.vocab[code]) {
     /* A selection takes the keystroke whole and stays where it is. Nothing
@@ -782,29 +941,54 @@ async function onKey(e) {
  * where this file never mounts and none of this exists.
  */
 function command(e) {
-  if (e.target.matches("input, select, textarea")) return;
+  if (e.target?.matches?.("input, select, textarea")) return;
   if (S.view !== "shelf") return;
-  const k = e.key.toLowerCase();
+
+  /* Option rewrites the character on a mac keyboard, so option+r arrives as
+     "®" and option+delete as a word-delete. The physical key is the only
+     thing in the event worth reading once a modifier is down. */
+  const k = e.code;
 
   /**
-   * Reveal, on the chord lightroom and bridge already use, and off the bare
-   * r it had been eating a tag with. The reveal request goes out before
-   * preventDefault has to hold, so the worst chrome can do with its own
-   * reload shortcut is reload a page that has already opened finder, and
-   * everything on screen is on the server anyway.
+   * Reveal in finder, on option rather than on cmd.
+   *
+   * It was cmd+r, which lightroom and bridge use and which reads right. In
+   * a browser it is not available: cmd+r is a chrome accelerator resolved
+   * above the page, preventDefault runs, and the tab reloads anyway. Tested
+   * by the person using it, which is the only test that counted.
+   *
+   * It is also off the bare r it used to sit on, where it was quietly
+   * eating the `resting` tag.
    */
-  if (k === "r") {
+  if (k === "KeyR") {
     reveal(previewOpen() ? current() : visible[cursor]);
     return e.preventDefault();
   }
 
+  /**
+   * The trash, on the chord finder uses for it, and it means what finder
+   * means: the file is moved, not removed. It goes to the macOS Trash with
+   * its Put Back record, so this is undone from finder in one keystroke.
+   *
+   * Two presses, like emptying a tray. The first arms and says what will
+   * happen and to how many, the second does it. A cull runs at a keystroke
+   * every half second and the one irreversible key in the app is not allowed
+   * to be reachable at that speed.
+   */
   if (!visible.length) return;
 
   /* Everything the filters left, and not one frame more. Select all on a
      filtered pile means all of this, because the filter is the question
      being asked and answering a different one would be the fastest way in
      this app to tag two thousand frames wrong. */
-  if (k === "a") {
+  if (k === "KeyA") {
+    /* Pressing it again lets the lot go. Select all with no way back out of
+       it is a trap, and the second press is where a hand already is. */
+    if (visible.every((i) => sel.has(i.id)) && sel.size) {
+      drop();
+      renderShelf();
+      return e.preventDefault();
+    }
     for (const i of visible) sel.add(i.id);
     anchor = visible[0].id;
     renderShelf();
@@ -815,7 +999,123 @@ function command(e) {
      cmd+return rather than a letter: every letter is either a tag or one
      keystroke away from being mistaken for one, and return already means
      commit the thing in front of you. */
-  if (e.key === "Enter") { collect(); return e.preventDefault(); }
+  if (k === "Enter") { collect(); return e.preventDefault(); }
+}
+
+/* ------------------------------------------------------------------ */
+/* the trash                                                           */
+/* ------------------------------------------------------------------ */
+
+let armed = null;      // the ids the armed press would take
+let armedAt = 0;
+
+/* Above this many, a repeat of the same key is not consent. One frame is a
+   decision you have already made by pointing at it. Four hundred is not, and
+   the second press arrives half a second after the first in an app where
+   every other keystroke is harmless and repeats fast. */
+const MANY = 6;
+
+/** what the trash would take right now: the selection, the frame the preview
+    is showing, or the one under the cursor, in that order */
+function binTargets() {
+  if (picked()) return [...sel];
+  const shown = previewOpen() ? current() : null;
+  return [shown?.id ?? visible[cursor]?.id].filter(Boolean);
+}
+
+/** first press arms and says so, second press inside the window commits */
+function binPress() {
+  const ids = binTargets();
+  if (!ids.length) return;
+  const same = armed && armed.length === ids.length && armed.every((id) => ids.includes(id));
+  /* a small number is committed by the same key again, because the card is
+     already in front of you and the count is one you can hold in your head.
+     a large one is not: it has its own button and you have to go and press
+     it. */
+  if (same && ids.length <= MANY && Date.now() - armedAt < 4000) return bin(ids);
+  armed = ids;
+  armedAt = Date.now();
+  sayBin();
+  if (ids.length <= MANY) {
+    setTimeout(() => { if (Date.now() - armedAt >= 4000) { armed = null; sayBin(); } }, 4100);
+  }
+}
+
+export function binCancel() {
+  if (!armed) return;
+  armed = null;
+  sayBin();
+}
+
+async function bin(ids) {
+  armed = null;
+  const ok = await post("/api/trash", { ids });
+  if (!ok) { sayBin("that did not go to the trash. the file may be on a drive that is gone."); return; }
+
+  /* The server has already dropped them from the index, so the page drops
+     them from its own copy rather than asking for the whole state again:
+     re-fetching would throw away the cursor, the selection and the scroll
+     position of someone in the middle of a cull. */
+  const gone = new Set(ids);
+  S.items = S.items.filter((i) => !gone.has(i.id));
+  S.byId = new Map(S.items.map((i) => [i.id, i]));
+  for (const id of gone) sel.delete(id);
+  renderShelf();
+  tally();
+  sayBin(`${ids.length} ${ids.length === 1 ? "frame" : "frames"} in the trash. finder can put them back.`);
+  setTimeout(() => sayBin(), 6000);
+}
+
+/**
+ * What the trash says, and where.
+ *
+ * Under the threshold it is one word in the filter row, because it is one
+ * frame and a dialog for one frame is an app that does not trust you.
+ *
+ * Over it, the confirmation comes to the middle of the screen and stops
+ * everything, because this is the only thing in keepers that cannot be
+ * undone from inside keepers. It names the number and it makes you press a
+ * different thing than the key you were already pressing.
+ */
+function sayBin(text) {
+  const el = $("#f-bin");
+  if (!el) return;
+  const n = armed?.length ?? 0;
+  const big = n > MANY;
+
+  el.hidden = !armed && !text && !binTargets().length;
+  el.classList.toggle("armed", !!armed && !big);
+  el.textContent = armed && !big
+    ? `press again to trash ${n} ${n === 1 ? "frame" : "frames"}`
+    : text || "move to trash";
+
+  bigAsk(big ? n : 0);
+}
+
+/** the full stop in the middle of the screen, and only for a real pile */
+function bigAsk(n) {
+  let box = $("#bin-ask");
+  if (!n) { box?.remove(); return; }
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "bin-ask";
+    box.innerHTML = `
+      <div class="bin-card">
+        <p class="bin-n"></p>
+        <p class="bin-what">to the trash. finder can put them back, and keepers cannot.</p>
+        <div class="bin-acts">
+          <button type="button" class="chip bin-no">keep them</button>
+          <button type="button" class="bin-yes"></button>
+        </div>
+      </div>`;
+    document.body.append(box);
+    box.querySelector(".bin-no").onclick = () => binCancel();
+    box.addEventListener("click", (e) => { if (e.target === box) binCancel(); });
+    box.querySelector(".bin-yes").onclick = () => { const ids = armed; armed = null; bigAsk(0); bin(ids); };
+  }
+  box.querySelector(".bin-n").textContent = `${n} frames`;
+  box.querySelector(".bin-yes").textContent = `trash ${n}`;
+  box.querySelector(".bin-yes").focus();
 }
 
 /**

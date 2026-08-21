@@ -41,6 +41,14 @@
       <button class="chip" id="f-star">kept <i></i></button>
       <button class="chip" id="f-untagged">untagged <i></i></button>
       <button class="chip" id="f-clear">clear</button>
+      <!--
+        the trash. it says what it would do rather than carrying a bin icon,
+        because this is the one control in keepers that touches an original
+        file, and the one place a word is worth the room it takes. it arms on
+        the first press and commits on the second, exactly as the delete key
+        does.
+      -->
+      <button class="chip" id="f-bin" hidden>move to trash</button>
       <input type="search" id="f-q" placeholder="search the path">
       <span class="grow"></span>
       <!--
@@ -105,14 +113,23 @@
 
 <footer class="keys">
   <!--
-    one rule holds this row together: a bare letter tags, cmd plus a key
-    commands. it is why r and f are back in the tag alphabet and why space
-    is quick look, the way it is everywhere else on this machine.
+    One rule holds this row together: a bare letter tags, a modifier plus a
+    key commands. It is why r and f are back in the tag alphabet and why
+    space is quick look, the way it is everywhere else on this machine.
+
+    The glyphs are the ones printed on the keys. Nobody on a mac reads the
+    word "cmd" faster than the symbol, and half of these are chords where
+    the words run three times the length.
+
+    ⌥ and not ⌘ on finder, open and the views: chrome resolves cmd+r, cmd+o
+    and cmd+1 through cmd+9 above the page, so preventDefault runs and the
+    tab reloads or switches anyway. Option is an ordinary application
+    modifier on this platform and chrome claims almost none of it.
   -->
-  <span><b>tag</b> <kbd>arrows</kbd> move · the letters above tag · <kbd>k</kbd> keep · <kbd>space</kbd> look</span>
-  <span><b>pick</b> click · <kbd>shift</kbd>+click a range · <kbd>cmd</kbd>+click one · <kbd>cmd</kbd>+drag a box · <kbd>cmd</kbd>+<kbd>a</kbd> all · <kbd>esc</kbd> none · <kbd>cmd</kbd>+<kbd>return</kbd> to the tray</span>
-  <span><b>app</b> <kbd>cmd</kbd>+<kbd>r</kbd> finder · <kbd>cmd</kbd>+<kbd>f</kbd> find · <kbd>cmd</kbd>+<kbd>o</kbd> open a folder · <kbd>1</kbd> <kbd>2</kbd> views</span>
-  <span><b>bench</b> drag a frame onto a slot · drag inside to move · <kbd>alt</kbd>+wheel to punch in · <kbd>0</kbd> reset · <kbd>del</kbd> clear</span>
+  <span><b>tag</b> <kbd>←↑↓→</kbd> move · <kbd>1</kbd> to <kbd>9</kbd> or the letters above · <kbd>k</kbd> keep · <kbd>␣</kbd> or click to look</span>
+  <span><b>pick</b> <kbd>⇧</kbd>click a range · <kbd>⌘</kbd>click one · <kbd>⌘</kbd>drag a box · <kbd>⌘A</kbd> all, again for none · <kbd>⎋</kbd> or click the ground · <kbd>⌘⏎</kbd> to the tray</span>
+  <span><b>app</b> <kbd>⌫</kbd> trash, twice · <kbd>⌥R</kbd> finder · <kbd>⌘F</kbd> find · <kbd>⌥O</kbd> open a folder · <kbd>⌥1</kbd> <kbd>⌥2</kbd> views</span>
+  <span><b>bench</b> drag onto a slot · drag inside to move · <kbd>⌥</kbd>wheel to punch in · <kbd>0</kbd> reset · <kbd>⌫</kbd> clear the slot</span>
 </footer>
 
 <script type="module" src="/app.js"></script>

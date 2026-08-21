@@ -4,7 +4,7 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { paths, readIndex, readTags, writeTags, readPlacements, writePlacements } from "./store.mjs";
+import { paths, readIndex, writeIndex, readTags, writeTags, readPlacements, writePlacements } from "./store.mjs";
 import { startOpen, jobState } from "./open.mjs";
 import { locate } from "./locate.mjs";
 import {
@@ -285,6 +285,66 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
         if (!hit) return json(res, 404, { error: "unknown frame" });
         execFile("open", ["-R", path.join(root, hit.path)], () => {});
         return json(res, 200, { ok: true });
+      }
+
+      /**
+       * The one thing in keepers that touches an original, and it moves it
+       * rather than removing it.
+       *
+       * Finder's own delete is used, through osascript, for one reason: it
+       * puts the file in the Trash with its "Put Back" record intact, so the
+       * whole thing is undone from Finder in one keystroke. `unlink` would
+       * be one line and it would be permanent, and permanent is not a thing
+       * a culling tool gets to do to somebody's negatives.
+       *
+       * Every id is checked against the index first, so this can only ever
+       * name a file keepers has already scanned, and the paths go to
+       * osascript as an argv list rather than inside a built string.
+       */
+      if (route === "/api/trash" && req.method === "POST") {
+        if (process.platform !== "darwin") {
+          return json(res, 400, { error: "the trash is macOS only" });
+        }
+        if (!ownOrigin(req)) return json(res, 403, { error: "that request came from another page" });
+
+        const b = await body(req);
+        const ids = Array.isArray(b.ids) ? b.ids : [];
+        if (!ids.length) return json(res, 400, { error: "no frames named" });
+
+        const index = await readIndex(root);
+        const known = new Map((index?.items ?? []).map((i) => [i.id, i]));
+        const hits = ids.map((id) => known.get(id)).filter(Boolean);
+        if (hits.length !== ids.length) return json(res, 404, { error: "unknown frame" });
+
+        const files = hits.map((h) => path.join(root, h.path));
+        const script = `on run argv
+  set l to {}
+  repeat with p in argv
+    set end of l to POSIX file (p as text)
+  end repeat
+  tell application "Finder" to delete l
+end run`;
+
+        try {
+          await new Promise((ok, no) => {
+            execFile("osascript", ["-e", script, ...files], (err, _o, stderr) =>
+              err ? no(new Error(String(stderr || err.message).trim())) : ok());
+          });
+        } catch (e) {
+          return json(res, 500, { error: e.message });
+        }
+
+        /* The index is the app's copy of what is on the drive, so it has to
+           lose them too. Tags and placements are deliberately left alone: a
+           frame put back from the Trash comes back to its own tags, because
+           an id is a hash of the path and the path did not change. */
+        const gone = new Set(ids);
+        await writeIndex(root, {
+          ...index,
+          items: (index?.items ?? []).filter((i) => !gone.has(i.id)),
+        });
+
+        return json(res, 200, { ok: true, trashed: hits.length });
       }
 
       if (route === "/api/tag" && req.method === "POST") {

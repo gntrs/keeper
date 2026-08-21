@@ -1,3 +1,4 @@
+@import "/font/outfit.css";
 @import "/font/geist.css";
 
 /* ---------------------------------------------------------------------
@@ -27,15 +28,18 @@
      reads across a wall without being a second thing to look at. */
   --pick: #2c2c31;
 
-  /* Geist and Geist Mono, both self hosted from web/font, so the app looks
-     the same on a plane as it does on wifi and never falls back to Times.
+  /* Outfit for everything with a word in it, Geist Mono for everything with
+     a number or a path in it. Both self hosted from web/font, so the app
+     looks the same on a plane as on wifi and never falls back to Times.
 
-     The mono is a real second voice here rather than a place to put code.
-     It carries the wordmark, the nav, every label, every chip and every
-     number, which is most of the interface, and the sans is left to do the
-     one thing a mono cannot: read as a sentence. Two faces, and the line
-     between them is whether the thing is a word or a control. */
-  --sans: Geist, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+     The mono used to carry the labels and the chips as well, which is the
+     openmail arrangement and is correct for a page you read. This is not a
+     page you read: it is a wall of photographs with words around the edge,
+     and a narrow mono at the edge of it reads as machine output rather than
+     as an interface. So the mono is now down to what a mono is actually for
+     here, holding a column of digits still and printing a path exactly, and
+     Outfit does the talking, round and heavy. */
+  --sans: Outfit, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
@@ -84,9 +88,9 @@ body {
    doing. If the capitals are ever wanted back it is the same one word
    in every rule here that carries text-transform. */
 .label {
-  font: 600 .72rem/1 var(--mono);
+  font: 600 .78rem/1 var(--sans);
   text-transform: lowercase;
-  letter-spacing: .16em;
+  letter-spacing: .06em;
   color: var(--ink-3);
 }
 .dim { color: var(--ink-2); }
@@ -119,14 +123,14 @@ header.bar {
    things beside it and it is the first word on the page because it is the
    first word on the page. */
 header.bar > strong {
-  font: 600 .95rem/1 var(--mono);
-  letter-spacing: .02em;
+  font: 700 1.05rem/1 var(--sans);
+  letter-spacing: -.01em;
 }
 header.bar nav { display: flex; gap: var(--s1); }
 header.bar nav button {
   border: 0; background: none; color: var(--ink-3);
   padding: var(--s1) var(--s3); border-radius: var(--r); cursor: pointer;
-  font: 600 .72rem/1 var(--mono); text-transform: lowercase; letter-spacing: .16em;
+  font: 600 .85rem/1 var(--sans); text-transform: lowercase; letter-spacing: 0;
 }
 header.bar nav button:hover { color: var(--ink); }
 /* the view you are looking at is already telling you which view it is, so
@@ -169,7 +173,7 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
 .chip {
   border: 0; background: none; color: var(--ink-2);
   border-radius: var(--r); padding: 5px var(--s2); cursor: pointer;
-  font: 500 .8rem/1.3 var(--mono); white-space: nowrap;
+  font: 600 .85rem/1.3 var(--sans); white-space: nowrap;
 }
 .chip:hover { color: var(--ink); background: var(--raise); }
 .chip.on { background: var(--hot); color: #fff; }
@@ -182,7 +186,7 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
 input[type=search] {
   border: 0; border-bottom: 1px solid var(--line-strong);
   background: none; padding: var(--s1) var(--s1) 5px;
-  font: 400 .8rem/1.3 var(--mono); width: 240px; border-radius: 0;
+  font: 500 .85rem/1.3 var(--sans); width: 240px; border-radius: 0;
   transition: border-color var(--fast) var(--ease);
 }
 input[type=search]:focus { outline: 0; border-bottom-color: var(--hot); }
@@ -204,6 +208,14 @@ input[type=search]::placeholder { color: var(--ink-3); }
    survives the pile scrolling under a held button. */
 #grid { grid-template-columns: repeat(auto-fill, minmax(var(--tile, 208px), 1fr));
         position: relative; }
+/* A swept box across a wall of tiles leaves a trail of highlighted captions
+   behind it, so the tiles themselves are not text. The caption is, because
+   it is a file path and a path is the one thing on this screen somebody
+   genuinely wants to take away with them. Everything outside the grid is
+   left alone: the tally, the labels, the numbers and the whole preview are
+   ordinary selectable text. */
+#grid figure, #strip figure { user-select: none; -webkit-user-select: none; }
+figcaption { user-select: text; -webkit-user-select: text; cursor: text; }
 figure { margin: 0; position: relative; background: #0f0f11; cursor: pointer; }
 figure img {
   display: block; width: 100%; aspect-ratio: 3/2; object-fit: cover;
@@ -569,9 +581,16 @@ footer.keys b {
   font: 500 .7rem/1.6 var(--mono); text-transform: lowercase;
   letter-spacing: .16em; color: var(--ink-3); margin-right: var(--s2);
 }
+/* The glyphs come out of the system font rather than Geist Mono, which has
+   no ⌘ ⌥ ⇧ ⏎ ⌫ ⎋ in it, and a missing glyph falls back to whatever the
+   browser can find and arrives at a different size and weight from the key
+   beside it. Naming the system stack here keeps a row of chords even. */
 kbd {
-  font: inherit; background: var(--raise); border-radius: 3px;
+  font: inherit;
+  font-family: -apple-system, BlinkMacSystemFont, var(--mono);
+  background: var(--raise); border-radius: 3px;
   padding: 1px 5px; color: var(--ink-2);
+  white-space: nowrap;
 }
 
 /* Reduced motion means no movement, not no feedback. Everything that slid,
@@ -1104,3 +1123,77 @@ body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
 @media (prefers-reduced-motion: reduce) {
   .size input[type="range"]::-webkit-slider-thumb { transition: none; }
 }
+
+
+/* ---------------------------------------------------------------------
+   The trash.
+
+   The one control in keepers that touches an original file, so it is the
+   one control that is allowed to be red, and only in its second state.
+   Resting it is a chip like any other and says what it would do. Armed it
+   is the accent and says what will happen and to how many, which is the
+   whole of the confirmation: no dialog, no overlay, no second window to
+   read, just the same button telling you the truth before you press it
+   again.
+
+   It sits in the `only` row rather than floating over the grid, because a
+   destructive control that follows your pointer around is one twitch from
+   being pressed by accident.
+   --------------------------------------------------------------------- */
+#f-bin[hidden] { display: none; }
+#f-bin { color: var(--ink-3); }
+#f-bin:hover { color: var(--ink); background: var(--raise); }
+#f-bin.armed,
+#f-bin.armed:hover { background: var(--hot); color: #fff; }
+
+/* ---------------------------------------------------------------------
+   The full stop.
+
+   Everything else in keepers happens quietly and can be undone from inside
+   keepers. Moving a pile of originals to the trash cannot, so it is the one
+   thing that comes to the middle of the screen and waits.
+
+   It only appears past a handful. One frame gets a word in the filter row,
+   because a dialog for one frame is an app that does not trust you.
+   --------------------------------------------------------------------- */
+#bin-ask {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center;
+  background: #0b0b0cc4;
+  backdrop-filter: blur(14px) saturate(.9);
+  -webkit-backdrop-filter: blur(14px) saturate(.9);
+  animation: rise var(--mid) var(--ease);
+}
+.bin-card {
+  background: var(--raise);
+  border-radius: 6px;
+  padding: var(--s6) var(--s7);
+  text-align: center;
+  box-shadow: 0 24px 64px #00000073;
+  max-width: 30rem;
+}
+/* the number is the whole message, so it is the size of one */
+.bin-n {
+  margin: 0;
+  font: 700 2.6rem/1 var(--sans);
+  letter-spacing: -.02em;
+  color: var(--hot);
+}
+.bin-what {
+  margin: var(--s3) 0 0;
+  color: var(--ink-2); font-size: .95rem; line-height: 1.5;
+}
+.bin-acts {
+  display: flex; gap: var(--s3); justify-content: center;
+  margin-top: var(--s6);
+}
+/* keeping them is the safe half, so it wears ordinary clothes and sits on
+   the left where a hand is not already travelling. */
+.bin-no { font-size: .9rem; }
+.bin-yes {
+  border: 0; border-radius: var(--r); cursor: pointer;
+  background: var(--hot); color: #fff;
+  padding: var(--s2) var(--s5);
+  font: 600 .9rem/1 var(--sans);
+}
+.bin-yes:hover { filter: brightness(1.12); }
