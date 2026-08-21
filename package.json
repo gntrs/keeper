@@ -1,0 +1,17 @@
+{
+  "name": "keepers",
+  "version": "0.1.0",
+  "description": "Point it at a drive of photographs, get back the ones worth keeping, cropped into the holes they have to fill.",
+  "type": "module",
+  "bin": { "keepers": "bin/keepers.mjs" },
+  "files": ["bin", "src", "web", "keepers.config.example.json"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "keepers": "node bin/keepers.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5"
+  },
+  "keywords": ["photography", "contact-sheet", "archive", "crop", "cull"],
+  "license": "MIT"
+}

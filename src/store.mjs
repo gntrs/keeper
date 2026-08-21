@@ -1,0 +1,44 @@
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+export const DIR = ".keepers";
+
+/**
+ * A frame's id is a hash of its path inside the archive, not its position in
+ * the scan. That choice is what lets an archive grow: drop 200 new frames in
+ * and every tag written last month still points at the same photograph.
+ * Position based ids would have silently slid by 200 and repointed the lot.
+ */
+export function idFor(relPath) {
+  return createHash("sha1").update(relPath).digest("hex").slice(0, 12);
+}
+
+export const paths = (root) => ({
+  dir: path.join(root, DIR),
+  index: path.join(root, DIR, "index.json"),
+  tags: path.join(root, DIR, "tags.json"),
+  placements: path.join(root, DIR, "placements.json"),
+  thumbs: path.join(root, DIR, "thumbs"),
+  sheets: path.join(root, DIR, "sheets"),
+});
+
+async function readJson(file, fallback) {
+  try {
+    return JSON.parse(await readFile(file, "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeJson(file, value) {
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify(value, null, 1));
+}
+
+export const readIndex = (root) => readJson(paths(root).index, null);
+export const writeIndex = (root, v) => writeJson(paths(root).index, v);
+export const readTags = (root) => readJson(paths(root).tags, {});
+export const writeTags = (root, v) => writeJson(paths(root).tags, v);
+export const readPlacements = (root) => readJson(paths(root).placements, {});
+export const writePlacements = (root, v) => writeJson(paths(root).placements, v);

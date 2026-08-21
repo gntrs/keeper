@@ -1,0 +1,12 @@
+{
+  "out": "keepers-out",
+  "slots": [
+    { "id": "hero",    "label": "hero banner",  "aspect": "16/9", "width": 2400,
+      "note": "wide, and it sits under type, so leave the middle quiet" },
+    { "id": "about-1", "label": "about, lead",  "aspect": "3/2",  "width": 1200,
+      "note": "the room rather than a wall of faces" },
+    { "id": "about-2", "label": "about, print", "aspect": "3/2",  "width": 600 },
+    { "id": "grid-a",  "label": "grid one",     "aspect": "1/1",  "width": 800 },
+    { "id": "grid-b",  "label": "grid two",     "aspect": "1/1",  "width": 800 }
+  ]
+}

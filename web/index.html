@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keepers</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e1062c'/></svg>">
+</head>
+<body>
+
+<header class="bar">
+  <strong>keepers</strong>
+  <nav>
+    <button data-view="shelf" class="on">shelf</button>
+    <button data-view="bench">bench</button>
+  </nav>
+  <span id="tally"></span>
+  <span class="grow"></span>
+  <span id="root" class="dim"></span>
+</header>
+
+<section id="shelf" class="view">
+  <div id="filters">
+    <div class="row"><b class="label">what</b><span id="f-tag"></span></div>
+    <div class="row"><b class="label">where</b><span id="f-dir"></span></div>
+    <div class="row">
+      <b class="label">only</b>
+      <button class="chip" id="f-star">the good ones <i></i></button>
+      <button class="chip" id="f-untagged">untagged <i></i></button>
+      <button class="chip" id="f-clear">clear</button>
+      <input type="search" id="f-q" placeholder="search the path">
+    </div>
+  </div>
+  <div id="grid"></div>
+  <p id="none" hidden>nothing matches that.</p>
+</section>
+
+<section id="bench" class="view" hidden>
+  <div id="slots"></div>
+  <div id="picker">
+    <div id="picker-head">
+      <span id="picker-label" class="label">drag onto a slot</span>
+      <span class="grow"></span>
+      <button class="chip" id="p-star">good ones only</button>
+      <input type="search" id="p-q" placeholder="search">
+    </div>
+    <div id="strip"></div>
+  </div>
+</section>
+
+<div id="lb" hidden><img alt=""><div id="lbmeta"></div></div>
+
+<footer class="keys">
+  <span><b>shelf</b> <kbd>arrows</kbd> move · <kbd>a-z</kbd> tag · <kbd>space</kbd> keep · <kbd>enter</kbd> open</span>
+  <span><b>bench</b> drag a frame onto a slot · drag inside to move · <kbd>alt</kbd>+wheel to punch in · <kbd>0</kbd> reset · <kbd>del</kbd> clear</span>
+</footer>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
