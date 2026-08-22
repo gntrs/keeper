@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { buildIndex } from "../src/open.mjs";
 import { buildSheets, GRID_ADVICE, cellWidth } from "../src/sheets.mjs";
 import { parseCompact, applyToIndex, VOCAB } from "../src/tags.mjs";
-import { paths, readIndex, readTags, writeTags } from "../src/store.mjs";
+import { adopt, paths, readIndex, readTags, writeTags } from "../src/store.mjs";
 import { loadConfig, CONFIG_NAME } from "../src/config.mjs";
 import { exportCrops } from "../src/crops.mjs";
 import { serve } from "../src/server.mjs";
@@ -47,7 +47,7 @@ function nice(p) {
 
 /**
  * Flags that are on or off and never carry a value. Without this list the
- * next word gets eaten as the flag's argument, so `keepers --no-open ~/shoot`
+ * next word gets eaten as the flag's argument, so `keeper --no-open ~/shoot`
  * would set no-open to the folder and then index the current directory
  * instead. `--open` is here although opening is the default now: it costs a
  * line, and someone with it in their fingers should not be punished by having
@@ -70,14 +70,14 @@ function parseArgs(argv) {
 }
 
 const HELP = `
-${hot("keepers")}  find the frames worth keeping, and crop them into the holes they fill
+${hot("keeper")}  find the frames worth keeping, and crop them into the holes they fill
 
-  keepers <folder>                 scan, thumbnail, and open the shelf
-  keepers sheets <folder>          contact sheets for a coding agent to read
-  keepers tag <folder> <file>      apply the tags that agent wrote
-  keepers export <folder>          write the placed crops out
-  keepers trays <folder>           what is in the trays, and how much
-  keepers init [folder]            create ${CONFIG_NAME}
+  keeper <folder>                 scan, thumbnail, and open the shelf
+  keeper sheets <folder>          contact sheets for a coding agent to read
+  keeper tag <folder> <file>      apply the tags that agent wrote
+  keeper export <folder>          write the placed crops out
+  keeper trays <folder>           what is in the trays, and how much
+  keeper init [folder]            create ${CONFIG_NAME}
 
 ${dim("options")}
   --port <n>        default 7777
@@ -135,7 +135,7 @@ async function indexWithBar(root, { rescan = false } = {}) {
     },
   });
 
-  if (!index.items.length) say(dim("  no photographs and no film here that keepers can read."));
+  if (!index.items.length) say(dim("  no photographs and no film here that keeper can read."));
   return index;
 }
 
@@ -162,9 +162,9 @@ async function main() {
 
   if (cmd === "help" || flags.help) { say(HELP); return; }
 
-  /* A bare `keepers` used to resolve to "." and start indexing it. Typed in a
+  /* A bare `keeper` used to resolve to "." and start indexing it. Typed in a
      home folder, which is where a terminal opens, that is a thumbnail of
-     every file you own and a .keepers folder written into your home, for
+     every file you own and a .keeper folder written into your home, for
      someone who was only asking what the command does. No folder is not a
      folder, so it gets the help. */
   if (cmd === "shelf" && !rest.length) { say(HELP); return; }
@@ -172,15 +172,16 @@ async function main() {
   if (cmd === "init") {
     const dst = path.join(root, CONFIG_NAME);
     if (existsSync(dst)) { say(hot(`  ${CONFIG_NAME} already exists, leaving it alone`)); return; }
-    await copyFile(path.join(HERE, "..", "keepers.config.example.json"), dst);
+    await copyFile(path.join(HERE, "..", "keeper.config.example.json"), dst);
     say(`  wrote ${hot(CONFIG_NAME)}`);
-    say(dim("  edit the slots, then run `keepers <your archive folder>`"));
+    say(dim("  edit the slots, then run `keeper <your archive folder>`"));
     return;
   }
 
   if (!existsSync(root)) { say(hot(`  no such folder: ${root}`)); process.exit(1); }
+  await adopt(root);
   say("");
-  say(`  ${hot("keepers")} ${dim(root)}`);
+  say(`  ${hot("keeper")} ${dim(root)}`);
 
   if (cmd === "sheets") {
     const index = await indexWithBar(root, { rescan: !!flags.rescan });
@@ -198,7 +199,7 @@ async function main() {
     say("");
     say(`  ${dim("they are in")} ${nice(P.sheets)}`);
     say(`  ${dim("hand them to a coding agent with AGENTS.md, then:")}`);
-    say(`     keepers tag ${nice(root)} tags.txt`);
+    say(`     keeper tag ${nice(root)} tags.txt`);
     return;
   }
 
@@ -246,11 +247,11 @@ async function main() {
     say("");
     say(`  wrote ${hot(n)} ${n === 1 ? "crop" : "crops"} to ${dim(nice(out.dir))}`);
     if (out.empty) {
-      say(dim(`  ${out.empty} of your ${out.mine} slots are still empty. run \`keepers <folder>\` and fill them.`));
+      say(dim(`  ${out.empty} of your ${out.mine} slots are still empty. run \`keeper <folder>\` and fill them.`));
     }
     if (!n && config.missing) {
-      say(dim(`  there is no ${CONFIG_NAME} in this folder, so keepers only knows`));
-      say(dim(`  the standard shapes. \`keepers init\` adds your own.`));
+      say(dim(`  there is no ${CONFIG_NAME} in this folder, so keeper only knows`));
+      say(dim(`  the standard shapes. \`keeper init\` adds your own.`));
     }
     return;
   }
@@ -316,7 +317,7 @@ async function main() {
       say(`  ${t.name.padEnd(20)} ${n.padEnd(12)} ${dim(t.id)}${mark}`);
     }
     say("");
-    say(dim(`  keepers trays ${nice(root)} --export <tray> --to <folder>`));
+    say(dim(`  keeper trays ${nice(root)} --export <tray> --to <folder>`));
     say(dim(`  add --mode symlink to point at the originals instead of copying them`));
     return;
   }
@@ -326,7 +327,7 @@ async function main() {
   const index = await indexWithBar(root, { rescan: !!flags.rescan });
   // An empty archive still opens. It used to stop here with one line in the
   // terminal, which is the least useful moment to say nothing: someone who
-  // pointed keepers at the wrong folder learns more from a page that says
+  // pointed keeper at the wrong folder learns more from a page that says
   // what it reads than from a sentence that says it found nothing. The shelf
   // has a state for this.
   summarise(index.items, await readTags(root));

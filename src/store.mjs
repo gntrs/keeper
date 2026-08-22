@@ -1,8 +1,31 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
-export const DIR = ".keepers";
+export const DIR = ".keeper";
+
+/** what the scratch folder was called before the tool was, and the archives
+ *  written under that name are still full of thumbnails and placements */
+const WAS = ".keepers";
+
+/**
+ * Take over an archive that was indexed under the old folder name. A rename
+ * rather than a rebuild, because the expensive half of an archive is the
+ * thumbnails and the irreplaceable half is the placements, and both are
+ * already sitting there under a name one letter longer than the one this
+ * looks for.
+ *
+ * It only ever runs when there is nothing to lose: a folder that already has
+ * a `.keeper` in it is left exactly as it is, both folders and all.
+ */
+export async function adopt(root) {
+  const now = path.join(root, DIR);
+  const then = path.join(root, WAS);
+  if (existsSync(now) || !existsSync(then)) return false;
+  await rename(then, now);
+  return true;
+}
 
 /**
  * A frame's id is a hash of its path inside the archive, not its position in

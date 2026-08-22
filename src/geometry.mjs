@@ -1,5 +1,5 @@
 /**
- * The crop model. The only part of keepers that has to be exactly right,
+ * The crop model. The only part of keeper that has to be exactly right,
  * because what the bench draws and what the exporter cuts are the same
  * rectangle, computed here once and used two ways.
  *
@@ -75,7 +75,7 @@ export function clamp(place, nw, nh, aspect) {
  * The same rectangle said the way CSS can already say it. Only honest when
  * the crop is at cover, because object-position moves a picture and cannot
  * cut into one. Above cover the cut has to be baked into the file, which is
- * what `keepers export` does.
+ * what `keeper export` does.
  */
 export function toObjectPosition(rect, nw, nh) {
   const r = (n) => Math.round(n * 10) / 10;

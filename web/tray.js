@@ -11,20 +11,20 @@ const $ = (s) => document.querySelector(s);
 
 /**
  * The same private mime type bench.js drags with, written out again here
- * rather than imported from it. The two files are the only places a keepers
+ * rather than imported from it. The two files are the only places a keeper
  * drag exists and neither owns the other, so a shared constant would mean a
  * module boundary invented for one string. The cost is that if this string
  * ever changes it has to change in both files, and the payoff is that a
  * frame dragged out of the shelf lands on a bench slot as readily as in the
  * tray, because both ends already speak the same flavour.
  */
-export const MIME = "application/x-keepers-frame";
+export const MIME = "application/x-keeper-frame";
 /* The plural flavour, set by the shelf alongside the singular one: a json
    array of every picked frame when the one you grabbed is in the selection,
    and just itself when it is not. The singular is still set and still read
    first by the bench, which places exactly one frame into one hole and has
    no use for a set. */
-export const MIMES = "application/x-keepers-frames";
+export const MIMES = "application/x-keeper-frames";
 
 const T = { list: [], active: null, live: false };
 
@@ -101,7 +101,7 @@ export async function mountTray() {
      which half of the app you were in. Someone who shut it to get the shelf
      back at 1280px should not have to shut it again after every reload, and
      someone who lives in it should not have to open it every time. */
-  show(localStorage.getItem("keepers.tray") === "open", true);
+  show(localStorage.getItem("keeper.tray") === "open", true);
   await refresh();
 }
 
@@ -111,7 +111,7 @@ export async function mountTray() {
 
 /**
  * app.js's post() answers one question, did it land, because that is all any
- * other write in keepers needs to know. The tray needs the answer itself:
+ * other write in keeper needs to know. The tray needs the answer itself:
  * an export has to report how many files it wrote and where it put them, and
  * a freshly created tray has to be found again afterwards. So this returns
  * the parsed body, or null when the request failed, and post() is left as
@@ -131,12 +131,12 @@ async function ask(route, body, method = "POST") {
          is something the person can act on, and "it did not work" is not.
          So a rejection comes back as a body with ok false on it, and null is
          kept for the case where the request never got an answer at all. */
-      console.error("[keepers]", route, seen);
+      console.error("[keeper]", route, seen);
       return { ok: false, error: seen?.error };
     }
     return seen;
   } catch (e) {
-    console.error("[keepers]", route, e);
+    console.error("[keeper]", route, e);
     return null;
   }
 }
@@ -200,7 +200,7 @@ export async function toggle(id) {
      that vanishes into a shut drawer reads as a picture that did nothing.
      After that the panel obeys whatever the person last chose, so this
      happens exactly once in the life of the app. */
-  if (!had && !localStorage.getItem("keepers.tray")) show(true);
+  if (!had && !localStorage.getItem("keeper.tray")) show(true);
 
   await ask("/api/trays", { id: t.id, [had ? "remove" : "add"]: [id] }, "PATCH");
 }
@@ -240,7 +240,7 @@ export async function addMany(ids) {
   remark();
   paint();
   renderShelf();
-  if (!localStorage.getItem("keepers.tray")) show(true);
+  if (!localStorage.getItem("keeper.tray")) show(true);
 
   await ask("/api/trays", { id: t.id, add: fresh }, "PATCH");
 }
@@ -265,7 +265,7 @@ let RESTING = "empty the tray";
 let armed = 0;
 
 /**
- * Nothing in keepers undoes anything. Forty frames picked one at a time for a
+ * Nothing in keeper undoes anything. Forty frames picked one at a time for a
  * client are gone the moment this fires, and the difference between meaning
  * it and brushing past it is one pixel of travel, so the button asks. This is
  * the only place in the app where the accent means "you have to deal with
@@ -366,7 +366,7 @@ async function pick(value) {
  * filled in, so the field stays empty and obvious while still telling you
  * exactly where the files are about to appear. The Desktop because the export
  * refuses to write inside the archive and a bare folder name would resolve
- * against whatever directory keepers happened to be started from, which is
+ * against whatever directory keeper happened to be started from, which is
  * the one place a person will not think to look. The tray's own id is the
  * folder name because that id is already a slug and is the same string the
  * command line uses for the tray.
@@ -607,7 +607,7 @@ function tile(id) {
 function show(on, quiet = false) {
   $("#tray").hidden = !on;
   $("#tray-toggle").setAttribute("aria-expanded", String(!!on));
-  if (!quiet) localStorage.setItem("keepers.tray", on ? "open" : "shut");
+  if (!quiet) localStorage.setItem("keeper.tray", on ? "open" : "shut");
 }
 
 /**
@@ -618,7 +618,7 @@ function show(on, quiet = false) {
  * the bench, without forgetting that the person had left it open.
  */
 export function trayView(view) {
-  const wanted = localStorage.getItem("keepers.tray") === "open";
+  const wanted = localStorage.getItem("keeper.tray") === "open";
   const allowed = view === "shelf";
   $("#tray").hidden = !(wanted && allowed);
   $("#tray-toggle").hidden = !allowed;

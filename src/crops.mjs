@@ -54,7 +54,7 @@ export async function exportCrops({ root, config }) {
   const [index, placements] = await Promise.all([readIndex(root), readPlacements(root)]);
   // resolved against the working directory, which is also where loadConfig
   // looked, so `out` in a config means what a person typing it would expect
-  const dir = path.resolve(config.out ?? "keepers-out");
+  const dir = path.resolve(config.out ?? "keeper-out");
   const byId = new Map((index?.items ?? []).map((i) => [i.id, i]));
   const rows = [];
 

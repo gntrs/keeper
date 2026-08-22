@@ -1,12 +1,12 @@
 /**
  * The shapes everything else in the world is cut to.
  *
- * keepers.config.json describes one project's holes. This file describes the
+ * keeper.config.json describes one project's holes. This file describes the
  * holes nobody gets to choose: a reel is nine by sixteen whether you like it
  * or not, and a youtube thumbnail is sixteen by nine at a size that decides
  * whether a face survives being 168 pixels wide in a sidebar. They are built
  * in rather than shipped in the example config because a person opening
- * keepers for the first time has no config at all, and the question they
+ * keeper for the first time has no config at all, and the question they
  * already have is whether the photograph they just took reads as a square.
  *
  * The widths are the real ones each platform wants, not round numbers, so a

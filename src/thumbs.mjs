@@ -116,7 +116,7 @@ export async function buildThumbs(root, items, thumbDir, { onProgress, concurren
   return { meta, failed, filmSkipped, ffmpeg: ff };
 }
 
-/** re-encode one source through a crop rectangle, for `keepers export` */
+/** re-encode one source through a crop rectangle, for `keeper export` */
 export async function exportCrop(srcAbs, dstAbs, rect, targetWidth) {
   const pipeline = sharp(srcAbs).rotate().extract({
     left: Math.round(rect.x),

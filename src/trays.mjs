@@ -79,7 +79,7 @@ export const trayById = (doc, id) => doc.trays.find((t) => t.id === id);
 
 /**
  * A tray's id is a slug of the name it was given, because the id shows up in
- * urls and in `keepers trays --export <id>` and a person has to be able to
+ * urls and in `keeper trays --export <id>` and a person has to be able to
  * type it from memory. The name itself stays exactly as typed, since renaming
  * a tray must not repoint anything that already refers to it by id.
  */
@@ -176,7 +176,7 @@ const inside = (parent, child) => {
  * every mode.
  *
  * The destination may not sit inside the archive either. A copy would work,
- * once: the next `keepers <archive>` would scan the copies, hand them fresh
+ * once: the next `keeper <archive>` would scan the copies, hand them fresh
  * ids, thumbnail them, and the shelf would show every exported frame twice
  * with the tags on only one of the pair. A link inside the archive is worse
  * rather than better, because it is a loop back into the tree it lives in

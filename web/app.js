@@ -22,7 +22,7 @@ export async function post(route, body, method = "POST") {
     headers: { "content-type": "application/json" },
     body: method === "DELETE" ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) console.error("[keepers]", route, await res.text());
+  if (!res.ok) console.error("[keeper]", route, await res.text());
   return res.ok;
 }
 
@@ -44,7 +44,7 @@ export function tally() {
      counting against all of them read as failure the moment it said 3/14,
      and a config that has been swapped or removed leaves placements behind
      whose slot is gone: live, `hero` and `about-1` were being counted
-     against a bench that has no such slot. `keepers export` counts your own
+     against a bench that has no such slot. `keeper export` counts your own
      holes for the same reason. With no slots of your own there is no
      fraction worth printing, so the segment goes. */
   const mine = S.slots.filter((s) => s.group === "yours");
@@ -129,7 +129,7 @@ addEventListener("keydown", (e) => {
        The header button is first in the document, and on an empty archive
        the one in the blank state answers instead. */
     if (k === "KeyO") {
-      document.querySelector("[data-keepers-choose]")?.click();
+      document.querySelector("[data-keeper-choose]")?.click();
       return e.preventDefault();
     }
     return;
@@ -151,25 +151,25 @@ Object.assign(S, state);
 S.byId = new Map(S.items.map((i) => [i.id, i]));
 $("#root").textContent = S.root;
 if (!S.slots.length) document.querySelector('[data-view="bench"]').title =
-  "no keepers.config.json, so there are no slots yet";
+  "no keeper.config.json, so there are no slots yet";
 
 /**
  * An archive with nothing in it is not an error and should not read like
  * one. It is the first thing a new user sees, so it is the only place in
- * keepers that explains itself.
+ * keeper that explains itself.
  */
 if (!S.items.length) {
   $("#shelf").innerHTML = `
     <div class="blank">
       <h2>nothing here yet</h2>
       <p>drag a folder onto this window, or
-         <button class="chip" type="button" data-keepers-choose>choose
+         <button class="chip" type="button" data-keeper-choose>choose
          one</button>.</p>
-      <p class="hint">keepers looked through <code>${S.root}</code> and found
+      <p class="hint">keeper looked through <code>${S.root}</code> and found
          no photographs and no film it can read. it reads jpg, png, webp,
          avif, tif, heic and dng, and mov, mp4, m4v and mkv. raw files come in
          through their embedded preview.</p>
-      <pre>keepers ~/Pictures/2026</pre>
+      <pre>keeper ~/Pictures/2026</pre>
     </div>`;
   document.querySelector("footer.keys").hidden = true;
 }

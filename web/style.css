@@ -2,7 +2,7 @@
 @import "/font/geist.css";
 
 /* ---------------------------------------------------------------------
-   keepers, dark and calm.
+   keeper, dark and calm.
 
    One accent, and it is a hex value rather than a mark: #e1062c. Everything
    else is greyscale on purpose, because this is a tool for looking at
@@ -10,7 +10,7 @@
    the print.
 
    Faces degrade to system-ui and never to Times. No webfont is fetched:
-   keepers runs against a drive on a plane, and a tool that loses its
+   keeper runs against a drive on a plane, and a tool that loses its
    typography without wifi is a tool that lied about its dependencies.
    --------------------------------------------------------------------- */
 :root {
@@ -101,7 +101,7 @@ button, input, select { font: inherit; color: inherit; }
 button { transition: color var(--fast) var(--ease), background var(--fast) var(--ease); }
 button:active { transform: scale(.97); }
 
-/* keepers is a keyboard tool and had no visible focus at all, which meant
+/* keeper is a keyboard tool and had no visible focus at all, which meant
    tabbing through it was flying blind. the ring is the accent because the
    accent is the only colour in the building, and it sits outside the
    control so it never eats into a label. */
@@ -135,7 +135,7 @@ header.bar nav button {
 header.bar nav button:hover { color: var(--ink); }
 /* the view you are looking at is already telling you which view it is, so
    this used to be the loudest thing on the page for no reason. red in
-   keepers now means one of two things and only these: you chose this, or you
+   keeper now means one of two things and only these: you chose this, or you
    have to deal with this. a tab is neither. */
 header.bar nav button.on { background: #ffffff12; color: var(--ink); }
 /* the running count. numbers you glance at rather than read, so they are
@@ -720,7 +720,7 @@ body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
 
 /* the picker is a native select with the arrow redrawn, because the system
    one is a blue capsule and this app has one colour. the caret is inlined
-   as a data uri: keepers has to work with the wifi off. */
+   as a data uri: keeper has to work with the wifi off. */
 #tray-pick {
   appearance: none; -webkit-appearance: none;
   border: 0; background: none; cursor: pointer;
@@ -825,7 +825,7 @@ body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
 #tray-folder:focus { outline: 0; border-bottom-color: var(--hot); }
 #tray-folder::placeholder { color: var(--ink-3); }
 
-/* the only filled button in the app. everything else in keepers is a
+/* the only filled button in the app. everything else in keeper is a
    decision you can take back, and this one writes files to a disk, so it is
    allowed to look like the end of the sentence. */
 #tray-export {
@@ -1015,7 +1015,7 @@ body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
    banner in one look. Nothing is written and nothing is saved.
 
    So it must not read as a placement, and red is not available for it: red
-   in keepers means you chose this or you have to deal with this, and a trial
+   in keeper means you chose this or you have to deal with this, and a trial
    is neither. It is a fitting. Nor is it the shelf's scrim, which means
    nobody has looked at this yet, and which would be dimming the only thing
    the trial exists to show.
@@ -1128,7 +1128,7 @@ body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
 /* ---------------------------------------------------------------------
    The trash.
 
-   The one control in keepers that touches an original file, so it is the
+   The one control in keeper that touches an original file, so it is the
    one control that is allowed to be red, and only in its second state.
    Resting it is a chip like any other and says what it would do. Armed it
    is the accent and says what will happen and to how many, which is the
@@ -1149,8 +1149,8 @@ body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
 /* ---------------------------------------------------------------------
    The full stop.
 
-   Everything else in keepers happens quietly and can be undone from inside
-   keepers. Moving a pile of originals to the trash cannot, so it is the one
+   Everything else in keeper happens quietly and can be undone from inside
+   keeper. Moving a pile of originals to the trash cannot, so it is the one
    thing that comes to the middle of the screen and waits.
 
    It only appears past a handful. One frame gets a word in the filter row,

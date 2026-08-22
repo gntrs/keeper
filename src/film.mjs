@@ -4,8 +4,8 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 
 /**
- * Film needs ffmpeg and keepers does not ship it. Rather than fail a whole
- * archive because one dependency is missing, keepers checks once, says so
+ * Film needs ffmpeg and keeper does not ship it. Rather than fail a whole
+ * archive because one dependency is missing, keeper checks once, says so
  * plainly, and files every clip as unreadable film: it still appears in the
  * shelf, it still gets tagged, it just has no poster behind it.
  *

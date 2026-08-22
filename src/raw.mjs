@@ -8,7 +8,7 @@ import { paths } from "./store.mjs";
 
 /**
  * Camera raw, and the two other formats sharp cannot open, turned into one
- * file the rest of keepers already can.
+ * file the rest of keeper already can.
  *
  * sharp is the decoder everywhere else in here and it cannot read an ARW, a
  * CR3 or an NEF at all: libvips ships no raw decoder, so the call throws
@@ -18,7 +18,7 @@ import { paths } from "./store.mjs";
  * tool already refuses to run anywhere but.
  *
  * So each of those files gets exactly one jpeg proxy, written once into
- * .keepers/proxy and then used by the thumbnail, the contact sheet, the
+ * .keeper/proxy and then used by the thumbnail, the contact sheet, the
  * browser and the export. The alternative is decoding a 36MB negative four
  * times, once per stage, every run.
  */
@@ -26,7 +26,7 @@ import { paths } from "./store.mjs";
 /**
  * WHY 3072 AND NOT THE 7008 THE SENSOR ACTUALLY HOLDS.
  *
- * The widest thing keepers ever writes out is the 2560px letterbox in
+ * The widest thing keeper ever writes out is the 2560px letterbox in
  * formats.mjs, and after it the 2400px hero. A proxy has to clear the widest
  * of those with room left over, because a crop that is not the full width of
  * the frame has fewer pixels than the frame does, and the moment the crop is
@@ -76,7 +76,7 @@ export const proxyPath = (root, id) => path.join(paths(root).proxy, `${id}.jpg`)
  *
  * Cached on the id rather than on the source path, so the file sits beside
  * the thumbnail of the same frame and is found again by the same key the rest
- * of keepers already addresses frames by.
+ * of keeper already addresses frames by.
  */
 export async function proxyFor(root, id, srcAbs) {
   const dst = proxyPath(root, id);
@@ -96,8 +96,8 @@ export async function proxyFor(root, id, srcAbs) {
    * 1. If the folder above the named file does not exist, sips does not fail
    *    and does not create it. It writes the image AT that path, as a file,
    *    named after the missing folder. So the mkdir above is not tidiness,
-   *    it is the difference between .keepers/proxy/<id>.jpg and a file called
-   *    .keepers/proxy holding one photograph.
+   *    it is the difference between .keeper/proxy/<id>.jpg and a file called
+   *    .keeper/proxy holding one photograph.
    * 2. If the named path is an existing folder, sips writes into it under the
    *    source's own basename, which would put DSC02478.jpg where <id>.jpg was
    *    asked for.

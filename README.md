@@ -1,9 +1,4 @@
-# keepers
-
-<img src="docs/media/banner.png" alt="keepers, point it at a drive and get back the frames worth keeping, cropped into the holes they have to fill" width="100%">
-
-<!-- to swap the banner for a real frame or a loop later, drop it in
-     docs/media/ and point the src at it. keep it wide, 4/1, and dark. -->
+# keeper
 
 <!-- one badge is red and the rest are the ground, for the same reason one
      thing on the shelf is red: the accent marks the claim that matters, and
@@ -20,19 +15,14 @@ hour between those two numbers goes on scrolling a finder window at 200px a
 thumbnail, and that is the hour this takes back.
 
 ```
-keepers ~/Archive
+keeper ~/Archive
 ```
 
 it scans, writes thumbnails, and **opens the browser itself**. pass
 `--no-open` and it prints the url instead. **mac only.** nothing is uploaded,
 the server binds to loopback, and **no original is ever edited.** one key
-moves a frame to the macos trash and that is the whole of what keepers can do
+moves a frame to the macos trash and that is the whole of what keeper can do
 to a file on your drive.
-
-<img src="docs/media/shelf.png" alt="the keepers shelf: a grid of frames with the tag legend across the top, a few frames picked out on their plate, and the key row along the bottom" width="100%">
-
-<sub>the photographs in every screenshot here are blurred. they are real
-people at real events and they did not sign up to be a readme.</sub>
 
 ## at a glance
 
@@ -43,35 +33,35 @@ people at real events and they did not sign up to be a readme.</sub>
 | dependencies | one, `sharp` |
 | network | none. it binds to `127.0.0.1` and talks to nothing |
 | who tags the photographs | the coding agent you already pay for |
-| what it writes | one folder, `<archive>/.keepers/`, and nothing else |
+| what it writes | one folder, `<archive>/.keeper/`, and nothing else |
 | licence | mit |
 
 ## the commands
 
 ```
-keepers <folder>                 scan, thumbnail, and open the shelf
-keepers sheets <folder>          contact sheets for a coding agent to read
-keepers tag <folder> <file>      apply the tags that agent wrote
-keepers export <folder>          write the placed crops out
-keepers trays <folder>           what is in the trays, and how much
-keepers init [folder]            create keepers.config.json
+keeper <folder>                 scan, thumbnail, and open the shelf
+keeper sheets <folder>          contact sheets for a coding agent to read
+keeper tag <folder> <file>      apply the tags that agent wrote
+keeper export <folder>          write the placed crops out
+keeper trays <folder>           what is in the trays, and how much
+keeper init [folder]            create keeper.config.json
 ```
 
 `--port` defaults to 7777, `--cols` and `--rows` set the contact sheet grid at
 6 by 4, `--rescan` rebuilds an index that already exists, and `--no-open`
-leaves the browser alone. typed bare, with no folder after it, `keepers`
+leaves the browser alone. typed bare, with no folder after it, `keeper`
 prints this list: **a terminal opens in your home folder**, and thumbnailing
 every file you own is not what someone asking what the command does had in
 mind.
 
 ## no api key, and none wanted
 
-keepers does not ship a vision model and does not ask for a key. it writes
+keeper does not ship a vision model and does not ask for a key. it writes
 **contact sheets built for a machine to read**, sized so a face survives the
 cell, and it takes the answer back as one line of letters per sheet.
 
 ```
-keepers sheets ~/Archive
+keeper sheets ~/Archive
 ```
 
 hand the sheets to claude code, or cursor, or whatever agent is already open,
@@ -79,7 +69,7 @@ together with [AGENTS.md](AGENTS.md), which is the brief. it reads them and
 writes a file. then:
 
 ```
-keepers tag ~/Archive tags.txt
+keeper tag ~/Archive tags.txt
 ```
 
 a sheet whose letter count disagrees with its cell count is **refused whole**,
@@ -89,17 +79,17 @@ wrong photograph is the failure that would make the whole thing worthless.
 six frames across is the default. `--cols 4` gives each frame 392px and lets a
 model tell one person from another; `--cols 8` gives it 196px and gets you the
 scene and nothing finer. that trade is the only real choice in the command,
-and `keepers sheets --help` prints the table.
+and `keeper sheets --help` prints the table.
 
 ## drag a folder in
 
-drop a folder from finder anywhere on the window and keepers opens it. no
+drop a folder from finder anywhere on the window and keeper opens it. no
 command, no path typed.
 
 it is worth knowing what happens under that, because it is the one place a
 browser cannot do the obvious thing. **a page is never told the absolute path
 of anything dragged in from outside.** it gets the name, and for a folder it
-may list what sits directly inside, and that is the end of it. so keepers
+may list what sits directly inside, and that is the end of it. so keeper
 recovers the path in three steps and each one is a real way in:
 
 1. the drag's own url flavour. some sources write a `file://` url and some
@@ -152,14 +142,12 @@ through a mouse.
   the corner of your eye
 - **delete arms and then commits.** the first press says how many frames and
   which way they are going, the second sends them, and finder puts them back
-  in one keystroke. it is the only key in keepers that touches an original,
+  in one keystroke. it is the only key in keeper that touches an original,
   and nothing here ever deletes anything for good
 
 ## the bench
 
 the bench asks one question: **does this photograph survive that shape.**
-
-<img src="docs/media/bench.png" alt="the keepers bench: one frame shown at once in an instagram post, a square, a reel, an x post, a youtube thumbnail and a link preview, each labelled with its aspect and target width" width="100%">
 
 click a frame in the strip and it is **tried on in every shape at once**,
 which is the question you actually have before you know which hole it wants.
@@ -193,7 +181,7 @@ each platform wants rather than round numbers, so a crop that comes out
 narrower **will be upscaled by somebody else's server**, and the bench says so
 in red before you export.
 
-then your own holes, in `keepers.config.json`:
+then your own holes, in `keeper.config.json`:
 
 ```json
 {
@@ -205,13 +193,13 @@ then your own holes, in `keepers.config.json`:
 }
 ```
 
-the config is read from **the folder you run keepers in**, not from the
+the config is read from **the folder you run keeper in**, not from the
 archive, because the holes belong to the project and the photographs do not.
-`keepers init` writes the example there for you. a slot of yours with the same
+`keeper init` writes the example there for you. a slot of yours with the same
 id as a built in one **replaces it quietly**, and `"formats": false` turns the
 whole standard set off for a project that knows exactly what it wants.
 
-`export the placed ones` on the bench and `keepers export` in the terminal
+`export the placed ones` on the bench and `keeper export` in the terminal
 write the same files, out of the same function, because two copies of that
 code would be two chances for the crop you saw and the crop you shipped to
 stop being the same picture. each placed slot gets a folder holding the cut
@@ -220,16 +208,14 @@ in whole pixels, and the `object-position` that reproduces it.
 
 ## trays
 
-<img src="docs/media/tray.gif" alt="" width="150" align="right">
-
 a tray is the pile you build while you browse. click a frame in, keep going,
 start another tray when the subject changes, export the one you want as a real
 folder of real files.
 
 ```
-keepers trays ~/Archive
-keepers trays ~/Archive --export tray-1 --to ~/Desktop/for-the-site
-keepers trays ~/Archive --export tray-1 --to ~/Desktop/live --mode symlink
+keeper trays ~/Archive
+keeper trays ~/Archive --export tray-1 --to ~/Desktop/for-the-site
+keeper trays ~/Archive --export tray-1 --to ~/Desktop/live --mode symlink
 ```
 
 a tray goes out three ways, and the panel spells out what each one leaves you
@@ -238,8 +224,6 @@ holding. **copies** are real files, yours to hand to anyone. **symlinks** and
 if you move them and the second following them. the terminal names the mode it
 just ran every time, because a folder of links and a folder of copies look
 identical in a listing and weigh nothing alike.
-
-<img src="docs/media/trays.png" alt="the tray panel open beside the shelf, eleven frames in it, a destination folder typed in and the export mode set to copy" width="100%">
 
 frames also **drag straight out to finder** and land as real files. a drag out
 of a browser is always a copy, on every browser, because no drag flavour
@@ -251,7 +235,7 @@ originals into a folder for a website is a tool that has lost your originals,
 so export reads from the archive and writes somewhere else, and the archive
 comes out of it byte for byte identical.
 
-for the same reason keepers refuses to export into a folder inside the
+for the same reason keeper refuses to export into a folder inside the
 archive. it would work once. the next scan would find the copies, give them
 their own ids, thumbnail them, and you would be browsing every exported frame
 twice with the tags on only one of the pair.
@@ -267,18 +251,18 @@ the preview as a real player rather than as a still. **the poster frame is cut
 from a third of the way in**, not from frame one, because frame one is a lens
 cap, a whip pan or a slate often enough that it is not worth trusting.
 
-needs `ffmpeg` on the path. without it the stills still work and keepers says
+needs `ffmpeg` on the path. without it the stills still work and keeper says
 which clips it could not read.
 
 ## what it tells you that a finder window does not
 
 - **whether the crop still ships whole.** if you have not punched in and you
-  have a `keepers.config.json`, the bench prints the exact `object-position`
+  have a `keeper.config.json`, the bench prints the exact `object-position`
   line for your stylesheet and your original ships uncut. the line is only for
   someone who has holes of their own, because that is who is holding a
   stylesheet to paste it into.
 - **when a crop has gone soft.** punch in far enough and the surviving
-  rectangle is narrower than the slot it has to fill. keepers compares the
+  rectangle is narrower than the slot it has to fill. keeper compares the
   two and warns before you export, not after you deploy.
 - **which frames you have already seen.** tagged, kept, placed and in a tray
   are four different states, drawn in four different channels, and none of
@@ -307,7 +291,7 @@ to its own tags.
 
 ```
 npm install
-node bin/keepers.mjs ~/Archive
+node bin/keeper.mjs ~/Archive
 ```
 
 reads jpg, png, webp, avif, tif, heic and dng, and mov, mp4, m4v, mkv, avi,
@@ -316,25 +300,21 @@ contact sheet needs.
 
 ## where things live
 
-everything keepers writes goes in `<archive>/.keepers/`: the index, the
+everything keeper writes goes in `<archive>/.keeper/`: the index, the
 thumbnails, the contact sheets, your tags, your placements and your trays.
 delete that folder and the archive is exactly as it was. nothing else on the
 drive is touched, and the one exception is the trash key, which moves a frame
 out and leaves finder holding the put back.
 
-## brand
+## the look
 
-keepers is built at [basedcollective](https://basedcollective.ai) and carries
-the colour and nothing else. **the based logo and the based typeface are
-trademarks.** they are not in this repository, are not licensed with it, and
-do not ship in it. there is no logo in the app either: the word `keepers`,
-set in the mono, is the whole of the mark.
+there is no logo. the word `keeper`, set in the mono, is the whole of the
+mark, and a photograph is the only thing on the screen worth looking at.
 
-<img src="docs/media/colour.png" alt="#e1062c the only colour, #131315 raised, #0b0b0c ground" width="100%">
-
-one accent, and it means one of exactly two things anywhere it appears: you
-chose this, or you have to deal with this. a tab you are already looking at
-is neither, and neither is a photograph.
+one accent, `#e1062c`, over `#131315` raised and `#0b0b0c` ground. it means
+one of exactly two things anywhere it appears: you chose this, or you have to
+deal with this. a tab you are already looking at is neither, and neither is a
+photograph.
 
 **type is geist and geist mono**, self hosted in `web/font`, ofl, nothing
 fetched at runtime. the line between them is not decorative: the mono

@@ -14,10 +14,10 @@ const SCORE_CAP = 40;
 
 /**
  * A dragged folder is a copy of a system folder as often as it is the real
- * one, and a .keepers folder is keepers' own scratch directory. None of the
+ * one, and a .keeper folder is keeper's own scratch directory. None of the
  * three is ever the archive someone meant to open.
  */
-const JUNK = new Set([".Trash", ".Trashes", "node_modules", ".keepers"]);
+const JUNK = new Set([".Trash", ".Trashes", "node_modules", ".keeper", ".keepers"]);
 const junky = (p) => p.split(path.sep).some((seg) => JUNK.has(seg));
 
 /**

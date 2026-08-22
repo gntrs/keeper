@@ -32,7 +32,7 @@ export const RAW_EXT = new Set([
  * `sharp.format` on the build shipped in node_modules reads exactly eight
  * things: gif, heif, jpeg, png, svg, tiff, webp and vips. Anything outside
  * that and inside what `sips --formats` says Image I/O reads is a still
- * keepers can show and sharp cannot open, so it gets the same jpeg proxy a
+ * keeper can show and sharp cannot open, so it gets the same jpeg proxy a
  * raw does. bmp and jxl are here for that reason alone. heif covers heic and
  * avif both, which is why neither of those needs one.
  *
@@ -49,7 +49,7 @@ export const PROXY_EXT = new Set([
 export const needsProxy = (ext) => PROXY_EXT.has(ext);
 
 /**
- * Everything keepers is willing to look at. The raw formats are in the same
+ * Everything keeper is willing to look at. The raw formats are in the same
  * set as the jpegs on purpose: a frame is a frame to the shelf, to the sheets
  * and to the bench, and the only place the difference shows is which file the
  * decoder is pointed at.
@@ -81,7 +81,7 @@ export const STILL_EXT = new Set([
  * NOT `.braw` AND NOT `.r3d`, ON PURPOSE. ffmpeg decodes neither without a
  * proprietary sdk that is not on this machine and cannot be brew installed,
  * so listing them would put clips in the index that can never get a poster:
- * a row of dead cells that look like a bug in keepers rather than a missing
+ * a row of dead cells that look like a bug in keeper rather than a missing
  * decoder.
  */
 export const FILM_EXT = new Set([
@@ -103,7 +103,7 @@ export const kindOf = (ext) =>
 
 /** skipped wherever they appear, at any depth */
 const SKIP_DIRS = new Set([
-  ".git", "node_modules", ".keepers", ".Trashes", ".Spotlight-V100",
+  ".git", "node_modules", ".keeper", ".keepers", ".Trashes", ".Spotlight-V100",
   ".fseventsd", "__MACOSX", ".DS_Store",
 ]);
 

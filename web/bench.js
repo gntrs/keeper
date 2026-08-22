@@ -55,7 +55,7 @@ export function renderBench() {
       <div class="blank">
         <h2>nothing here yet</h2>
         <p>drag a folder onto this window, or
-           <button class="chip" type="button" data-keepers-choose>choose
+           <button class="chip" type="button" data-keeper-choose>choose
            one</button>.</p>
         <p class="hint">the slots come back the moment there are frames to
            put in them.</p>
@@ -68,9 +68,9 @@ export function renderBench() {
       <div class="blank">
         <h2>no slots to fill</h2>
         <p>the bench needs to know what shape the holes are. that lives in
-           <code>keepers.config.json</code>, in the folder you ran keepers
+           <code>keeper.config.json</code>, in the folder you ran keeper
            from, because only you know what your layout wants.</p>
-        <pre>keepers init</pre>
+        <pre>keeper init</pre>
         <p class="hint">that writes a starting file. edit the slots, reload
            this page, and they appear here at their real proportions.</p>
       </div>`;
@@ -89,15 +89,15 @@ export function renderBench() {
                  ...present.filter((g) => !GROUPS.includes(g))];
   const racks = order.map((g) => rackEl(g, S.slots.filter((s) => groupOf(s) === g)));
 
-  /* No group of your own means no keepers.config.json. That file used to be
+  /* No group of your own means no keeper.config.json. That file used to be
      the whole of the bench, so its absence explained itself by leaving the
      page empty; now the built ins fill the page and it explains nothing. */
   if (!order.includes("yours")) {
     const foot = document.createElement("p");
     foot.className = "rack-foot";
     foot.innerHTML = `these are the shapes the world cuts to. the holes in
-      your own layout go in <code>keepers.config.json</code>, in the folder
-      you ran keepers from, and they land above these.`;
+      your own layout go in <code>keeper.config.json</code>, in the folder
+      you ran keeper from, and they land above these.`;
     racks.push(foot);
   }
 
@@ -298,10 +298,10 @@ async function assign(item, slotId) {
  * A private mime type, not "text/plain". A drag carrying only text would be
  * accepted by every text input on the page and, worse, this drop handler
  * would accept a drag that started somewhere else entirely. The plain text
- * flavour is still set, so dragging a frame out of keepers and into an
+ * flavour is still set, so dragging a frame out of keeper and into an
  * editor pastes its path.
  */
-const MIME = "application/x-keepers-frame";
+const MIME = "application/x-keeper-frame";
 
 function clearOver() {
   for (const el of document.querySelectorAll(".slot[data-over]")) {
@@ -316,7 +316,7 @@ function clearOver() {
 /**
  * The end of the main flow used to be a dead end: twenty minutes of fitting
  * frames into shapes, and the only way to get a file was a command mentioned
- * once in `keepers help`, in a terminal the person had already left.
+ * once in `keeper help`, in a terminal the person had already left.
  *
  * Built here rather than in index.html because the button is useless without
  * the code under it, and the head it goes into belongs to this view alone.
@@ -378,7 +378,7 @@ async function ship() {
     });
     d = await res.json();
   } catch (e) {
-    console.error("[keepers] /api/export", e);
+    console.error("[keeper] /api/export", e);
   }
   btn.disabled = false;
 
@@ -456,7 +456,7 @@ function paint(slotId) {
      always, because it is the one thing here anyone has to act on.
 
      The object-position line is css to paste into a stylesheet, so it appears
-     only for someone who wrote a keepers.config.json: that file is the exact
+     only for someone who wrote a keeper.config.json: that file is the exact
      test for a person who has holes of their own and a stylesheet to put them
      in. Everybody else was reading a declaration for a page they do not have.
      A trial never shows it either, because nothing has been decided yet.

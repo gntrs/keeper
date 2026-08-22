@@ -16,7 +16,7 @@ let cursor = 0;
  * until they do, dragging forty frames into the tray still adds the one
  * under the hand rather than nothing at all.
  */
-export const MIMES = "application/x-keepers-frames";
+export const MIMES = "application/x-keeper-frames";
 
 /**
  * The set, as ids rather than as indices. A filter changing underneath is
@@ -245,7 +245,7 @@ function mountClear() {
    stepped one lurches and this is a thing you drag while looking at the
    pictures move. The 4px granularity is what keeps that smooth without
    relaying out a thousand tiles for a change nobody can see. */
-const SIZE_KEY = "keepers.tile";
+const SIZE_KEY = "keeper.tile";
 const NUDGE = 24;
 
 function mountSize() {
@@ -1073,8 +1073,8 @@ async function bin(ids) {
  * frame and a dialog for one frame is an app that does not trust you.
  *
  * Over it, the confirmation comes to the middle of the screen and stops
- * everything, because this is the only thing in keepers that cannot be
- * undone from inside keepers. It names the number and it makes you press a
+ * everything, because this is the only thing in keeper that cannot be
+ * undone from inside keeper. It names the number and it makes you press a
  * different thing than the key you were already pressing.
  */
 function sayBin(text) {
@@ -1102,7 +1102,7 @@ function bigAsk(n) {
     box.innerHTML = `
       <div class="bin-card">
         <p class="bin-n"></p>
-        <p class="bin-what">to the trash. finder can put them back, and keepers cannot.</p>
+        <p class="bin-what">to the trash. finder can put them back, and keeper cannot.</p>
         <div class="bin-acts">
           <button type="button" class="chip bin-no">keep them</button>
           <button type="button" class="bin-yes"></button>

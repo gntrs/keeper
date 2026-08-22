@@ -1,6 +1,6 @@
 import { scan } from "./scan.mjs";
 import { buildThumbs } from "./thumbs.mjs";
-import { idFor, paths, readIndex, writeIndex } from "./store.mjs";
+import { adopt, idFor, paths, readIndex, writeIndex } from "./store.mjs";
 
 /**
  * Scan a folder and thumbnail what is in it, reusing the index that is
@@ -8,7 +8,7 @@ import { idFor, paths, readIndex, writeIndex } from "./store.mjs";
  *
  * onPhase is the only way out. The terminal draws a bar from it and the
  * server keeps a job record from it, and neither of those two belongs in
- * here: this ran inside the CLI until the browser needed to point keepers at
+ * here: this ran inside the CLI until the browser needed to point keeper at
  * a second folder without restarting the process.
  *
  * Every event carries {phase, done, total, frames}. frames is the scanned
@@ -19,6 +19,8 @@ import { idFor, paths, readIndex, writeIndex } from "./store.mjs";
  */
 export async function buildIndex(root, { rescan = false, onPhase } = {}) {
   const emit = (e) => { try { onPhase?.(e); } catch { /* a broken listener is not a broken scan */ } };
+
+  await adopt(root);
 
   const existing = rescan ? null : await readIndex(root);
   if (existing?.items?.length) {
@@ -67,7 +69,7 @@ export async function buildIndex(root, { rescan = false, onPhase } = {}) {
  * One job at a time, in module state, because one server serves one person
  * looking at one archive. A queue or a map keyed by request would be
  * machinery for a second user who does not exist, and two scans racing on
- * the same .keepers folder would both write the index.
+ * the same .keeper folder would both write the index.
  */
 const job = { root: null, phase: "idle", done: 0, total: 0, frames: 0, error: null };
 let running = false;

@@ -7,7 +7,7 @@
  * nobody uses. So places are rules: a pattern against the path, and the
  * name you actually call it.
  *
- * The rules live in keepers.config.json because only the person who shot
+ * The rules live in keeper.config.json because only the person who shot
  * the archive knows that june the nineteenth was the london house. Nothing
  * here guesses.
  */

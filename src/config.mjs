@@ -4,12 +4,12 @@ import { parseAspect } from "./geometry.mjs";
 import { compile } from "./places.mjs";
 import { FORMATS } from "./formats.mjs";
 
-export const CONFIG_NAME = "keepers.config.json";
+export const CONFIG_NAME = "keeper.config.json";
 
 /**
  * The slots a project wants filled. This file is the whole of what makes
- * keepers yours rather than mine: without it the bench has nothing to place
- * into, and with it keepers knows nothing about your project beyond a list
+ * keeper yours rather than mine: without it the bench has nothing to place
+ * into, and with it keeper knows nothing about your project beyond a list
  * of holes and their shapes.
  */
 export async function loadConfig(dir) {
@@ -59,7 +59,7 @@ export async function loadConfig(dir) {
     slots: [...slots, ...standardSlots(ids, json.formats)],
     file,
     missing: false,
-    out: json.out ?? "keepers-out",
+    out: json.out ?? "keeper-out",
     places: compile(json.places ?? []),
   };
 }
@@ -70,7 +70,7 @@ export async function loadConfig(dir) {
  *
  * A config slot of the same id wins and the built in is dropped, silently.
  * That is the useful way round: someone who writes their own `wide` has a
- * reason for it, and a keepers that shouted about a name collision with a
+ * reason for it, and a keeper that shouted about a name collision with a
  * list the user never wrote would be scolding them for our choices.
  *
  * `"formats": false` turns the whole set off, for the project that knows

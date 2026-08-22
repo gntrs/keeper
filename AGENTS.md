@@ -1,6 +1,6 @@
 # tagging an archive with a coding agent
 
-keepers does not ship a tagger and does not want an api key. it ships contact
+keeper does not ship a tagger and does not want an api key. it ships contact
 sheets built for a machine to read, and a command that takes the answer back.
 the tagger is whatever agent you already pay for.
 
@@ -8,13 +8,13 @@ if you are that agent, this file is the brief. read it once, then work.
 
 ## the job
 
-1. `keepers sheets <archive>` has already run. the sheets are in
-   `<archive>/.keepers/sheets/`, numbered `sheet-001.jpg` upward, with
+1. `keeper sheets <archive>` has already run. the sheets are in
+   `<archive>/.keeper/sheets/`, numbered `sheet-001.jpg` upward, with
    `index.json` beside them.
 2. read every sheet. one image at a time, in order.
 3. for each sheet, write one line of single letter codes, one letter per
    cell, reading left to right and top to bottom.
-4. save the lines to a file and stop. the human runs `keepers tag`.
+4. save the lines to a file and stop. the human runs `keeper tag`.
 
 ## the line format
 
@@ -72,7 +72,7 @@ sheet holds the remainder. if your line has 23 codes for a 24 cell sheet,
 every tag after the slip lands on the wrong photograph, and it lands
 confidently, which is worse than not tagging at all.
 
-`keepers tag` checks this and refuses a sheet whose count disagrees with the
+`keeper tag` checks this and refuses a sheet whose count disagrees with the
 index. it cannot catch a line that is the right length and shifted in the
 middle. group your codes by row.
 
@@ -83,7 +83,7 @@ middle. group your codes by row.
 - **do not open the originals.** the sheets are the whole input. reading
   1,768 full size photographs will exhaust your context long before it
   improves a single tag.
-- **do not invent letters.** `keepers tag` rejects the whole sheet on an
+- **do not invent letters.** `keeper tag` rejects the whole sheet on an
   unknown code rather than dropping the frame quietly.
 - **do not describe the photographs back to the human.** the file is the
   output.

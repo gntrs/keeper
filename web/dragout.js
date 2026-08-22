@@ -26,7 +26,7 @@ import { S } from "/app.js";
 /* The same string shelf.js, bench.js and tray.js write, spelled out again
    for the same reason they spell it out: nobody owns it, and a module
    invented to hold one constant is a module invented for nothing. */
-const MIME = "application/x-keepers-frame";
+const MIME = "application/x-keeper-frame";
 
 /**
  * What Finder is told the file is. It matters more than it looks: the type
@@ -49,9 +49,9 @@ const extOf = (name) => name.split(".").pop().toLowerCase();
 const typeOf = (name) => TYPES[extOf(name)] ?? "application/octet-stream";
 
 /**
- * Every raw format keepers reads. It matters here for one reason: `/full/`
+ * Every raw format keeper reads. It matters here for one reason: `/full/`
  * does not serve a raw file's own bytes. macOS decodes the negative once and
- * keepers caches a jpeg proxy, and the proxy is what the url returns,
+ * keeper caches a jpeg proxy, and the proxy is what the url returns,
  * because no browser can draw an ARW.
  *
  * So the drag has to say jpeg and end in .jpg. Offering Finder
@@ -78,7 +78,7 @@ const fileUrl = (abs) => `file://${abs.split("/").map(encodeURIComponent).join("
 
 /**
  * The absolute path of the original. S.root is the archive and item.path is
- * relative to it, which is the pair every other part of keepers works from,
+ * relative to it, which is the pair every other part of keeper works from,
  * so the join happens here rather than the server being asked for a path it
  * has already told the browser twice.
  */

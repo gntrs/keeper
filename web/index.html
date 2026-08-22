@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>keepers</title>
+<title>keeper</title>
 <link rel="stylesheet" href="/icons.css">
 <link rel="stylesheet" href="/style.css">
 <!--
@@ -18,7 +18,7 @@
 <body>
 
 <header class="bar">
-  <strong>keepers</strong>
+  <strong>keeper</strong>
   <nav>
     <button data-view="shelf" class="on">shelf</button>
     <button data-view="bench">bench</button>
@@ -27,8 +27,8 @@
   <span class="grow"></span>
   <button id="tray-toggle" type="button" aria-expanded="false">tray</button>
   <!-- the folder you are looking at, and the control that changes it.
-       drop.js listens for [data-keepers-choose] anywhere on the page. -->
-  <button id="root" type="button" data-keepers-choose
+       drop.js listens for [data-keeper-choose] anywhere on the page. -->
+  <button id="root" type="button" data-keeper-choose
           title="open a different folder"></button>
 </header>
 
@@ -43,7 +43,7 @@
       <button class="chip" id="f-clear">clear</button>
       <!--
         the trash. it says what it would do rather than carrying a bin icon,
-        because this is the one control in keepers that touches an original
+        because this is the one control in keeper that touches an original
         file, and the one place a word is worth the room it takes. it arms on
         the first press and commits on the second, exactly as the delete key
         does.

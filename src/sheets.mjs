@@ -9,7 +9,7 @@ const sharp = require("sharp");
 
 /**
  * Contact sheets, sized for a machine to read rather than for a human to
- * print. This is the part of keepers that exists because tagging an archive
+ * print. This is the part of keeper that exists because tagging an archive
  * by hand does not scale and paying per frame for an API does not either:
  * you hand these to a coding agent, it reads them, it writes the tags back.
  *
@@ -85,7 +85,7 @@ export async function buildSheets(root, items, outDir, {
         path: item.path,
       });
       try {
-        // film goes on the sheet through the poster keepers already cut, not
+        // film goes on the sheet through the poster keeper already cut, not
         // through ffmpeg a second time: the poster is on disk, it is the
         // frame a person would judge the clip by, and re-decoding a 4K mov
         // per sheet would make a tagging pass take an hour instead of a

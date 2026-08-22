@@ -128,7 +128,7 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
 
   /**
    * A page on any origin can POST to a localhost port, and /api/open now aims
-   * keepers at any folder on the disk. The json content type these three
+   * keeper at any folder on the disk. The json content type these three
    * routes are called with already forces a CORS preflight that a cross site
    * page cannot pass, and this is the belt to that pair of braces. No CORS
    * headers are sent back, deliberately: one browser on one machine.
@@ -228,7 +228,7 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
           // that is already in without asking a second time per thumbnail
           trays: membership(trays),
           slots: config.slots,
-          // whether there is a keepers.config.json at all. the bench prints an
+          // whether there is a keeper.config.json at all. the bench prints an
           // object-position line only for someone who has one, because that
           // line is a thing to paste into a stylesheet and only a person who
           // wrote their own slots is holding a stylesheet.
@@ -244,7 +244,7 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
        * to kill the process and type the path again.
        *
        * A path that names a file opens the folder holding it, because a
-       * person dragging one photograph in is showing keepers where their
+       * person dragging one photograph in is showing keeper where their
        * photographs are, not asking for an archive of one.
        */
       if (route === "/api/open" && req.method === "POST") {
@@ -318,7 +318,7 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
        * you get a file on this machine is Finder with it already selected.
        * `open -R` does exactly that and nothing else: it cannot run an
        * arbitrary command, and the path is checked against the index first
-       * so it can only ever reveal a file keepers already scanned.
+       * so it can only ever reveal a file keeper already scanned.
        */
       if (route === "/api/reveal" && req.method === "POST") {
         if (process.platform !== "darwin") {
@@ -333,7 +333,7 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
       }
 
       /**
-       * The one thing in keepers that touches an original, and it moves it
+       * The one thing in keeper that touches an original, and it moves it
        * rather than removing it.
        *
        * Finder's own delete is used, through osascript, for one reason: it
@@ -343,7 +343,7 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
        * a culling tool gets to do to somebody's negatives.
        *
        * Every id is checked against the index first, so this can only ever
-       * name a file keepers has already scanned, and the paths go to
+       * name a file keeper has already scanned, and the paths go to
        * osascript as an argv list rather than inside a built string.
        */
       if (route === "/api/trash" && req.method === "POST") {
@@ -534,7 +534,7 @@ end run`;
       /**
        * The crops, cut and written, from the bench instead of from a second
        * terminal. Twenty minutes of fitting frames into shapes used to end
-       * with no button anywhere and one sentence in `keepers help`.
+       * with no button anywhere and one sentence in `keeper help`.
        *
        * It runs the same function the `export` command runs, and it takes no
        * body: what to write is whatever is placed, and where it goes is the

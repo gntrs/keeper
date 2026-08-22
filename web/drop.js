@@ -165,10 +165,10 @@ async function ask(route, body, method = "POST") {
       body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
     });
     const seen = await res.json().catch(() => null);
-    if (!res.ok) console.error("[keepers]", route, seen);
+    if (!res.ok) console.error("[keeper]", route, seen);
     return { status: res.status, ...(seen ?? {}) };
   } catch (e) {
-    console.error("[keepers]", route, e);
+    console.error("[keeper]", route, e);
     return null;
   }
 }
@@ -178,7 +178,7 @@ async function ask(route, body, method = "POST") {
 /* ------------------------------------------------------------------ */
 
 /* A drag only belongs to this file when it carries files. Every drag that
-   starts inside keepers, a frame going to the tray or onto a bench slot,
+   starts inside keeper, a frame going to the tray or onto a bench slot,
    carries a private mime type instead, so this one test is what keeps the
    two systems from ever meeting. */
 const carries = (e) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
@@ -255,7 +255,7 @@ function invite(n) {
     mode: "drag",
     eyebrow: "open an archive",
     line: n > 1 ? `drop these ${n} here` : "drop it here",
-    note: "keepers opens the folder it came out of. nothing is copied and nothing moves.",
+    note: "keeper opens the folder it came out of. nothing is copied and nothing moves.",
   });
 }
 
@@ -313,10 +313,10 @@ async function resolve(url, entries, files) {
     mode: "work",
     eyebrow: "opening",
     line: dir ? `looking for ${dir.name}` : "looking for those files",
-    note: "the browser is told the name and never the path, so keepers is asking spotlight where it lives.",
+    note: "the browser is told the name and never the path, so keeper is asking spotlight where it lives.",
   });
 
-  /* Several folders at once is one folder as far as keepers is concerned:
+  /* Several folders at once is one folder as far as keeper is concerned:
      it opens a single root and the first one is the one the hand was on. */
   const body = dir
     ? { name: dir.name, kind: "folder", files: await peek(dir) }
@@ -399,7 +399,7 @@ function withheld(name, why) {
     note: name
       ? `a browser is only ever told the name, ${name}, and spotlight could not place it on the disk.`
       : "a browser is never told where a dropped thing lives on the disk.",
-    hint: why || "point at the folder once and keepers has it from there.",
+    hint: why || "point at the folder once and keeper has it from there.",
     acts: [askFinder(), dismiss()],
     esc: true,
   });
@@ -435,7 +435,7 @@ async function chooser() {
     mode: "work",
     eyebrow: "finder",
     line: "pick the folder",
-    note: "the dialog is open in front of this window. keepers is waiting for it.",
+    note: "the dialog is open in front of this window. keeper is waiting for it.",
   });
 
   const d = await ask("/api/choose", {});
@@ -451,7 +451,7 @@ async function chooser() {
    this attribute. no import to order, and nothing to break on a page that
    has none. */
 addEventListener("click", (e) => {
-  if (!e.target.closest?.("[data-keepers-choose]")) return;
+  if (!e.target.closest?.("[data-keeper-choose]")) return;
   e.preventDefault();
   chooser();
 });
