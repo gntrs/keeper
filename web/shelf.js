@@ -1,9 +1,9 @@
-import { S, post, tally, reveal } from "/app.js";
+import { S, post, tally, reveal, typed } from "/app.js";
 import { open, previewOpen, current, close as shut } from "/preview.js";
 import { MIME, inTray, addMany as trayAddMany, toggle as trayToggle } from "/tray.js";
 
 const $ = (s) => document.querySelector(s);
-const F = { tag: new Set(), dir: new Set(), star: false, untagged: false, q: "" };
+const F = { tag: new Set(), dir: new Set(), star: false, untagged: false, q: "", binned: false };
 let visible = [];
 let cursor = 0;
 
@@ -69,7 +69,7 @@ const word = (c) => S.vocab[c];
    left. */
 const leaf = (p) => p.split("/").pop();
 /** whether any filter is actually on, which is the only reason clear exists */
-const filtering = () => Boolean(F.tag.size || F.dir.size || F.star || F.untagged || F.q);
+const filtering = () => Boolean(F.tag.size || F.dir.size || F.star || F.untagged || F.q || F.binned);
 
 /**
  * One chip, wearing the value it stands for. The counts move while you tag,
@@ -235,10 +235,19 @@ export function mountShelf() {
     if (!drop()) return;
     renderShelf();
   });
-  /* the same two presses the keyboard does, because a button that trashed on
-     one click and a key that took two would be two different promises about
-     the same irreversible thing. */
+  /* the same gesture the keyboard does, so the button and the key are never
+     two different promises about the same frame */
   $("#f-bin").onclick = () => binPress();
+  $("#f-nuke").onclick = () => nukePress();
+  $("#f-binned").onclick = (e) => {
+    F.binned = !F.binned;
+    e.currentTarget.classList.toggle("on", F.binned);
+    /* leaving the bin with a pile still selected would carry a selection of
+       set aside frames onto a wall that is not showing any of them */
+    sel.clear();
+    binCancel();
+    renderShelf();
+  };
   addEventListener("keydown", onKey);
 }
 
@@ -261,12 +270,14 @@ function mountClear() {
     F.dir.clear();
     F.star = false;
     F.untagged = false;
+    F.binned = false;
     F.q = "";
     $("#f-q").value = "";
     for (const c of document.querySelectorAll("#filters .chip.on")) {
       c.classList.remove("on");
       quiet(c);
     }
+    binCancel();
     renderShelf();
   };
 }
@@ -530,6 +541,10 @@ export function renderShelf() {
 
   visible = S.items.filter((i) => {
     const t = S.tags[i.id] ?? {};
+    /* The bin is a place you go to, not a thing mixed into everything else.
+       Off, a binned frame is simply not on the wall; on, it is the only kind
+       of frame on the wall, and every other filter still applies inside it. */
+    if (S.binned.has(i.id) !== F.binned) return false;
     return (!F.tag.size || F.tag.has(t.tag)) &&
       (!F.dir.size || F.dir.has(i.place)) &&
       (!F.star || t.star) &&
@@ -548,6 +563,11 @@ export function renderShelf() {
     if (anchor && !live.has(anchor)) anchor = null;
   }
 
+  const binChip = $("#f-binned");
+  if (binChip) {
+    binChip.querySelector("i").textContent = S.binned.size;
+    binChip.hidden = !S.binned.size && !F.binned;
+  }
   $("#f-star").querySelector("i").textContent = S.items.filter((i) => S.tags[i.id]?.star).length;
   $("#f-untagged").querySelector("i").textContent = S.items.filter((i) => !S.tags[i.id]?.tag).length;
   syncTags();
@@ -837,7 +857,7 @@ async function onKey(e) {
      be typed at all, and putting find on f would have taken food the same
      way. The rule frees both letters and every letter after them. */
   if (e.metaKey || e.altKey) return command(e);
-  if (S.view !== "shelf" || e.target.matches("input")) return;
+  if (S.view !== "shelf" || typed(e)) return;
 
   /**
    * The preview keeps the arrows, and it moves this cursor itself as it
@@ -1049,7 +1069,7 @@ let armedAt = 0;
    every other keystroke is harmless and repeats fast. */
 const MANY = 6;
 
-/** what the trash would take right now: the selection, the frame the preview
+/** what the bin would take right now: the selection, the frame the preview
     is showing, or the one under the cursor, in that order */
 function binTargets() {
   if (picked()) return [...sel];
@@ -1057,22 +1077,28 @@ function binTargets() {
   return [shown?.id ?? visible[cursor]?.id].filter(Boolean);
 }
 
-/** first press arms and says so, second press inside the window commits */
+/**
+ * Backspace, and it does not delete anything.
+ *
+ * IT USED TO GO STRAIGHT TO THE MACOS TRASH AND THAT WAS A REAL MISTAKE ON A
+ * REAL DRIVE. A shot can be bad and still be the only copy of itself, and the
+ * fastest key in a culling tool must not be wired to the one irreversible
+ * thing on the machine. The frame you are done looking at and the file you
+ * want off the disk are two different decisions and this key only ever makes
+ * the first one.
+ *
+ * So it sets frames aside. The file does not move, the index keeps it, the
+ * tags keep it, and the shelf stops drawing it. Inside the bin the same key
+ * is the way back out, because the one gesture that put a frame here should
+ * be the one that takes it away again.
+ *
+ * There is no arming any more, on either side. Two presses are the price of
+ * something you cannot undo, and this is not that.
+ */
 function binPress() {
   const ids = binTargets();
   if (!ids.length) return;
-  const same = armed && armed.length === ids.length && armed.every((id) => ids.includes(id));
-  /* a small number is committed by the same key again, because the card is
-     already in front of you and the count is one you can hold in your head.
-     a large one is not: it has its own button and you have to go and press
-     it. */
-  if (same && ids.length <= MANY && Date.now() - armedAt < 4000) return bin(ids);
-  armed = ids;
-  armedAt = Date.now();
-  sayBin();
-  if (ids.length <= MANY) {
-    setTimeout(() => { if (Date.now() - armedAt >= 4000) { armed = null; sayBin(); } }, 4100);
-  }
+  return F.binned ? unbin(ids) : bin(ids);
 }
 
 export function binCancel() {
@@ -1081,7 +1107,52 @@ export function binCancel() {
   sayBin();
 }
 
+const many = (n) => `${n} ${n === 1 ? "frame" : "frames"}`;
+
 async function bin(ids) {
+  const ok = await post("/api/bin", { ids });
+  if (!ok) { sayBin("that did not go in the bin."); return; }
+  for (const id of ids) { S.binned.add(id); sel.delete(id); }
+  renderShelf();
+  tally();
+  sayBin(`${many(ids.length)} set aside. nothing was deleted.`);
+  setTimeout(() => sayBin(), 6000);
+}
+
+async function unbin(ids) {
+  const ok = await post("/api/bin", { ids, put: true });
+  if (!ok) { sayBin("that did not come back out."); return; }
+  for (const id of ids) { S.binned.delete(id); sel.delete(id); }
+  renderShelf();
+  tally();
+  sayBin(`${many(ids.length)} back on the shelf.`);
+  setTimeout(() => sayBin(), 6000);
+}
+
+/**
+ * The real one, and it lives at the bottom of the bin where you have to go
+ * on purpose. Finder's own delete, so the Put Back record survives and the
+ * whole thing is still undone from the Trash in one keystroke.
+ *
+ * A small pile is committed by pressing the same button again. A large one
+ * is not: it gets the full stop in the middle of the screen, because the
+ * second press arrives half a second after the first and four hundred
+ * photographs is not a thing anybody agrees to by accident.
+ */
+function nukePress() {
+  const ids = binTargets();
+  if (!ids.length) return;
+  const same = armed && armed.length === ids.length && armed.every((id) => ids.includes(id));
+  if (same && ids.length <= MANY && Date.now() - armedAt < 4000) return nuke(ids);
+  armed = ids;
+  armedAt = Date.now();
+  sayBin();
+  if (ids.length <= MANY) {
+    setTimeout(() => { if (Date.now() - armedAt >= 4000) { armed = null; sayBin(); } }, 4100);
+  }
+}
+
+async function nuke(ids) {
   armed = null;
   const ok = await post("/api/trash", { ids });
   if (!ok) { sayBin("that did not go to the trash. the file may be on a drive that is gone."); return; }
@@ -1093,37 +1164,41 @@ async function bin(ids) {
   const gone = new Set(ids);
   S.items = S.items.filter((i) => !gone.has(i.id));
   S.byId = new Map(S.items.map((i) => [i.id, i]));
-  for (const id of gone) sel.delete(id);
+  for (const id of gone) { sel.delete(id); S.binned.delete(id); }
   renderShelf();
   tally();
-  sayBin(`${ids.length} ${ids.length === 1 ? "frame" : "frames"} in the trash. finder can put them back.`);
+  sayBin(`${many(ids.length)} in the macos trash. finder can put them back.`);
   setTimeout(() => sayBin(), 6000);
 }
 
 /**
- * What the trash says, and where.
+ * What the two buttons say.
  *
- * Under the threshold it is one word in the filter row, because it is one
- * frame and a dialog for one frame is an app that does not trust you.
- *
- * Over it, the confirmation comes to the middle of the screen and stops
- * everything, because this is the only thing in keeper that cannot be
- * undone from inside keeper. It names the number and it makes you press a
- * different thing than the key you were already pressing.
+ * The first one is the reversible one and it never asks, because asking
+ * about something you can undo teaches people to press through questions.
+ * The second one asks, and over a real pile it stops the screen.
  */
 function sayBin(text) {
   const el = $("#f-bin");
   if (!el) return;
-  const n = armed?.length ?? 0;
-  const big = n > MANY;
+  const targets = binTargets().length;
 
-  el.hidden = !armed && !text && !binTargets().length;
-  el.classList.toggle("armed", !!armed && !big);
-  el.textContent = armed && !big
-    ? `press again to trash ${n} ${n === 1 ? "frame" : "frames"}`
-    : text || "move to trash";
+  el.hidden = !targets && !text;
+  el.textContent = text || (F.binned
+    ? `put back ${targets > 1 ? many(targets) : "this one"}`
+    : `set aside ${targets > 1 ? many(targets) : "this one"}`);
 
-  bigAsk(big ? n : 0);
+  const kill = $("#f-nuke");
+  if (kill) {
+    const n = armed?.length ?? 0;
+    const big = n > MANY;
+    kill.hidden = !F.binned || (!targets && !armed);
+    kill.classList.toggle("armed", !!armed && !big);
+    kill.textContent = armed && !big
+      ? `press again to delete ${many(n)}`
+      : "delete off the drive";
+    bigAsk(big ? n : 0);
+  }
 }
 
 /** the full stop in the middle of the screen, and only for a real pile */
@@ -1136,7 +1211,8 @@ function bigAsk(n) {
     box.innerHTML = `
       <div class="bin-card">
         <p class="bin-n"></p>
-        <p class="bin-what">to the trash. finder can put them back, and keeper cannot.</p>
+        <p class="bin-what">off the drive and into the macos trash. finder can put
+          them back, and keeper cannot.</p>
         <div class="bin-acts">
           <button type="button" class="chip bin-no">keep them</button>
           <button type="button" class="bin-yes"></button>
@@ -1145,10 +1221,10 @@ function bigAsk(n) {
     document.body.append(box);
     box.querySelector(".bin-no").onclick = () => binCancel();
     box.addEventListener("click", (e) => { if (e.target === box) binCancel(); });
-    box.querySelector(".bin-yes").onclick = () => { const ids = armed; armed = null; bigAsk(0); bin(ids); };
+    box.querySelector(".bin-yes").onclick = () => { const ids = armed; armed = null; bigAsk(0); nuke(ids); };
   }
   box.querySelector(".bin-n").textContent = `${n} frames`;
-  box.querySelector(".bin-yes").textContent = `trash ${n}`;
+  box.querySelector(".bin-yes").textContent = `delete ${n}`;
   box.querySelector(".bin-yes").focus();
 }
 

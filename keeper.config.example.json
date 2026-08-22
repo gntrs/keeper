@@ -1,5 +1,4 @@
 {
-  "out": "keeper-out",
   "slots": [
     { "id": "hero",    "label": "hero banner",  "aspect": "16/9", "width": 2400,
       "note": "wide, and it sits under type, so leave the middle quiet" },

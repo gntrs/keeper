@@ -59,7 +59,10 @@ export async function loadConfig(dir) {
     slots: [...slots, ...standardSlots(ids, json.formats)],
     file,
     missing: false,
-    out: json.out ?? "keeper-out",
+    /* Undefined and not a default. Where a crop goes when nobody said lives
+       in crops.mjs beside the code that writes it, so there is one answer to
+       that question and not two that can disagree. */
+    out: json.out,
     places: compile(json.places ?? []),
   };
 }

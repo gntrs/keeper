@@ -173,6 +173,27 @@ function slotEl(slot) {
   const nums = document.createElement("div");
   nums.className = "nums";
 
+  /* The export, under the picture it exports.
+     There was one button for the whole bench and it wrote every placed slot
+     at once, which is the right thing to have and the wrong thing to have
+     only. Most of the time the question is about this picture: it is framed,
+     it is right, give me the file. Firing off nineteen crops to get at one
+     is a folder to sort through afterwards.
+     It is here only while the slot holds something, so an empty bench is not
+     nineteen buttons offering to export nothing. */
+  const foot = document.createElement("div");
+  foot.className = "slot-foot";
+  foot.hidden = true;
+  const shot = document.createElement("button");
+  shot.className = "chip";
+  shot.type = "button";
+  shot.dataset.icon = "";
+  shot.textContent = "export this one";
+  const said = document.createElement("span");
+  said.className = "said";
+  foot.append(shot, said);
+  shot.onclick = (e) => { e.stopPropagation(); ship(slot.id, shot, said); };
+
   root.append(head, box);
   if (slot.note) {
     const n = document.createElement("div");
@@ -183,7 +204,7 @@ function slotEl(slot) {
     n.title = slot.note;
     root.append(n);
   }
-  root.append(nums);
+  root.append(nums, foot);
 
   root.addEventListener("dragover", (e) => {
     if (!e.dataTransfer.types.includes(MIME)) return;
@@ -203,7 +224,7 @@ function slotEl(slot) {
     if (item) assign(item, slot.id);
   });
 
-  els.set(slot.id, { root, box, img, empty, nums,
+  els.set(slot.id, { root, box, img, empty, nums, foot, said,
                      zoom: head.querySelector(".zoom"), pct: head.querySelector(".pct") });
 
   /* With a trial up, the whole bench is already showing this frame and the
@@ -366,13 +387,23 @@ function clearOver() {
  * print itself in rather than a share of a narrow column.
  */
 function buildExport() {
-  $("#bench-export").onclick = ship;
+  $("#bench-export").onclick = () => ship();
+  /* Where a crop lands, said before one exists. It is the only thing about
+     this button nobody can guess, and the answer used to arrive in the
+     sentence after the files were already written. Home is a tilde because
+     the whole point is that a person reads it, and /Users/gince is eleven
+     characters of nothing. */
+  $("#bench-out").textContent = S.out ? `into ${nice(S.out)}` : "";
 }
 
-async function ship() {
-  const btn = $("#bench-export");
-  const out = $("#bench-export-result");
+/** the path a person would write, rather than the one the server holds */
+const nice = (p) => p.replace(/^\/Users\/[^/]+\//, "~/");
 
+/**
+ * Cut and write. One slot when the button under a picture asks, everything
+ * placed when the row at the foot does.
+ */
+async function ship(only = null, btn = $("#bench-export"), out = $("#bench-export-result")) {
   /* An export of nothing would still make the folder and then report that it
      wrote zero crops to it, which reads as a failure of the tool rather than
      of the afternoon.
@@ -382,11 +413,15 @@ async function ship() {
      behind whose slot is gone, and those are exactly what the exporter walks
      past: `hero` and `about-1` sat in this archive's file pointing at holes
      that no longer exist. */
-  if (!S.slots.some((s) => S.placements[s.id])) {
-    out.textContent = "nothing is placed yet. drag a frame onto a slot first.";
+  const has = only ? !!S.placements[only] : S.slots.some((sl) => S.placements[sl.id]);
+  if (!has) {
+    out.textContent = only
+      ? "nothing in this slot yet."
+      : "nothing is placed yet. drag a frame onto a slot first.";
     return;
   }
 
+  const was = btn.textContent;
   btn.disabled = true;
   out.textContent = "cutting...";
   let d = null;
@@ -394,13 +429,14 @@ async function ship() {
     const res = await fetch("/api/export", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: "{}",
+      body: JSON.stringify(only ? { slot: only } : {}),
     });
     d = await res.json();
   } catch (e) {
     console.error("[keeper] /api/export", e);
   }
   btn.disabled = false;
+  btn.textContent = was;
 
   if (!d?.ok) {
     out.textContent = d?.error
@@ -408,16 +444,47 @@ async function ship() {
       : "that export did not finish. the console has the reason.";
     return;
   }
-  /* The path is the whole answer, so it is said in full and not shortened to
-     a folder name. The counts after it are the ones worth reading: soft is a
-     crop somebody else's server will upscale, lost is a slot whose frame has
-     left the index, which is how you learn a file moved, and refused is a
-     negative this machine could not read. Each of them is silent at zero. */
-  out.textContent =
-    `wrote ${d.written} ${d.written === 1 ? "crop" : "crops"} to ${d.dir}` +
-    (d.soft ? `, ${d.soft} narrower than the slot wants` : "") +
-    (d.lost ? `, ${d.lost} skipped: the frame is gone from the index` : "") +
-    (d.failed ? `, ${d.failed} refused: the terminal has the reason` : "");
+
+  /* One slot says which file it just made, because that is the whole answer
+     and the folder is already printed beside the button at the foot. The
+     whole bench says how many, because nineteen filenames is not a sentence
+     anybody reads. */
+  const soft = d.soft ? `, ${d.soft} narrower than the slot wants` : "";
+  const lost = d.lost ? `, ${d.lost} skipped: the frame is gone from the index` : "";
+  const bad = d.failed ? `, ${d.failed} refused: the terminal has the reason` : "";
+  const file = only ? d.files?.[0] : null;
+
+  if (only && !file) {
+    out.textContent = `nothing came out${lost}${bad}`;
+    return;
+  }
+
+  /* "wrote yt-thumb.jpg" is a claim, and a claim is not the same thing as a
+     file. So the answer is the finder: press it, the folder opens with the
+     crop already selected, and the question of whether the export actually
+     happened stops being a question. The word is `done` rather than `wrote`
+     for the same reason a receipt does not say "attempted": this is the end
+     of the job, and it should read like it. */
+  out.replaceChildren();
+  const seen = document.createElement("button");
+  seen.type = "button";
+  seen.className = "said-go";
+  seen.textContent = file
+    ? `done · ${file}`
+    : `done · ${d.written} ${d.written === 1 ? "crop" : "crops"}`;
+  seen.title = file ? "show it in finder" : "open the folder in finder";
+  seen.onclick = (e) => {
+    e.stopPropagation();
+    post("/api/reveal-export", file ? { file } : {});
+  };
+  out.append(seen);
+
+  const rest = soft + lost + bad;
+  if (rest) {
+    const note = document.createElement("span");
+    note.textContent = rest;
+    out.append(note);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -437,6 +504,12 @@ function paint(slotId) {
   const p = saved ?? (trial ? { id: trial, place: CENTERED } : null);
   const fitting = !!p && !saved;
   hit.root.classList.toggle("trying", fitting);
+
+  /* Only a committed placement gets an export button. A trial is the bench
+     showing you what a frame would look like in a hole, and there is nothing
+     to write out of a question. */
+  hit.foot.hidden = !saved;
+  if (!saved) hit.said.textContent = "";
 
   if (!p) {
     hit.img.hidden = true;

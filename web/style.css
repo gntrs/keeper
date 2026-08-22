@@ -149,11 +149,19 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
    because the tail is the half that identifies it: every path on a shoot
    drive starts /Volumes/something and ends with the name you care about. */
 #root {
-  max-width: 30vw; overflow: hidden; white-space: nowrap;
-  direction: rtl; text-align: left;
+  --ph: var(--ph-folder);
+  max-width: 30vw; min-width: 0;
   border: 0; background: none; padding: var(--s1) var(--s2);
   border-radius: var(--r); cursor: pointer;
   font: 400 .78rem/1 var(--mono); color: var(--ink-3);
+}
+/* the path itself keeps the truncation. it is on the ::after rather than the
+   button because the button is a flex row now and rtl on the row would put
+   the folder icon on the wrong end of it. */
+#root::after {
+  content: attr(data-path);
+  min-width: 0; overflow: hidden; white-space: nowrap;
+  direction: rtl; text-align: left;
 }
 #root:hover { color: var(--ink); background: #ffffff12; }
 
@@ -185,6 +193,24 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
   font-size: .72rem; opacity: .6;
   font-variant-numeric: tabular-nums;
 }
+
+/* The magnifier. It stands in front of the field rather than inside it,
+   because inside means padding-left on an input whose width is already the
+   thing being negotiated in a 400px column, and a glyph floating over the
+   first letter somebody types is a worse trade than four pixels of gap. */
+.find {
+  display: inline-flex; align-items: baseline; gap: var(--s2);
+  min-width: 0; color: var(--ink-3);
+}
+.find::before {
+  content: ""; flex: none; width: .82em; height: .82em;
+  align-self: center;
+  background: currentColor;
+  -webkit-mask: var(--ph-search) center / contain no-repeat;
+  mask: var(--ph-search) center / contain no-repeat;
+}
+.find:focus-within { color: var(--ink-2); }
+.find input { color: var(--ink); }
 
 input[type=search] {
   border: 0; border-bottom: 1px solid var(--line-strong);
@@ -562,6 +588,7 @@ figure.intray .add:hover { filter: brightness(1.16); }
 #picker[hidden] { display: none; }
 #picker-head { display: flex; align-items: center; gap: var(--s2);
                padding: var(--s3) var(--s4) var(--s4); }
+#picker-head .find { flex: 1; min-width: 0; }
 #picker-head input { width: 100%; }
 #picker-label { flex: none; }
 /* The row that writes files, across the foot of the bench. It is the one
@@ -573,12 +600,42 @@ figure.intray .add:hover { filter: brightness(1.16); }
   padding: var(--s2) var(--s5);
   border-top: 1px solid var(--line);
 }
-#bench-export { flex: none; }
+#bench-export { flex: none; --ph: var(--ph-download); }
+.slot-foot .chip { --ph: var(--ph-download); }
+/* where it goes, beside the button that sends it there */
+#bench-out { flex: none; font-size: .78rem; color: var(--ink-3); }
+
+/* the export under a picture. it is the same chip as everywhere else, with
+   the sentence it writes beside it rather than under it, so a slot does not
+   change height the moment you use it. */
+.slot-foot {
+  display: flex; align-items: baseline; gap: var(--s3);
+  padding-top: var(--s2); min-width: 0;
+}
+.slot-foot[hidden] { display: none; }
+.slot-foot .chip { flex: none; }
+/* The answer, and the way to check it. It is a button because it does
+   something, and it is underlined on hover rather than always, because a
+   line under every result would turn a quiet sentence into a link farm. */
+.said-go {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; color: var(--ink-2);
+  text-decoration: underline; text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: color var(--fast) var(--ease), text-decoration-color var(--fast) var(--ease);
+}
+.said-go:hover { color: var(--ink); text-decoration-color: var(--line-strong); }
+
+.slot-foot .said {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: .78rem/1.5 var(--mono); color: var(--ink-3);
+}
 /* dressed as #tray-result, because it is the same sentence in the same
    place: how many files went where, after a button that writes to disk. */
 #bench-export-result {
   margin: 0; min-width: 0; font: .78rem/1.5 var(--mono);
   color: var(--ink-3); overflow-wrap: anywhere;
+  display: flex; align-items: baseline; gap: .3em; flex-wrap: wrap;
 }
 #strip { grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
          padding: 0 var(--s4) var(--s7); }
@@ -628,9 +685,10 @@ body:has(#tray:not([hidden])) #keys { right: var(--tray-w); }
 
 .keys-head { display: flex; align-items: center; margin-bottom: var(--s4); }
 #keys-shut {
+  --ph: var(--ph-x);
   border: 0; background: none; cursor: pointer; color: var(--ink-3);
   border-radius: var(--r); padding: var(--s1) var(--s2);
-  font: 500 .72rem/1 var(--mono); text-transform: lowercase; letter-spacing: .14em;
+  font: 500 .9rem/1 var(--mono);
 }
 #keys-shut:hover { color: var(--ink); }
 
@@ -859,12 +917,19 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
 }
 #tray-pick:hover { color: var(--ink); }
 
+/* A bin, and not the words "empty the tray". The head is 296px wide on the
+   narrow screen and the sentence was being clipped to "empty the t", which
+   is a control saying something it does not mean. Armed, it drops the icon
+   and says the word, because "sure?" is a question and a question has to be
+   in words. */
 #tray-clear {
+  --ph: var(--ph-trash);
   flex: none; border: 0; background: none; cursor: pointer;
   color: var(--ink-3); border-radius: var(--r);
-  padding: var(--s1) var(--s2);
-  font: 500 .68rem/1 var(--mono); text-transform: lowercase; letter-spacing: .14em;
+  padding: var(--s1) var(--s2); font: 500 .68rem/1 var(--mono);
+  text-transform: lowercase; letter-spacing: .14em;
 }
+#tray-clear[data-armed]::before { display: none; }
 #tray-clear:hover { color: var(--hot); }
 #tray-clear[disabled] { color: #ffffff26; cursor: default; }
 
@@ -974,6 +1039,7 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
    decision you can take back, and this one writes files to a disk, so it is
    allowed to look like the end of the sentence. */
 #tray-export {
+  --ph: var(--ph-download);
   flex: none; border: 0; cursor: pointer;
   background: var(--hot); color: #fff;
   border-radius: var(--r); padding: 7px var(--s3);
@@ -1285,11 +1351,19 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
    destructive control that follows your pointer around is one twitch from
    being pressed by accident.
    --------------------------------------------------------------------- */
-#f-bin[hidden] { display: none; }
-#f-bin { color: var(--ink-3); }
-#f-bin:hover { color: var(--ink); background: var(--raise); }
-#f-bin.armed,
-#f-bin.armed:hover { background: var(--hot); color: #fff; }
+#f-bin[hidden], #f-nuke[hidden], #f-binned[hidden] { display: none; }
+#f-bin, #f-nuke { color: var(--ink-3); }
+#f-bin:hover, #f-nuke:hover { color: var(--ink); background: var(--raise); }
+/* the accent, on the one control in the app that reaches a file. armed is
+   the only state in keeper where red means "you have to deal with this"
+   rather than "you chose this", and it is earned here and nowhere else. */
+#f-nuke.armed,
+#f-nuke.armed:hover { background: var(--hot); color: #fff; }
+/* the bin itself is a filter and wears a filter's clothes, because going to
+   look at what you set aside is not a destructive act */
+#f-binned { color: var(--ink-3); }
+#f-binned:hover { color: var(--ink); background: var(--raise); }
+#f-binned.on { background: var(--hot); color: #fff; }
 
 /* ---------------------------------------------------------------------
    The full stop.

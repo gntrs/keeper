@@ -49,7 +49,7 @@ export async function mountTray() {
   const box = $("#tray");
 
   $("#tray-toggle").onclick = () => show(box.hidden);
-  RESTING = $("#tray-clear").textContent.trim() || RESTING;
+  RESTING = $("#tray-clear").textContent.trim();
   $("#tray-clear").onclick = () => wipe();
   $("#tray-pick").onchange = (e) => pick(e.target.value);
   $("#tray-export").onclick = () => ship();
@@ -268,7 +268,7 @@ const SURE = 3000;
  * second time in here. Two copies of a sentence a person reads is two places
  * to change it and one of them will be missed.
  */
-let RESTING = "empty the tray";
+let RESTING = "";
 let armed = 0;
 
 /**
@@ -307,6 +307,9 @@ function arm() {
      are reading it. The width is measured rather than named because the word
      on the button belongs to the markup. */
   b.style.minWidth = `${b.offsetWidth}px`;
+  /* the icon steps aside for the word. "sure?" is a question and a question
+     cannot be drawn as a bin. */
+  b.dataset.armed = "1";
   b.textContent = "sure?";
   b.style.color = "var(--hot)";
   armed = setTimeout(disarm, SURE);
@@ -321,6 +324,7 @@ function disarm() {
   armed = 0;
   const b = $("#tray-clear");
   if (b.textContent !== RESTING) b.textContent = RESTING;
+  delete b.dataset.armed;
   b.style.color = "";
   b.style.minWidth = "";
 }

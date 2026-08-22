@@ -42,7 +42,7 @@
   <button id="tray-toggle" type="button" aria-expanded="false">tray</button>
   <!-- the folder you are looking at, and the control that changes it.
        drop.js listens for [data-keeper-choose] anywhere on the page. -->
-  <button id="root" type="button" data-keeper-choose
+  <button id="root" type="button" data-keeper-choose data-icon
           title="open a different folder"></button>
 </header>
 
@@ -56,14 +56,24 @@
       <button class="chip" id="f-untagged">untagged <i></i></button>
       <button class="chip" id="f-clear">clear</button>
       <!--
-        the trash. it says what it would do rather than carrying a bin icon,
-        because this is the one control in keeper that touches an original
-        file, and the one place a word is worth the room it takes. it arms on
-        the first press and commits on the second, exactly as the delete key
-        does.
+        The bin, and what is in it.
+
+        `set aside` moves nothing. It writes an id to a list and the shelf
+        stops drawing that frame, which is what deleting in a culling tool
+        should always have meant: a bad shot can still be the only copy of
+        itself, and the fastest key in the app must not be wired to the one
+        irreversible thing on the machine.
+
+        `delete off the drive` is the other decision and it only exists
+        inside the bin, where you had to go on purpose. It says what it would
+        do rather than carrying an icon, because it is the one control in
+        keeper that touches an original file and the one place a word is
+        worth the room it takes.
       -->
-      <button class="chip" id="f-bin" hidden>move to trash</button>
-      <input type="search" id="f-q" placeholder="search the path">
+      <button class="chip" id="f-binned">in the bin <i></i></button>
+      <button class="chip" id="f-bin" hidden>set aside</button>
+      <button class="chip" id="f-nuke" hidden>delete off the drive</button>
+      <span class="find"><input type="search" id="f-q" placeholder="search the path"></span>
       <span class="grow"></span>
       <!--
         how many frames across. a contact sheet is a density argument and the
@@ -104,13 +114,14 @@
       <span class="grow"></span>
       <button class="chip" id="p-tray">in tray</button>
       <button class="chip" id="p-star">kept only</button>
-      <input type="search" id="p-q" placeholder="search">
+      <span class="find"><input type="search" id="p-q" placeholder="search"></span>
     </div>
     <div id="strip"></div>
   </div>
   </div>
   <div id="bench-bar">
-    <button class="chip" id="bench-export" type="button">export the placed ones</button>
+    <button class="chip" id="bench-export" type="button" data-icon>export all the placed ones</button>
+    <span id="bench-out" class="num"></span>
     <p id="bench-export-result" class="dim"></p>
   </div>
 </section>
@@ -133,12 +144,13 @@
     <span class="label">tray</span>
     <select id="tray-pick"></select>
     <span id="tray-count" class="num">0</span>
-    <button id="tray-clear" type="button">empty the tray</button>
+    <button id="tray-clear" type="button" data-icon="only"
+            title="empty the tray"></button>
   </header>
   <div id="tray-grid"></div>
   <footer class="tray-foot">
     <input id="tray-folder" placeholder="folder name">
-    <button id="tray-export" type="button">export</button>
+    <button id="tray-export" type="button" data-icon>export</button>
     <p id="tray-result"></p>
   </footer>
 </aside>
@@ -174,7 +186,7 @@
   <div class="keys-head">
     <span class="label">shortcuts</span>
     <span class="grow"></span>
-    <button id="keys-shut" type="button">close</button>
+    <button id="keys-shut" type="button" data-icon="only" title="close"></button>
   </div>
   <div class="keys-cols">
     <section>
@@ -191,7 +203,7 @@
       <div class="k"><span class="ks"><kbd>1</kbd>…<kbd>9</kbd></span><span>the tags up top</span></div>
       <div class="k"><span class="ks"><kbd>a</kbd><kbd>z</kbd></span><span>or the tag's own letter</span></div>
       <div class="k"><span class="ks"><kbd>k</kbd></span><span>keep it</span></div>
-      <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>trash it, twice to mean it</span></div>
+      <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>set it aside, nothing is deleted</span></div>
     </section>
     <section>
       <h4 class="label">picking</h4>

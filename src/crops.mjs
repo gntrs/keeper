@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 
 import { resolve as resolveCrop, isAtCover, toObjectPosition } from "./geometry.mjs";
@@ -50,15 +51,60 @@ function pixels(rect, w, h) {
  * because a terminal reading them top to bottom should see the same sequence
  * as the bench.
  */
-export async function exportCrops({ root, config }) {
+/**
+ * Where a crop goes when nobody said.
+ *
+ * It was `keeper-out` in the working directory, which is correct and is not
+ * findable. keeper is normally started against a drive from whatever folder
+ * the terminal happened to be in, so the crops landed next to the source of
+ * keeper itself, and the honest answer to "where did my export go" was a
+ * path nobody would have guessed. Downloads is the folder every mac already
+ * uses for "a file I just made and am about to do something with", it is one
+ * click from the dock, and it is the same place whichever folder keeper was
+ * launched from.
+ *
+ * `"out"` in a keeper.config.json still wins, and is still resolved against
+ * the working directory, so a project that wants its crops inside itself
+ * says so in one line.
+ */
+export const DEFAULT_OUT = path.join(homedir(), "Downloads", "keeper");
+
+/**
+ * A name nothing is using yet.
+ *
+ * An export used to write `<slot>/<slot>.jpg` and write over it every time,
+ * which meant the second export silently destroyed the first. That is the
+ * wrong default for a file somebody spent a minute framing: crops are cheap,
+ * a crop you cannot get back is not. So every export is a new file, numbered
+ * from the second one on, and the sidecar takes the same stem so a crop and
+ * its numbers can never drift apart.
+ */
+async function freeStem(dir, id) {
+  for (let n = 1; n < 1000; n++) {
+    const stem = n === 1 ? id : `${id}-${n}`;
+    try {
+      await access(path.join(dir, `${stem}.json`));
+    } catch {
+      return stem;
+    }
+  }
+  return `${id}-${Date.now()}`;
+}
+
+export async function exportCrops({ root, config, only = null }) {
   const [index, placements] = await Promise.all([readIndex(root), readPlacements(root)]);
   // resolved against the working directory, which is also where loadConfig
   // looked, so `out` in a config means what a person typing it would expect
-  const dir = path.resolve(config.out ?? "keeper-out");
+  const dir = config.out ? path.resolve(config.out) : DEFAULT_OUT;
   const byId = new Map((index?.items ?? []).map((i) => [i.id, i]));
   const rows = [];
 
-  for (const slot of config.slots) {
+  /* One slot, when the bench asks for one. The button under a picture means
+     that picture and nothing else, and an export of nineteen crops fired off
+     by a person who wanted one is nineteen files to sort through. */
+  const wanted = only ? config.slots.filter((s) => s.id === only) : config.slots;
+
+  for (const slot of wanted) {
     const p = placements[slot.id];
     if (!p) continue;
     const item = byId.get(p.id);
@@ -67,13 +113,16 @@ export async function exportCrops({ root, config }) {
     const rect = resolveCrop(p.place, item.w, item.h, slot.aspect);
     const box = pixels(rect, item.w, item.h);
     const proxied = needsProxy(path.extname(item.path).toLowerCase());
-    const into = path.join(dir, slot.id);
-    await mkdir(into, { recursive: true });
+    /* One flat folder, not a folder per slot holding one picture each. The
+       old shape was tidy and it meant six clicks to get at six crops, on a
+       screen whose whole point was choosing them quickly. */
+    await mkdir(dir, { recursive: true });
     /* The crop of a raw is a jpeg and has to be called one. `wide.arw` full
        of jpeg bytes is a file no viewer opens, no uploader accepts and every
        tool that reads the extension gets wrong. */
     const ext = proxied ? ".jpg" : path.extname(item.path).toLowerCase();
-    const dst = path.join(into, `${slot.id}${ext}`);
+    const stem = await freeStem(dir, slot.id);
+    const dst = path.join(dir, `${stem}${ext}`);
 
     /* One slot at a time, because a decoder that gives up on one negative
        must not cost the other eighteen their crops. The message goes back
@@ -103,7 +152,7 @@ export async function exportCrops({ root, config }) {
 
     // the numbers that made the file, next to the file. a crop nobody can
     // reproduce six months later is a crop that has to be eyeballed again.
-    await writeFile(path.join(into, "placement.json"), JSON.stringify({
+    await writeFile(path.join(dir, `${stem}.json`), JSON.stringify({
       slot: slot.id,
       source: item.path,
       from: proxied ? "proxy" : "original",

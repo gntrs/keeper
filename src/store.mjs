@@ -42,6 +42,7 @@ export const paths = (root) => ({
   index: path.join(root, DIR, "index.json"),
   tags: path.join(root, DIR, "tags.json"),
   placements: path.join(root, DIR, "placements.json"),
+  binned: path.join(root, DIR, "binned.json"),
   thumbs: path.join(root, DIR, "thumbs"),
   sheets: path.join(root, DIR, "sheets"),
   // one jpeg per raw negative, keyed by the same id as the thumbnail beside
@@ -66,5 +67,18 @@ export const readIndex = (root) => readJson(paths(root).index, null);
 export const writeIndex = (root, v) => writeJson(paths(root).index, v);
 export const readTags = (root) => readJson(paths(root).tags, {});
 export const writeTags = (root, v) => writeJson(paths(root).tags, v);
+
+/**
+ * The frames you are done looking at.
+ *
+ * A list of ids and nothing else. It is not a folder of files and nothing
+ * moves into it, because the whole point of it is that nothing moves: a
+ * frame in here is exactly where it always was on the drive, and keeper has
+ * simply stopped putting it on the wall. That makes the list throwaway. Lose
+ * binned.json and you lose an opinion about which frames were boring, not a
+ * single photograph.
+ */
+export const readBinned = (root) => readJson(paths(root).binned, []);
+export const writeBinned = (root, v) => writeJson(paths(root).binned, v);
 export const readPlacements = (root) => readJson(paths(root).placements, {});
 export const writePlacements = (root, v) => writeJson(paths(root).placements, v);

@@ -20,9 +20,11 @@ keeper ~/Archive
 
 it scans, writes thumbnails, and **opens the browser itself**. pass
 `--no-open` and it prints the url instead. **mac only.** nothing is uploaded,
-the server binds to loopback, and **no original is ever edited.** one key
-moves a frame to the macos trash and that is the whole of what keeper can do
-to a file on your drive.
+the server binds to loopback, and **no original is ever edited.** no key
+touches a file on your drive: `delete` sets a frame aside in keeper's own bin
+and the photograph stays exactly where it was. one button, at the bottom of
+that bin, moves files to the macos trash, and you have to go there to press
+it.
 
 ## at a glance
 
@@ -122,7 +124,7 @@ keyboard first, because that is the only way it actually gets done:
 | `cmd`+`return` | sends the picked frames to the tray |
 | `option`+`r` | reveals the original in finder, selected |
 | `cmd`+`f` | finds, `option`+`o` opens another folder, `option`+`1` and `option`+`2` change view |
-| `delete`, twice | moves the originals to the macos trash |
+| `delete` | sets the frame aside in keeper's bin, nothing on the drive moves |
 
 the modifier is option and not cmd on three of those because **chrome resolves
 `cmd`+`r`, `cmd`+`o` and `cmd`+`1`** above the page: `preventDefault` runs and
@@ -199,12 +201,18 @@ archive, because the holes belong to the project and the photographs do not.
 id as a built in one **replaces it quietly**, and `"formats": false` turns the
 whole standard set off for a project that knows exactly what it wants.
 
-`export the placed ones` on the bench and `keeper export` in the terminal
-write the same files, out of the same function, because two copies of that
-code would be two chances for the crop you saw and the crop you shipped to
-stop being the same picture. each placed slot gets a folder holding the cut
-image and a `placement.json`: the source path, the source size, the crop box
-in whole pixels, and the `object-position` that reproduces it.
+`export this one` under a picture, `export all the placed ones` at the foot of
+the bench, and `keeper export` in the terminal all write the same files out of
+the same function, because two copies of that code would be two chances for
+the crop you saw and the crop you shipped to stop being the same picture.
+
+crops land in **`~/Downloads/keeper`** unless a `"out"` in your config says
+otherwise, and that path is printed next to the button so it is never a
+question. each crop is a new file: `hero.jpg`, then `hero-2.jpg`, then
+`hero-3.jpg`, because a crop you spent a minute framing should not be
+destroyed by the next press of the same button. beside each one is a json of
+the same name holding the source path, the source size, the crop box in whole
+pixels, and the `object-position` that reproduces it.
 
 ## trays
 
@@ -284,8 +292,8 @@ written in screen pixels would.
 **a frame's id is a hash of its path, not its position.** drop 200 new
 photographs into the archive and every tag written last month still points at
 the same picture. position based ids would have slid by 200 and repointed the
-lot, quietly. it is also why a frame you take back out of the trash comes back
-to its own tags.
+lot, quietly. it is also why a frame you take back out of the bin, or out of
+finder's trash, comes back to its own tags.
 
 ## install
 
@@ -303,13 +311,22 @@ contact sheet needs.
 everything keeper writes goes in `<archive>/.keeper/`: the index, the
 thumbnails, the contact sheets, your tags, your placements and your trays.
 delete that folder and the archive is exactly as it was. nothing else on the
-drive is touched, and the one exception is the trash key, which moves a frame
-out and leaves finder holding the put back.
+drive is touched by anything you can reach with a keystroke. `delete` writes
+an id to `binned.json` and nothing else: the frame leaves the shelf, the file
+does not leave the folder. the only thing in keeper that moves a file is
+`delete off the drive`, which lives inside the bin, asks first, and uses
+finder's own delete so the put back record survives.
+
+**this is the second design and the first one was wrong.** `delete` used to go
+straight to the macos trash. a bad shot can still be the only copy of itself,
+and wiring the fastest key in a culling tool to the one irreversible thing on
+the machine is how a tool eats somebody's footage. two decisions, two places,
+and only one of them can reach a file.
 
 ## the look
 
-there is no logo. the word `keeper`, set in the mono, is the whole of the
-mark, and a photograph is the only thing on the screen worth looking at.
+a red square and the word `keeper` beside it, and a photograph is the only
+thing on the screen worth looking at.
 
 one accent, `#e1062c`, over `#131315` raised and `#0b0b0c` ground. it means
 one of exactly two things anywhere it appears: you chose this, or you have to

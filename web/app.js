@@ -10,10 +10,23 @@ import "/drop.js";
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
   byId: new Map(),
+  /* The frames set aside. A set rather than the array the server sends,
+     because the shelf asks "is this one binned" once per tile per render and
+     an array would make that a scan of the whole list. */
+  binned: new Set(),
   view: "shelf",
 };
 
 const $ = (s) => document.querySelector(s);
+
+/* Is this keystroke going into a field?
+   `e.target.matches` and not this used to be the test, which throws whenever
+   the target is not an element: a keydown dispatched on window has window as
+   its target, window has no matches, and the whole handler dies on the way
+   past. It only showed up under a synthetic event, and a keyboard handler
+   that can be killed by one is a keyboard handler with a loose wire. */
+export const typed = (e) =>
+  e.target instanceof Element && e.target.closest("input, textarea, select");
 
 /** every write goes through here, so nothing is only true on screen */
 export async function post(route, body, method = "POST") {
@@ -38,7 +51,7 @@ export function reveal(item) {
  * below is the same fact, said in the one place you can act on it.
  */
 export function tally() {
-  const kept = S.items.filter((i) => S.tags[i.id]?.star).length;
+  const kept = S.items.filter((i) => S.tags[i.id]?.star && !S.binned.has(i.id)).length;
   /* Your own slots, and only the placements still pointing at one. The
      bench ships fourteen standard shapes nobody set out to fill, so
      counting against all of them read as failure the moment it said 3/14,
@@ -49,8 +62,9 @@ export function tally() {
      fraction worth printing, so the segment goes. */
   const mine = S.slots.filter((s) => s.group === "yours");
   const placed = mine.filter((s) => S.placements[s.id]).length;
+  const on = S.items.length - S.binned.size;
   $("#tally").innerHTML =
-    `<span class="dim">${S.items.length} frames · ${kept} kept` +
+    `<span class="dim">${on} frames · ${kept} kept` +
     (mine.length ? ` · ${placed}/${mine.length} placed` : "") + `</span>`;
 }
 
@@ -149,7 +163,7 @@ addEventListener("keydown", (e) => {
     return;
   }
 
-  if (e.target.matches("input")) return;
+  if (typed(e)) return;
 
   /* Both keys, because ? is shift and / is the key the hand is already on,
      and every tool that has ever had a cheat sheet answers to one of them.
@@ -180,8 +194,17 @@ addEventListener("keydown", (e) => {
 
 const state = await (await fetch("/api/state")).json();
 Object.assign(S, state);
+S.binned = new Set(state.binned ?? []);
 S.byId = new Map(S.items.map((i) => [i.id, i]));
-$("#root").textContent = S.root;
+/* On a data attribute rather than as text, because the button is an icon and
+   a path now, and only the path half is allowed to truncate.
+   
+   Wrapped in a left to right embedding. The path is truncated from its left
+   end, which css does by setting the box to rtl, and rtl then moves the
+   leading slash of `/Volumes/...` around to the far end: the button read
+   `Volumes/Crucial X9 Pro For Mac/` and the root slash had quietly walked to
+   the back. U+202A holds the string itself ltr inside an rtl box. */
+$("#root").dataset.path = `\u202A${S.root}\u202C`;
 if (!S.slots.length) document.querySelector('[data-view="bench"]').title =
   "no keeper.config.json, so there are no slots yet";
 

@@ -4,7 +4,7 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { paths, readIndex, writeIndex, readTags, writeTags, readPlacements, writePlacements } from "./store.mjs";
+import { paths, readIndex, writeIndex, readTags, writeTags, readPlacements, writePlacements, readBinned, writeBinned } from "./store.mjs";
 import { startOpen, jobState } from "./open.mjs";
 import { locate } from "./locate.mjs";
 import {
@@ -12,7 +12,7 @@ import {
 } from "./trays.mjs";
 import { VOCAB } from "./tags.mjs";
 import { placeOf } from "./places.mjs";
-import { exportCrops } from "./crops.mjs";
+import { exportCrops, DEFAULT_OUT } from "./crops.mjs";
 import { readableSource } from "./raw.mjs";
 import { clock } from "./film.mjs";
 import { execFile } from "node:child_process";
@@ -210,8 +210,8 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
       }
 
       if (route === "/api/state") {
-        const [index, tags, placements, trays] = await Promise.all([
-          readIndex(root), readTags(root), readPlacements(root), readTrays(root),
+        const [index, tags, placements, trays, binned] = await Promise.all([
+          readIndex(root), readTags(root), readPlacements(root), readTrays(root), readBinned(root),
         ]);
         const items = (index?.items ?? []).map((i) => ({
           ...i,
@@ -224,6 +224,9 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
           builtAt: index?.builtAt ?? null,
           tags,
           placements,
+          // the frames set aside. they are still on the drive and still in
+          // the index; the shelf simply stops showing them.
+          binned,
           // frame id to the trays holding it, so the shelf can mark a frame
           // that is already in without asking a second time per thumbnail
           trays: membership(trays),
@@ -233,6 +236,10 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
           // line is a thing to paste into a stylesheet and only a person who
           // wrote their own slots is holding a stylesheet.
           configured: !config.missing,
+          // where a crop lands, said before anything is written rather than
+          // only in the sentence after. it is the one thing about export
+          // nobody could guess.
+          out: config.out ? path.resolve(config.out) : DEFAULT_OUT,
           vocab: Object.fromEntries(Object.entries(VOCAB).map(([k, v]) => [k, v[0]])),
           hints: Object.fromEntries(Object.entries(VOCAB).map(([k, v]) => [k, v[1]])),
         });
@@ -333,6 +340,35 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
       }
 
       /**
+       * Put a frame out of sight. NOTHING ON THE DISK MOVES.
+       *
+       * `delete` in a culling tool used to mean the macOS trash, and that was
+       * wrong in a way that took a real drive to notice: a shot can be bad
+       * and still be the only copy, and a tool whose fast key is wired to
+       * the one irreversible thing on the machine is a tool that will
+       * eventually eat somebody's footage. The frame you do not want to look
+       * at any more is not the same frame as the file you want off the disk,
+       * and keeper was treating them as one.
+       *
+       * So this writes an id to a list. The photograph stays exactly where it
+       * was, the index still holds it, the tags still hold it, and putting it
+       * back is the same request with `put` set. Actually removing a file is
+       * a separate, slower, louder thing, and it can only be asked for about
+       * a frame that is already in here.
+       */
+      if (route === "/api/bin" && req.method === "POST") {
+        const b = await body(req);
+        const ids = Array.isArray(b.ids) ? b.ids : [];
+        if (!ids.length) return json(res, 400, { error: "no frames named" });
+
+        const have = new Set(await readBinned(root));
+        for (const id of ids) b.put ? have.delete(id) : have.add(id);
+        const next = [...have];
+        await writeBinned(root, next);
+        return json(res, 200, { ok: true, binned: next });
+      }
+
+      /**
        * The one thing in keeper that touches an original, and it moves it
        * rather than removing it.
        *
@@ -361,6 +397,17 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
         const hits = ids.map((id) => known.get(id)).filter(Boolean);
         if (hits.length !== ids.length) return json(res, 404, { error: "unknown frame" });
 
+        /* Only out of the bin, and there is no way round this from the
+           browser. Two stages is the whole safety: the fast key sets a frame
+           aside and cannot reach a file, and the slow one that can reach a
+           file is only reachable from a screen you had to go to on purpose.
+           A single request that both binned and trashed would put the file
+           back within one keystroke of a photograph. */
+        const set = new Set(await readBinned(root));
+        if (!ids.every((id) => set.has(id))) {
+          return json(res, 409, { error: "only frames already in the bin can be deleted" });
+        }
+
         const files = hits.map((h) => path.join(root, h.path));
         const script = `on run argv
   set l to {}
@@ -388,6 +435,9 @@ end run`;
           ...index,
           items: (index?.items ?? []).filter((i) => !gone.has(i.id)),
         });
+        // out of the bin as well, because the bin is a list of frames on the
+        // drive and these are not on the drive any more
+        await writeBinned(root, [...set].filter((id) => !gone.has(id)));
 
         return json(res, 200, { ok: true, trashed: hits.length });
       }
@@ -540,10 +590,48 @@ end run`;
        * body: what to write is whatever is placed, and where it goes is the
        * config's, so there is nothing here for a caller to aim.
        */
+      /**
+       * Open the finder on something this export just wrote.
+       *
+       * "wrote yt-thumb.jpg" is a claim, and a person who has been burned by
+       * a tool once wants the folder, not the sentence. A basename and
+       * nothing else: no separators, no dots, so nothing outside the export
+       * folder can be named from the browser however the request is dressed.
+       * With no name it opens the folder itself, which is what the row at the
+       * foot of the bench asks for after writing nineteen of them.
+       */
+      if (route === "/api/reveal-export" && req.method === "POST") {
+        if (process.platform !== "darwin") {
+          return json(res, 400, { error: "reveal is macOS only" });
+        }
+        const b = await body(req).catch(() => ({}));
+        const dir = config.out ? path.resolve(config.out) : DEFAULT_OUT;
+        const name = typeof b?.file === "string" ? b.file : "";
+        if (name && (name.includes("/") || name.includes("\\") || name.startsWith("."))) {
+          return json(res, 400, { error: "that is not a file this export wrote" });
+        }
+        if (name) execFile("open", ["-R", path.join(dir, name)], () => {});
+        else execFile("open", [dir], () => {});
+        return json(res, 200, { ok: true });
+      }
+
       if (route === "/api/export" && req.method === "POST") {
-        const out = await exportCrops({ root, config });
+        /* A slot id means that slot alone, which is what the button under a
+           picture asks for. No id is still everything placed. Checked here
+           rather than in the exporter, because a name that matches nothing
+           would come back as a cheerful "wrote 0 crops" and read as the
+           export being broken. */
+        const b = await body(req).catch(() => ({}));
+        const only = typeof b?.slot === "string" && b.slot ? b.slot : null;
+        if (only && !config.slots.some((sl) => sl.id === only)) {
+          return json(res, 404, { error: `no slot called ${only}` });
+        }
+        const out = await exportCrops({ root, config, only });
         return json(res, 200, {
           ok: true, written: out.written, soft: out.soft, lost: out.lost, failed: out.failed, dir: out.dir,
+          // the names, so the bench can say which file it just made rather
+          // than only how many
+          files: out.rows.filter((r) => r.file).map((r) => path.basename(r.file)),
         });
       }
 
