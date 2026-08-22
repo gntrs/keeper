@@ -27,6 +27,9 @@ import { S } from "/app.js";
    for the same reason they spell it out: nobody owns it, and a module
    invented to hold one constant is a module invented for nothing. */
 const MIME = "application/x-keeper-frame";
+/* the plural, written by the same three files. a drag that started on a
+   frame inside the selection carries every id in it. */
+const MIMES = "application/x-keeper-frames";
 
 /**
  * What Finder is told the file is. It matters more than it looks: the type
@@ -100,6 +103,22 @@ document.addEventListener("dragstart", (e) => {
   const item = id && S.byId.get(id);
   if (!item) return;
 
+  /* The whole set, with the frame under the hand first, because the one
+     flavour that can only carry a single file should carry the one that was
+     grabbed. A drag that started outside the selection has no plural and is
+     a set of one. */
+  let ids = [id];
+  try {
+    const many = JSON.parse(dt.getData(MIMES) || "[]");
+    if (Array.isArray(many) && many.length > 1) {
+      ids = [id, ...many.filter((x) => typeof x === "string" && x !== id)];
+    }
+  } catch {
+    /* a malformed plural is not worth losing the drag over. one file still
+       goes, which is what this did before the plural existed. */
+  }
+  const items = ids.map((x) => S.byId.get(x)).filter(Boolean);
+
   const name = item.path.split("/").pop();
   /* the file:// flavour keeps naming the original, including for a raw. a
      path is a place on the drive and the negative is what is there. only the
@@ -121,19 +140,27 @@ document.addEventListener("dragstart", (e) => {
   const out = served(name);
   dt.setData("DownloadURL", `${out.type}:${out.name}:${location.origin}/full/${id}`);
 
-  /* And the path itself, for the half of the time the thing you actually
-     want is not a file but somewhere to type. Dropped into a terminal, an
-     editor or a chat box this pastes the original's location, which costs
-     nothing and copies nothing. It replaces the relative path the shelf put
-     in text/plain: relative to an archive the receiving app has never heard
-     of is relative to nothing. */
-  dt.setData("text/uri-list", fileUrl(abs));
-  dt.setData("text/plain", fileUrl(abs));
+  /* And the paths themselves, for the half of the time the thing you
+     actually want is not a file but somewhere to type. Dropped into a
+     terminal, an editor or a chat box this pastes the originals' locations,
+     which costs nothing and copies nothing. It replaces the relative path
+     the shelf put in text/plain: relative to an archive the receiving app
+     has never heard of is relative to nothing.
+
+     THIS IS THE FLAVOUR THAT CARRIES A WHOLE SELECTION. uri-list is a list
+     by definition, one url per line, and it is the only standard flavour a
+     browser will hand over with more than one thing in it. So forty frames
+     dragged into an editor, a terminal, a chat box or any app that reads
+     uri-list arrive as forty paths. Only DownloadURL is stuck at one, and
+     that is Chrome, not this. */
+  const urls = items.map((it) => fileUrl(absOf(it)));
+  dt.setData("text/uri-list", urls.join("\r\n"));
+  dt.setData("text/plain", urls.join("\n"));
 
   /* effectAllowed stays whatever the figure set. Saying "copy" out loud is
      already true of every drop this app accepts, and Finder decides for
      itself regardless. */
-  note();
+  note(items.length);
 });
 
 /* ------------------------------------------------------------------ */
@@ -148,13 +175,19 @@ document.addEventListener("dragstart", (e) => {
 let said = false;
 let hide = 0;
 
-function note() {
+function note(n = 1) {
   if (said) return;
   said = true;
 
   const p = document.createElement("p");
   p.className = "dragout-note";
-  p.textContent = "one file per drag, that is chrome's limit. the tray export writes the whole tray at once.";
+  /* The sentence says what this particular drag is carrying, because "one
+     file per drag" over a set of forty reads as a refusal when it is only
+     half the story: the forty paths really are going, and into most things
+     that is the useful half. */
+  p.textContent = n > 1
+    ? `${n} paths are going. finder takes one file per drag, that is chrome's limit, and the tray export writes the whole set at once.`
+    : "one file per drag, that is chrome's limit. the tray export writes the whole tray at once.";
   document.body.append(p);
 
   /* Two frames before the class that fades it in, because an element that

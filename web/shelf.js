@@ -463,7 +463,13 @@ function mountSweep() {
 
   grid.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
-    const held = e.metaKey || e.shiftKey;
+    /* Option joins cmd and shift as a select modifier. All three mean the
+       same thing to this grid, which is "the press you are about to make is
+       about the set, not about the photograph", and a hand that reaches for
+       the wrong one of the three should not get a different app. Option is
+       also the only one of them that is not already spoken for by the
+       system while the button is down. */
+    const held = e.metaKey || e.shiftKey || e.altKey;
     const onFrame = Boolean(e.target.closest("figure"));
     if (onFrame && !held) return;
     stop();
@@ -528,7 +534,12 @@ function mountSweep() {
        nothing, and clicking on nothing lets go of the selection. Held with a
        modifier it does not, because that is the hand that was about to add
        to the set and slipped. */
-    if (!live && !e.metaKey && !e.shiftKey) drop();
+    /* Whether anything on screen actually changed. A press that never became
+       a sweep and was held with a modifier changes nothing here, and that
+       case has to leave the grid alone: see the repaint at the bottom. */
+    const swept = live;
+    let changed = false;
+    if (!live && !e.metaKey && !e.shiftKey && !e.altKey) changed = drop();
     /* A sweep that began on a photograph and ended on the same one is still
        a click as far as the document is concerned, and that click would run
        the tile's handler and collapse the set that was just swept up. One
@@ -540,7 +551,27 @@ function mountSweep() {
       setTimeout(() => grid.removeEventListener("click", eat, true), 0);
     }
     stop();
-    renderShelf();
+    /* THE REPAINT IS CONDITIONAL, AND CMD CLICK IS WHY.
+
+       A click is only born when mousedown and mouseup land on the same
+       element. Pointer events run ahead of the mouse events chrome builds
+       out of them, so this handler fires between the two, and it used to
+       repaint unconditionally. renderShelf replaces every tile in the grid,
+       which means the img that took the mousedown no longer existed by the
+       time mouseup was dispatched: chrome retargeted mouseup to the grid
+       div, the targets no longer matched, and no click was ever generated.
+       The tile's handler, which is the only thing that toggles a pick, was
+       never called.
+
+       It looked exactly like cmd click not being implemented, and it was the
+       second time this app has produced that symptom from a different cause.
+       The first was a preventDefault on the press, fixed above.
+
+       So the repaint now happens only when something changed: a sweep that
+       really swept, or a click on the background that really let a pile go.
+       A cmd or shift click that never moved falls through untouched, the
+       tile survives to receive its own mouseup, and the click arrives. */
+    if (swept || changed) renderShelf();
   });
 
   /* A cancelled pointer, which on this machine means a system gesture took
@@ -672,6 +703,69 @@ export function focus(id) {
   $("#grid").children[cursor]?.scrollIntoView({ block: "nearest" });
 }
 
+/**
+ * The drag image for a set: three tiles fanned out, and the number.
+ *
+ * A canvas rather than markup, because a drag image is snapshotted once at
+ * dragstart and never updated, so there is nothing a live element buys here
+ * and a canvas cannot be caught mid transition. It is drawn at the device
+ * pixel ratio and sized down in css, or it is a soft rectangle on a retina
+ * screen.
+ *
+ * The element has to be in the document to be snapshotted, and it has to be
+ * gone before the next paint or it is a stray canvas sitting over the wall.
+ * Off screen and removed on the next frame does both: the browser takes its
+ * picture during dragstart, synchronously, so by the time the timeout runs
+ * the image has already been captured.
+ */
+function stack(ids) {
+  const dpr = Math.min(devicePixelRatio || 1, 3);
+  const W = 108, H = 92;
+  const c = document.createElement("canvas");
+  c.width = W * dpr; c.height = H * dpr;
+  c.style.cssText = `position:fixed;left:-9999px;top:0;width:${W}px;height:${H}px`;
+  const g = c.getContext("2d");
+  g.scale(dpr, dpr);
+
+  /* back to front, so the one under the cursor ends up on top */
+  const shown = ids.slice(0, 3).reverse();
+  shown.forEach((id, i) => {
+    const src = $(`#grid figure[data-id="${CSS.escape(id)}"] img`);
+    const back = shown.length - 1 - i;
+    const x = 8 + back * 7, y = 8 + back * 6;
+    const s = 62;
+    g.save();
+    g.shadowColor = "#000000a6"; g.shadowBlur = 10; g.shadowOffsetY = 3;
+    g.fillStyle = "#141416";
+    g.beginPath(); g.roundRect(x, y, s, s, 3); g.fill();
+    g.restore();
+    if (src?.complete && src.naturalWidth) {
+      g.save();
+      g.beginPath(); g.roundRect(x, y, s, s, 3); g.clip();
+      /* cover, so a portrait and a landscape both fill the square the way
+         they do on the wall */
+      const k = Math.max(s / src.naturalWidth, s / src.naturalHeight);
+      const w = src.naturalWidth * k, h = src.naturalHeight * k;
+      g.drawImage(src, x + (s - w) / 2, y + (s - h) / 2, w, h);
+      g.restore();
+    }
+  });
+
+  const label = String(ids.length);
+  g.font = "600 13px ui-sans-serif, system-ui, sans-serif";
+  const w = Math.max(22, g.measureText(label).width + 14);
+  const bx = W - w - 6, by = H - 24;
+  g.fillStyle = "#e1062c";
+  g.beginPath(); g.roundRect(bx, by, w, 20, 3); g.fill();
+  g.fillStyle = "#fff";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(label, bx + w / 2, by + 10.5);
+
+  document.body.append(c);
+  setTimeout(() => c.remove(), 0);
+  return c;
+}
+
 function tile(item, n) {
   const t = S.tags[item.id] ?? {};
   const fig = document.createElement("figure");
@@ -742,7 +836,24 @@ function tile(item, n) {
   const held = inTray(item.id);
   add.title = held ? "remove from tray" : "add to tray";
   add.setAttribute("aria-label", add.title);
-  add.onclick = (e) => { e.stopPropagation(); trayToggle(item.id); };
+  add.onclick = (e) => {
+    /* A modifier means the hand is building a selection, and the corner of a
+       tile is not an exception to that.
+
+       This button is invisible until the tile is hovered, but it was never
+       inactive: opacity zero still takes the pointer, so the top right 26
+       pixels of every frame on the wall were a live add to tray control the
+       whole time. A cmd click that landed there called this handler, and
+       stopPropagation then swallowed the click the figure needed to toggle
+       the pick, so the frame went quietly into the tray and was never
+       selected. Both halves were wrong and neither said anything.
+
+       Letting it bubble is the whole fix: the figure's own handler is the
+       one place the modifiers are read, and it is now the only one. */
+    if (e.metaKey || e.shiftKey || e.altKey) return;
+    e.stopPropagation();
+    trayToggle(item.id);
+  };
   fig.append(add);
 
   const cap = document.createElement("figcaption");
@@ -773,7 +884,13 @@ function tile(item, n) {
     e.dataTransfer.setData(MIMES, JSON.stringify(many));
     e.dataTransfer.setData("text/plain", item.path);
     e.dataTransfer.effectAllowed = "copy";
-    if (img.complete && img.naturalWidth) {
+    /* One frame drags its own thumbnail. A set drags a stack with the count
+       on it, because the single thumbnail was a lie about how many were
+       coming: forty frames and one photograph under the cursor look exactly
+       like one frame under the cursor. */
+    const ghost = many.length > 1 ? stack(many) : null;
+    if (ghost) e.dataTransfer.setDragImage(ghost, 34, 34);
+    else if (img.complete && img.naturalWidth) {
       e.dataTransfer.setDragImage(img, img.width / 2, img.height / 2);
     }
     document.body.dataset.dragging = "1";
@@ -795,7 +912,7 @@ function tile(item, n) {
    */
   fig.onclick = (e) => {
     e.preventDefault();
-    if (e.metaKey) {
+    if (e.metaKey || e.altKey) {
       sel.has(item.id) ? sel.delete(item.id) : sel.add(item.id);
       anchor = item.id;
     } else if (e.shiftKey) {
