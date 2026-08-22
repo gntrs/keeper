@@ -55,6 +55,7 @@ export async function mountTray() {
   $("#tray-export").onclick = () => ship();
   $("#tray-folder").onkeydown = (e) => { if (e.key === "Enter") ship(); };
   buildMode();
+  mountGrip();
 
   /* A drop target that only lights up for our own mime type. A dragover
      handler that preventDefaults everything would make the panel accept a
@@ -559,6 +560,12 @@ function repaint() {
   grid.replaceChildren(...ids.map(tile));
 }
 
+function calm(b) {
+  clearTimeout(b.timer);
+  delete b.dataset.armed;
+  b.textContent = "";
+}
+
 function tile(id) {
   const frame = S.byId.get(id);
   const fig = document.createElement("figure");
@@ -594,16 +601,29 @@ function tile(id) {
     $("#tray").removeAttribute("data-over");
   });
 
+  /* Two presses, in a corner, and the second one is red.
+
+     The whole thumbnail used to be this button, which meant hovering a frame
+     to look at it put the pointer on the control that throws it away, and a
+     tray is the pile you already decided on. It is the same promise the
+     trash makes on the shelf: arm, then commit. The armed state says what
+     the next click does in a word rather than in a cross, because a cross
+     over a photograph raises the one question this button must never raise,
+     which is whether the file itself is about to go. */
   const kill = document.createElement("button");
   kill.className = "tray-remove";
   kill.type = "button";
-  /* Left empty on purpose. The button covers the whole thumbnail and the
-     stylesheet fills it with the word "remove" through :empty::before, which
-     it can only do while nothing is written in here. A cross floating over
-     the middle of a photograph asks whether the file is about to be deleted,
-     and that is the one question this button must never raise. */
   kill.title = "take it out of the tray";
-  kill.onclick = (e) => { e.stopPropagation(); toggle(id); };
+  kill.onclick = (e) => {
+    e.stopPropagation();
+    if (kill.dataset.armed) return toggle(id);
+    kill.dataset.armed = "1";
+    kill.textContent = "sure?";
+    clearTimeout(kill.timer);
+    kill.timer = setTimeout(() => calm(kill), 2400);
+  };
+  /* leaving the tile is an answer too, and it is the commonest one */
+  fig.addEventListener("mouseleave", () => calm(kill));
   fig.append(kill);
 
   /* The tray is where you go to check a choice, so a frame in it opens the
@@ -616,6 +636,71 @@ function tile(id) {
 
 /* ------------------------------------------------------------------ */
 /* showing and hiding                                                  */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* how wide the panel is                                               */
+/* ------------------------------------------------------------------ */
+
+const WIDE = "keeper.tray.w";
+
+/**
+ * The width is a control, not a constant. A tray holding four frames wants
+ * a column and a tray holding forty wants a wall, and the panel is the one
+ * place in keeper where the number of things in it swings by an order of
+ * magnitude between two minutes of work.
+ *
+ * It writes a custom property on the root rather than a width on the panel,
+ * because everything that steps aside for the tray, the header, the filter
+ * row, the grid and the bench, is already reading that same property. One
+ * number moves and the whole layout follows.
+ */
+function widen(px) {
+  /* A floor of four columns of thumbnails, and a ceiling that leaves the
+     photographs more than half the window no matter how wide the screen is.
+     The panel is for choosing from, and the moment it is the larger half it
+     has stopped being a panel. */
+  const max = Math.min(720, Math.round(innerWidth * 0.46));
+  const w = Math.max(240, Math.min(Math.round(px), max));
+  document.documentElement.style.setProperty("--tray-w", `${w}px`);
+  return w;
+}
+
+function mountGrip() {
+  const grip = $("#tray-grip");
+  if (!grip) return;
+
+  const saved = Number(localStorage.getItem(WIDE));
+  if (saved) widen(saved);
+
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    document.body.dataset.trayResize = "1";
+
+    /* innerWidth minus the pointer, so the panel edge sits exactly under the
+       finger for the whole drag rather than drifting by whatever the grab
+       offset was. */
+    const move = (ev) => localStorage.setItem(WIDE, String(widen(innerWidth - ev.clientX)));
+    const up = () => {
+      delete document.body.dataset.trayResize;
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", up);
+      grip.removeEventListener("pointercancel", up);
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up);
+    grip.addEventListener("pointercancel", up);
+  });
+
+  /* double click puts it back to whatever the stylesheet says, which is one
+     number at one screen size and another at the next */
+  grip.addEventListener("dblclick", () => {
+    localStorage.removeItem(WIDE);
+    document.documentElement.style.removeProperty("--tray-w");
+  });
+}
+
 /* ------------------------------------------------------------------ */
 
 function show(on, quiet = false) {

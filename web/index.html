@@ -18,13 +18,27 @@
 <body>
 
 <header class="bar">
-  <strong>keeper</strong>
+  <!--
+    A red square and the word, set tight to each other so they read as one
+    object rather than as a logo with a caption. Nothing is drawn inside the
+    square: it is the accent at its plainest, and it is the favicon at a
+    larger size, so the tab and the corner agree.
+  -->
+  <span class="mark">
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <rect width="20" height="20" rx="3" fill="#e1062c"/>
+    </svg>
+    <strong>keeper</strong>
+  </span>
   <nav>
     <button data-view="shelf" class="on">shelf</button>
     <button data-view="bench">bench</button>
   </nav>
   <span id="tally"></span>
   <span class="grow"></span>
+  <!-- the only way in to the shortcuts, other than the key it names -->
+  <button id="keys-toggle" type="button" aria-expanded="false"
+          title="shortcuts">?</button>
   <button id="tray-toggle" type="button" aria-expanded="false">tray</button>
   <!-- the folder you are looking at, and the control that changes it.
        drop.js listens for [data-keeper-choose] anywhere on the page. -->
@@ -71,6 +85,18 @@
 </section>
 
 <section id="bench" class="view" hidden>
+  <!--
+    Two rows: the work, and the one button that writes files.
+
+    The export used to live under the picker's head, which meant it went
+    away with the picker. Below 1600px with the tray open the stylesheet
+    drops the picker so a slot keeps the room to judge a crop in, and it was
+    taking the only way to export off the screen with it. A control that
+    disappears at one window size and not another is a control nobody
+    trusts, so it has a row of its own now, across the foot of the bench,
+    where the full path it reports has somewhere to go.
+  -->
+  <div id="bench-work">
   <div id="slots"></div>
   <div id="picker">
     <div id="picker-head">
@@ -82,6 +108,11 @@
     </div>
     <div id="strip"></div>
   </div>
+  </div>
+  <div id="bench-bar">
+    <button class="chip" id="bench-export" type="button">export the placed ones</button>
+    <p id="bench-export-result" class="dim"></p>
+  </div>
 </section>
 
 <!--
@@ -91,6 +122,13 @@
   It is a sibling of the sections so the stylesheet can stand it beside them.
 -->
 <aside id="tray" hidden>
+  <!--
+    Drag the edge. The tray holds a pile you are choosing from, and how much
+    room that pile deserves is different when it holds four frames and when
+    it holds forty, so the width is a control rather than a number in a
+    stylesheet. Double click puts it back.
+  -->
+  <div id="tray-grip" title="drag to resize, double click to reset"></div>
   <header class="tray-head">
     <span class="label">tray</span>
     <select id="tray-pick"></select>
@@ -112,25 +150,67 @@
   </div>
 </div>
 
-<footer class="keys">
-  <!--
-    One rule holds this row together: a bare letter tags, a modifier plus a
-    key commands. It is why r and f are back in the tag alphabet and why
-    space is quick look, the way it is everywhere else on this machine.
+<!--
+  The shortcuts, on a key and not on the screen.
 
-    The glyphs are the ones printed on the keys. Nobody on a mac reads the
-    word "cmd" faster than the symbol, and half of these are chords where
-    the words run three times the length.
+  This used to be four permanent rows along the bottom, which is the shape a
+  cheat sheet takes when nobody has decided whether it is documentation or
+  furniture. It was neither: after the first afternoon nobody reads it, and
+  it was taking a strip of a screen whose whole job is showing photographs
+  as large as they will go.
 
-    ⌥ and not ⌘ on finder, open and the views: chrome resolves cmd+r, cmd+o
-    and cmd+1 through cmd+9 above the page, so preventDefault runs and the
-    tab reloads or switches anyway. Option is an ordinary application
-    modifier on this platform and chrome claims almost none of it.
-  -->
-  <span><b>tag</b> <kbd>←↑↓→</kbd> move · <kbd>1</kbd> to <kbd>9</kbd> or the letters above · <kbd>k</kbd> keep · <kbd>␣</kbd> or click to look</span>
-  <span><b>pick</b> <kbd>⇧</kbd>click a range · <kbd>⌘</kbd>click one · <kbd>⌘</kbd>drag a box · <kbd>⌘A</kbd> all, again for none · <kbd>⎋</kbd> or click the ground · <kbd>⌘⏎</kbd> to the tray</span>
-  <span><b>app</b> <kbd>⌫</kbd> trash, twice · <kbd>⌥R</kbd> finder · <kbd>⌘F</kbd> find · <kbd>⌥O</kbd> open a folder · <kbd>⌥1</kbd> <kbd>⌥2</kbd> views</span>
-  <span><b>bench</b> drag onto a slot · drag inside to move · <kbd>⌥</kbd>wheel to punch in · <kbd>0</kbd> reset · <kbd>⌫</kbd> clear the slot</span>
+  So it is a sheet now, on ? and on /, which is where every tool that has
+  ever had one puts it. Both keys, because ? is shift and / is the key your
+  hand is already on.
+
+  One rule still holds the list together: a bare letter tags, a modifier
+  plus a key commands. The glyphs are the ones printed on the keys, because
+  nobody on a mac reads the word "cmd" faster than the symbol. Option and
+  not command on finder, open and the views: chrome resolves cmd+r, cmd+o
+  and cmd+1 through cmd+9 above the page, so preventDefault runs and the tab
+  reloads anyway.
+-->
+<footer id="keys" hidden>
+  <div class="keys-head">
+    <span class="label">shortcuts</span>
+    <span class="grow"></span>
+    <button id="keys-shut" type="button">close</button>
+  </div>
+  <div class="keys-cols">
+    <section>
+      <h4 class="label">looking</h4>
+      <div class="k"><span class="ks"><kbd>←↑↓→</kbd></span><span>move</span></div>
+      <div class="k"><span class="ks"><kbd>␣</kbd></span><span>look at this one</span></div>
+      <div class="k"><span class="ks"><kbd>⌥1</kbd><kbd>⌥2</kbd></span><span>shelf, bench</span></div>
+      <div class="k"><span class="ks"><kbd>⌘F</kbd></span><span>search</span></div>
+      <div class="k"><span class="ks"><kbd>⌥O</kbd></span><span>another folder</span></div>
+      <div class="k"><span class="ks"><kbd>⌥R</kbd></span><span>show it in finder</span></div>
+    </section>
+    <section>
+      <h4 class="label">tagging</h4>
+      <div class="k"><span class="ks"><kbd>1</kbd>…<kbd>9</kbd></span><span>the tags up top</span></div>
+      <div class="k"><span class="ks"><kbd>a</kbd><kbd>z</kbd></span><span>or the tag's own letter</span></div>
+      <div class="k"><span class="ks"><kbd>k</kbd></span><span>keep it</span></div>
+      <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>trash it, twice to mean it</span></div>
+    </section>
+    <section>
+      <h4 class="label">picking</h4>
+      <div class="k"><span class="ks"><kbd>⇧</kbd>click</span><span>a run of them</span></div>
+      <div class="k"><span class="ks"><kbd>⌘</kbd>click</span><span>one more, or one less</span></div>
+      <div class="k"><span class="ks"><kbd>⌘</kbd>drag</span><span>a box around them</span></div>
+      <div class="k"><span class="ks"><kbd>⌘A</kbd></span><span>all, again for none</span></div>
+      <div class="k"><span class="ks"><kbd>⌘⏎</kbd></span><span>the pick, into the tray</span></div>
+      <div class="k"><span class="ks"><kbd>⎋</kbd></span><span>let the pick go</span></div>
+    </section>
+    <section>
+      <h4 class="label">bench</h4>
+      <div class="k"><span class="ks">drag</span><span>a frame onto a slot</span></div>
+      <div class="k"><span class="ks">drag</span><span>inside a slot to move the crop</span></div>
+      <div class="k"><span class="ks"><kbd>⌥</kbd>wheel</span><span>punch in, or pinch</span></div>
+      <div class="k"><span class="ks"><kbd>0</kbd></span><span>the whole frame back</span></div>
+      <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>empty the slot</span></div>
+    </section>
+  </div>
 </footer>
 
 <script type="module" src="/app.js"></script>

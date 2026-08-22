@@ -10,11 +10,9 @@
 .dragout-note {
   position: fixed;
   left: var(--s5);
-  /* clear of footer.keys, which is the one thing that lives along the
-     bottom edge. the note sits above it rather than over it, because the
-     keyboard legend is the other sentence someone reads while learning
-     this app and covering it to explain a drag would be a poor trade. */
-  bottom: 3.6rem;
+  /* the bottom edge is clear now that the key legend lives on a key, so the
+     note sits where a note goes and nothing has to be worked around. */
+  bottom: var(--s5);
   z-index: 40;
 
   margin: 0;

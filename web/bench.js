@@ -347,35 +347,26 @@ function clearOver() {
  * frames into shapes, and the only way to get a file was a command mentioned
  * once in `keeper help`, in a terminal the person had already left.
  *
- * Built here rather than in index.html because the button is useless without
- * the code under it, and the head it goes into belongs to this view alone.
+ * The control lives in index.html now, in a row of its own across the foot
+ * of the bench, so this only has to wire it.
  *
- * ITS OWN ROW, AND NOT INSIDE #picker-head, WHICH IS WHERE IT LOOKS LIKE IT
- * BELONGS. That head is one nowrap flex row in a four hundred pixel column
- * and it is already carrying a label, a chip and a search field. Measured
- * with the button in it: 513px of content in 399px of room, which pushed the
- * kept only chip and the search box clean off the right edge. The result is
- * a full path as well, and a path is the half of the sentence nobody can
- * afford to have squeezed. So the export gets the line under the label
- * rather than a share of it.
+ * IT WAS BUILT HERE AND PUT UNDER #picker-head, AND THAT WAS A BUG WITH A
+ * GOOD REASON BEHIND IT. The head is one nowrap flex row in a four hundred
+ * pixel column already carrying a label, two chips and a search field:
+ * measured with the button inside it, 513px of content in 399px of room,
+ * which pushed the search box clean off the right edge. So it went on the
+ * line underneath, which was right about the width and wrong about the
+ * column. Below 1600px with the tray open the stylesheet drops the whole
+ * picker, because two pickers is what does not fit, and that took the only
+ * way to export off the screen with it: at that window size the bench
+ * simply had no export button.
+ *
+ * A row across the foot answers both. It is never inside the panel that
+ * goes away, and the full path it reports has the width of the window to
+ * print itself in rather than a share of a narrow column.
  */
 function buildExport() {
-  const row = document.createElement("div");
-  row.id = "bench-export-row";
-
-  const btn = document.createElement("button");
-  btn.id = "bench-export";
-  btn.type = "button";
-  btn.className = "chip";
-  btn.textContent = "export the placed ones";
-  btn.onclick = ship;
-
-  const out = document.createElement("p");
-  out.id = "bench-export-result";
-  out.className = "dim";
-
-  row.append(btn, out);
-  $("#picker-head").after(row);
+  $("#bench-export").onclick = ship;
 }
 
 async function ship() {

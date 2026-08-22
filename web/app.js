@@ -78,6 +78,20 @@ for (const b of document.querySelectorAll("header nav button")) {
 }
 
 /**
+ * The shortcuts sheet. It used to be four rows printed along the bottom of
+ * every screen, which is what a cheat sheet becomes when nobody decides
+ * whether it is documentation or furniture: unread after the first
+ * afternoon, and holding a strip of a window whose whole job is showing
+ * photographs as large as they go.
+ */
+export function showKeys(on) {
+  $("#keys").hidden = !on;
+  $("#keys-toggle").setAttribute("aria-expanded", String(!!on));
+}
+$("#keys-toggle").onclick = () => showKeys($("#keys").hidden);
+$("#keys-shut").onclick = () => showKeys(false);
+
+/**
  * The four keys that belong to the app rather than to a view, and the rule
  * they are the top of: a bare letter tags a photograph, cmd plus a key does
  * something to the app. Three of these work on the bench as well as the
@@ -136,6 +150,24 @@ addEventListener("keydown", (e) => {
   }
 
   if (e.target.matches("input")) return;
+
+  /* Both keys, because ? is shift and / is the key the hand is already on,
+     and every tool that has ever had a cheat sheet answers to one of them.
+     It works with a photograph open, which is where a question about a key
+     is most likely to come up. */
+  if (e.key === "?" || e.key === "/") {
+    showKeys($("#keys").hidden);
+    return e.preventDefault();
+  }
+  /* Escape shuts the sheet and stops there. stopImmediatePropagation is what
+     keeps the same press from also throwing away the pick underneath it:
+     this listener is registered before the shelf's, so it gets the say. */
+  if (e.key === "Escape" && !$("#keys").hidden) {
+    showKeys(false);
+    e.stopImmediatePropagation();
+    return e.preventDefault();
+  }
+
   /* The preview handles its own escape and its own arrows. While it is up it
      also has the bare number keys, for the reason above. */
   if (previewOpen()) return;
@@ -171,7 +203,7 @@ if (!S.items.length) {
          through their embedded preview.</p>
       <pre>keeper ~/Pictures/2026</pre>
     </div>`;
-  document.querySelector("footer.keys").hidden = true;
+  $("#keys-toggle").hidden = true;
 }
 
 /* The blank state above throws the filter row away along with the grid, so

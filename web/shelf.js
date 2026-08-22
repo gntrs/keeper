@@ -157,17 +157,51 @@ function chips(host, values, label, count, key) {
 }
 
 /**
- * Everything past the eighth folder, behind one chip. It is not a filter
- * and never becomes one: clicking it lays the rest of the folders out in
- * the row and takes itself away, which is the whole of what it does.
+ * Everything past the eighth folder, behind one chip. It is not a filter and
+ * never becomes one.
+ *
+ * It used to open once and take itself away, which meant a drive with fifty
+ * shoots on it put a permanent three line thicket above the photographs and
+ * the only way back was a reload. So it closes again, and it says how many
+ * it is hiding rather than saying "more", because the count is the fact you
+ * are deciding on.
+ *
+ * A folder you actually chose stays out when the row closes. Collapsing a
+ * live filter out of sight is the row lying about what it is showing you.
  */
 function more(host, rest) {
   const b = document.createElement("button");
   b.className = "chip";
   b.type = "button";
-  b.textContent = "more";
-  b.title = `${rest.length} more folders`;
-  b.onclick = () => b.replaceWith(...rest.map((p) => chip(p, leaf, countPlace, "dir")));
+  b.style.color = "var(--ink-3)";
+  b.title = "the rest of the folders";
+  let open = false;
+  let shown = [];
+
+  const say = () => { b.textContent = open ? "less" : `${rest.length} more`; };
+
+  b.onclick = () => {
+    open = !open;
+    if (open) {
+      const have = new Set(shown.map((c) => c.dataset.place));
+      for (const p of rest) {
+        if (have.has(p)) continue;
+        const c = chip(p, leaf, countPlace, "dir");
+        c.dataset.place = p;
+        host.insertBefore(c, b);
+        shown.push(c);
+      }
+    } else {
+      shown = shown.filter((c) => {
+        if (c.classList.contains("on")) return true;
+        c.remove();
+        return false;
+      });
+    }
+    say();
+  };
+
+  say();
   host.append(b);
 }
 
