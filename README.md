@@ -1,3 +1,6 @@
+<img src="docs/media/banner.jpg" alt="a dark contact sheet of several hundred
+frames with one marked in red" width="100%">
+
 # keeper
 
 <!-- one badge is red and the rest are the ground, for the same reason one
@@ -17,6 +20,12 @@ thumbnail, and that is the hour this takes back.
 ```
 keeper ~/Archive
 ```
+
+<img src="docs/media/shelf.jpg" alt="the shelf: a wall of thumbnails under a
+row of tag filters" width="100%">
+
+<sub>every frame in these shots is a generated stand in. real work does not go
+in a readme.</sub>
 
 it scans, writes thumbnails, and **opens the browser itself**. pass
 `--no-open` and it prints the url instead. **mac only.** nothing is uploaded,
@@ -142,10 +151,28 @@ through a mouse.
 - double click opens a card over the dimmed page rather than a full screen
   takeover, because the row you were comparing against is worth keeping in
   the corner of your eye
-- **delete arms and then commits.** the first press says how many frames and
-  which way they are going, the second sends them, and finder puts them back
-  in one keystroke. it is the only key in keeper that touches an original,
-  and nothing here ever deletes anything for good
+- **delete sets a frame aside and touches nothing.** see the bin below
+
+## the bin
+
+a bad shot can still be the only copy of itself. so `delete` in keeper does
+not delete: it writes an id to a list, the shelf stops drawing that frame,
+and **the file does not move.** no arming, no second press, because two
+presses are the price of something you cannot undo and this is not that.
+
+<img src="docs/media/bin.jpg" alt="the shelf filtered to the bin, showing put
+back and delete off the drive" width="100%">
+
+`in the bin` shows you what you set aside. in there the same key puts a frame
+back, and `delete off the drive` is the other decision entirely: it asks, it
+stops the screen over a real pile, and it uses finder's own delete so the put
+back record survives. the server refuses to trash any frame that is not
+already in the bin, so there is no path from a keystroke on a photograph to a
+file.
+
+**this is the second design and the first one was wrong.** `delete` used to go
+straight to the macos trash. wiring the fastest key in a culling tool to the
+one irreversible thing on the machine is how a tool eats somebody's footage.
 
 ## the bench
 
@@ -157,6 +184,9 @@ drag it onto a slot to commit it there, drag inside the slot to move the
 picture, `option`+wheel to punch in. every slot is drawn at its true
 proportions and every one prints the crop it is holding, in the negative's own
 pixels.
+
+<img src="docs/media/bench.jpg" alt="the bench: a slot at its true
+proportions, the picker strip, and the tray" width="100%">
 
 the shapes nobody gets to choose are built in, so the bench is full on the
 first run with no config at all:
