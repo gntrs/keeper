@@ -488,6 +488,24 @@ figure.intray .add:hover { filter: brightness(1.16); }
   font-variant-numeric: tabular-nums; letter-spacing: .04em;
   color: var(--ink-3);
 }
+/* The punch, said out loud. It sits in the head rather than over the picture
+   because a control floating on a photograph is a control you have to look
+   past to judge the crop, and judging the crop is the whole job here. Same
+   mono, same weight and same colour as the ratio beside it, so a row that
+   already had two numbers in it now has three rather than a widget. */
+.slot .zoom { display: flex; align-items: center; gap: 2px; }
+.slot .zoom[hidden] { display: none; }
+.slot .zoom .pct { min-width: 3.4em; text-align: center; }
+.slot .zoom button {
+  appearance: none; -webkit-appearance: none;
+  border: 0; background: none; cursor: pointer;
+  color: var(--ink-3); padding: 0 var(--s1);
+  font: 500 .82rem/1 var(--mono);
+  border-radius: var(--r);
+}
+.slot .zoom button:hover { color: var(--ink); background: var(--raise); }
+.slot .zoom button:active { transform: translateY(1px); }
+
 .slot .box {
   position: relative; overflow: hidden; background: #0f0f11;
   border-radius: var(--r); cursor: grab;
@@ -710,6 +728,17 @@ body:has(#tray:not([hidden])) #grid,
 body:has(#tray:not([hidden])) #slots { padding-right: calc(var(--tray-w) + var(--s5)); }
 body:has(#tray:not([hidden])) #bench #picker { margin-right: var(--tray-w); }
 body:has(#tray:not([hidden])) #bench #slots { padding-right: var(--s5); }
+
+/* Two pickers is what does not fit on the bench, not the tray.
+   400px of strip plus 348px of tray leaves a 1280px window about 530px to
+   judge a crop in, and judging a crop is the whole job of that screen. So
+   below the width where both earn their place, the tray stands in for the
+   strip: it is the narrower pile and the one you came here to place. The
+   `in tray` chip in the picker head covers the other direction, for anyone
+   who would rather keep the strip and leave the panel shut. */
+@media (max-width: 1600px) {
+  body:has(#tray:not([hidden])) #bench #picker { display: none; }
+}
 
 .tray-head {
   flex: none; display: flex; align-items: center; gap: var(--s2);

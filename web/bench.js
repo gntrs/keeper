@@ -1,10 +1,11 @@
 import { S, post, tally } from "/app.js";
+import { inTray } from "/tray.js";
 import { CENTERED, clamp, coverWidth, isAtCover, resolve, toObjectPosition } from "/geometry.mjs";
 
 const $ = (s) => document.querySelector(s);
 const els = new Map();          // slotId -> { root, box, img, empty, nums }
 let active = null;              // the slot a picked frame lands in
-const P = { star: false, q: "" };
+const P = { star: false, q: "", tray: false };
 
 /**
  * The frame being tried on, or null. One id, held here and nowhere else.
@@ -22,6 +23,19 @@ const groupOf = (slot) => slot.group || "yours";
 
 export function mountBench() {
   $("#p-star").onclick = (e) => { P.star = !P.star; e.currentTarget.classList.toggle("on"); strip(); };
+
+  /* The tray, in the one place the bench had no way to see it. The pile you
+     built on the shelf is exactly the pile you came here to place, and
+     before this the only route from one to the other was remembering a
+     filename. It sits before "kept only" because it is the narrower claim:
+     kept is everything you liked, the tray is what you chose. */
+  $("#p-tray").onclick = (e) => { P.tray = !P.tray; e.currentTarget.classList.toggle("on"); strip(); };
+
+  /* The tray is edited from the panel and from the shelf, both of which can
+     be on screen while the bench holds a filtered strip underneath. An event
+     rather than an import because tray.js already reaches into the shelf,
+     and a second module reaching back would be a cycle for one call. */
+  addEventListener("keeper:tray", () => { if (P.tray) strip(); });
   $("#p-q").oninput = (e) => { P.q = e.target.value.trim().toLowerCase(); strip(); };
 
   /* Land on the pile he made. The shelf is where frames get kept and the
@@ -129,8 +143,19 @@ function slotEl(slot) {
 
   const head = document.createElement("header");
   head.className = "head";
+  /* The zoom used to be option plus a scroll wheel and nothing else: no
+     control, no number, one line in a footer. Across three archives and
+     3,697 frames it had been used exactly zero times, which is what an
+     invisible gesture is worth. The keyboard and the pinch are still the
+     fast paths; this is the one that can be found. */
   head.innerHTML = `<strong>${slot.label}</strong><em>${slot.aspectText}</em>
-    <span class="grow"></span><em>${slot.width || "?"}px</em>`;
+    <span class="grow"></span>
+    <span class="zoom" hidden><button type="button" data-z="out" title="wider"
+      >&minus;</button><em class="pct">100%</em><button type="button" data-z="in"
+      title="punch in">+</button></span>
+    <em>${slot.width || "?"}px</em>`;
+  head.querySelector('[data-z="in"]').onclick = () => nudge(slot.id, 1 / 1.12);
+  head.querySelector('[data-z="out"]').onclick = () => nudge(slot.id, 1.12);
 
   const box = document.createElement("div");
   box.className = "box";
@@ -178,7 +203,8 @@ function slotEl(slot) {
     if (item) assign(item, slot.id);
   });
 
-  els.set(slot.id, { root, box, img, empty, nums });
+  els.set(slot.id, { root, box, img, empty, nums,
+                     zoom: head.querySelector(".zoom"), pct: head.querySelector(".pct") });
 
   /* With a trial up, the whole bench is already showing this frame and the
      only thing left to settle is which hole it belongs in, so a click on the
@@ -232,7 +258,9 @@ function setTrial(id) {
 function strip() {
   const hits = S.items.filter((i) => {
     const t = S.tags[i.id] ?? {};
-    return (!P.star || t.star) && (!P.q || i.path.toLowerCase().includes(P.q));
+    return (!P.star || t.star)
+      && (!P.tray || inTray(i.id))
+      && (!P.q || i.path.toLowerCase().includes(P.q));
   }).slice(0, 400);
 
   if (!hits.length) {
@@ -242,6 +270,7 @@ function strip() {
        "nothing matches that search" under a search box they had not typed in. */
     $("#strip").innerHTML = `<p class="dim" style="grid-column:1/-1">${
       !S.items.length ? "no frames in this folder yet."
+      : P.tray ? "the tray is empty. fill it in the shelf, or drag frames into the panel."
       : P.star ? "nothing is kept yet. keep a few in the shelf first."
       : "nothing matches that search."
     }</p>`;
@@ -422,10 +451,15 @@ function paint(slotId) {
     hit.img.hidden = true;
     hit.empty.hidden = false;
     hit.nums.textContent = "";
+    hit.zoom.hidden = true;
     return;
   }
   const item = S.byId.get(p.id);
-  if (!item || !item.w) { hit.nums.textContent = "that frame is no longer in the index"; return; }
+  if (!item || !item.w) {
+    hit.nums.textContent = "that frame is no longer in the index";
+    hit.zoom.hidden = true;
+    return;
+  }
 
   hit.empty.hidden = true;
   hit.img.hidden = false;
@@ -467,6 +501,16 @@ function paint(slotId) {
     ? ` · <code>object-position: ${toObjectPosition(rect, item.w, item.h)}</code>`
     : "";
   hit.nums.innerHTML = (fitting ? `<span class="prov">trying</span> · ` : "") + size + css + thin;
+
+  /* 100% is cover, the whole frame filling the hole with nothing thrown away
+     that the shape did not demand. Past that you are punching in, and the
+     number says how far. A trial has not been committed to anything, so it
+     gets no control: there is nothing to save yet. */
+  hit.zoom.hidden = fitting;
+  if (!fitting) {
+    const max = coverWidth(item.w, item.h, slot.aspect);
+    hit.pct.textContent = `${Math.round((max / p.place.cw) * 100)}%`;
+  }
 }
 
 function paintAll() { for (const id of els.keys()) paint(id); }
@@ -522,8 +566,27 @@ function onMove(e) {
  * the wheel would stop scrolling the moment the pointer crossed a
  * photograph, which is exactly where the pointer lives while this is in use.
  */
+/**
+ * Punch in or out by a factor, clamped at cover. Cover is the widest a crop
+ * may be: past it the slot would be showing something the negative does not
+ * have. Everything that zooms comes through here.
+ */
+function nudge(slotId, factor) {
+  const c = ctx(slotId);
+  if (!c) return;
+  const max = coverWidth(c.item.w, c.item.h, c.aspect);
+  set(slotId, { ...c.p.place, cw: Math.min(c.p.place.cw * factor, max) });
+}
+
+/**
+ * Option plus a scroll, and a trackpad pinch. A pinch arrives as a wheel
+ * event with ctrl held, whether or not a ctrl key was anywhere near it, and
+ * that is the gesture a person already has in their hands for making a
+ * picture bigger. Leaving it out meant the only way to punch in was a
+ * modifier nobody had been told about.
+ */
 function onWheel(e) {
-  if (!e.altKey || S.view !== "bench") return;
+  if ((!e.altKey && !e.ctrlKey) || S.view !== "bench") return;
   const id = slotAt(e.target);
   const c = id && ctx(id);
   if (!c) return;

@@ -169,6 +169,12 @@ async function refresh() {
   renderShelf();
 }
 
+/* Anyone who paints from the tray hears about it here. The shelf is called
+   directly below because tray.js already owns that relationship; the bench
+   listens for this instead, so the two modules never have to import each
+   other for the sake of one repaint. */
+const announce = () => dispatchEvent(new CustomEvent("keeper:tray"));
+
 const cur = () => T.list.find((t) => t.id === T.active) ?? null;
 const remark = () => (mark = new Set(cur()?.ids ?? []));
 
@@ -486,7 +492,15 @@ async function ship() {
  */
 let filled = { id: null, dest: null };
 
-function paint() {
+/**
+ * Paint the panel, then say so once. Every add, remove, clear, rename and
+ * tray switch already funnels through here, and paint has half a dozen early
+ * returns, so this wrapper is the only place the announcement fires exactly
+ * once per change no matter which path got here.
+ */
+function paint() { repaint(); announce(); }
+
+function repaint() {
   const sel = $("#tray-pick");
   const grid = $("#tray-grid");
   const t = cur();
@@ -611,15 +625,24 @@ function show(on, quiet = false) {
 }
 
 /**
- * The bench already spends 360px of the right hand side on its own picker.
- * Standing the tray beside that at 1280px leaves a slot around 500px wide,
- * which is too small to judge a crop in, and judging a crop is the entire
- * job of that screen. So the panel belongs to the shelf and steps aside on
- * the bench, without forgetting that the person had left it open.
+ * The panel opens on both views now. It used to be shelf only, on the
+ * grounds that the bench already spends 400px on its own picker and standing
+ * the tray beside that at 1280px leaves a slot too narrow to judge a crop
+ * in. That reasoning was right about the width and wrong about the answer:
+ * the tray is the pile you came to the bench to place, so locking it out of
+ * the one screen that places things solved a layout problem by removing the
+ * feature.
+ *
+ * The width is handled where widths belong. Past 1600px both panels stand
+ * side by side; below it the stylesheet drops the bench picker while the
+ * tray is open, because two pickers is what does not fit, not the tray.
+ * Either way the slot keeps the room it needs.
  */
 export function trayView(view) {
   const wanted = localStorage.getItem("keeper.tray") === "open";
-  const allowed = view === "shelf";
-  $("#tray").hidden = !(wanted && allowed);
-  $("#tray-toggle").hidden = !allowed;
+  $("#tray").hidden = !wanted;
+  $("#tray-toggle").hidden = false;
+  /* The bench reads the tray while filtering, and arriving on it with the
+     filter already on must not show a strip built before the panel loaded. */
+  if (view === "bench") announce();
 }
