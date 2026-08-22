@@ -101,6 +101,21 @@ export const FILM_EXT = new Set([
 export const kindOf = (ext) =>
   STILL_EXT.has(ext) ? "still" : FILM_EXT.has(ext) ? "film" : null;
 
+/**
+ * Ignored without comment. These are the droppings of the tools that made the
+ * archive, and a scan that announces four hundred .DS_Store files has told
+ * you nothing while hiding the one line that mattered.
+ */
+const QUIET_EXT = new Set([".ini", ".lnk", ".tmp", ".part", ".download"]);
+
+/**
+ * The same thing by name rather than by extension, because a dotfile has no
+ * extension as far as `path.extname` is concerned: `.DS_Store` comes back as
+ * the empty string, and without this the commonest file on a mac drive lands
+ * in a bucket called "(no extension)".
+ */
+const QUIET_NAMES = new Set([".ds_store", ".localized", "thumbs.db", "desktop.ini", "icon\r"]);
+
 /** skipped wherever they appear, at any depth */
 const SKIP_DIRS = new Set([
   ".git", "node_modules", ".keeper", ".keepers", ".Trashes", ".Spotlight-V100",
@@ -112,36 +127,81 @@ const SKIP_DIRS = new Set([
  * order is the same on every machine and every run. That stability is not
  * cosmetic: cell ids are derived from position, and an id that moves between
  * runs would silently repoint every tag written against it.
+ *
+ * It also returns what it walked past, and that half exists because of a real
+ * afternoon: a 903GB drive scanned to 2,836 frames and said nothing else, so
+ * the eight hundred gigabytes of audio, project files and empty render
+ * folders stayed invisible and the question "are my videos on this drive"
+ * took an hour of searching to answer no. A scan that only reports what it
+ * liked is a scan you cannot trust a negative from.
  */
 export async function scan(root, { onProgress } = {}) {
   const out = [];
+  const ignored = new Map(); // extension -> { count, bytes }
+  const barren = []; // folders holding nothing readable, at any depth
   let seen = 0;
 
+  const note = (ext, bytes) => {
+    const at = ignored.get(ext) ?? { count: 0, bytes: 0 };
+    at.count += 1;
+    at.bytes += bytes;
+    ignored.set(ext, at);
+  };
+
+  /** returns how many readable frames sit at or under this folder */
   async function walk(dir) {
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
-      return; // unreadable directory, e.g. a permissions-locked system folder
+      return 0; // unreadable directory, e.g. a permissions-locked system folder
     }
+    let found = 0;
     for (const e of entries) {
       if (e.name.startsWith("._")) continue; // apple resource fork sidecars
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
         if (SKIP_DIRS.has(e.name)) continue;
-        await walk(full);
+        found += await walk(full);
       } else if (e.isFile()) {
-        const kind = kindOf(path.extname(e.name).toLowerCase());
-        if (!kind) continue;
+        const base = e.name.toLowerCase();
+        const ext = path.extname(base);
+        const kind = kindOf(ext);
         const s = await stat(full).catch(() => null);
+        if (!kind) {
+          // the sidecars a camera and an editor leave everywhere are not a
+          // finding, they are furniture. everything else is worth a line.
+          if (!QUIET_EXT.has(ext) && !QUIET_NAMES.has(base)) {
+            note(ext || "(no extension)", s?.size ?? 0);
+          }
+          continue;
+        }
         if (!s || s.size < 1024) continue; // a sub-1KB "image" is not one
         out.push({ path: path.relative(root, full), bytes: s.size, kind });
+        found += 1;
         if (++seen % 250 === 0) onProgress?.(seen);
       }
     }
+    if (!found && dir !== root) barren.push(path.relative(root, dir));
+    return found;
   }
 
   await walk(root);
   out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  return out;
+
+  // A barren folder inside a barren folder is one fact, not two. Reporting
+  // every leaf of an empty tree buries the one line that matters, which is
+  // the name of the tree.
+  const set = new Set(barren);
+  const topmost = barren
+    .filter((p) => !set.has(path.dirname(p)))
+    .sort((a, b) => (a < b ? -1 : 1));
+
+  return {
+    items: out,
+    ignored: [...ignored]
+      .map(([ext, at]) => ({ ext, ...at }))
+      .sort((a, b) => b.count - a.count),
+    barren: topmost,
+  };
 }

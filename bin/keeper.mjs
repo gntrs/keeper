@@ -115,6 +115,10 @@ async function indexWithBar(root, { rescan = false } = {}) {
         if (!scanning) { scanning = true; process.stdout.write(dim("  scanning ... ")); }
         return;
       }
+      // An index already on disk does no work and draws no bar, but it still
+      // knows what the drive holds that it cannot read, and that is exactly
+      // the run where someone is asking whether a file is in here at all.
+      if (e.phase === "ready" && !scanning) { sayWhatItWalkedPast(e); return; }
       if (!scanning) return;
       // the frame count closes the scanning line, and it is the same line
       // whether or not there turned out to be anything to thumbnail
@@ -131,12 +135,43 @@ async function indexWithBar(root, { rescan = false } = {}) {
           say(hot(`  ! ${e.filmSkipped} clips have no poster: ffmpeg is not on PATH.`));
           say(dim("    brew install ffmpeg, then run again with --rescan."));
         }
+        sayWhatItWalkedPast(e);
       }
     },
   });
 
   if (!index.items.length) say(dim("  no photographs and no film here that keeper can read."));
   return index;
+}
+
+const size = (b) =>
+  b >= 1e9 ? `${(b / 1e9).toFixed(1)}GB` : b >= 1e6 ? `${Math.round(b / 1e6)}MB` : `${Math.round(b / 1e3)}KB`;
+
+/**
+ * What the scan walked past. It exists because a 903GB drive scanned to 2,836
+ * frames and said nothing else, so the audio, the project files and thirty
+ * three empty render folders stayed invisible, and answering "are my videos
+ * even on this drive" took an hour instead of one line.
+ *
+ * A tool that reports only what it liked cannot be trusted for a negative,
+ * and the negative is half of what anyone asks an archive.
+ */
+function sayWhatItWalkedPast({ ignored, barren }) {
+  if (!ignored?.length && !barren?.length) return;
+  say("");
+  if (ignored?.length) {
+    const n = ignored.reduce((t, i) => t + i.count, 0);
+    const bytes = ignored.reduce((t, i) => t + i.bytes, 0);
+    const top = ignored.slice(0, 6).map((i) => `${i.ext.replace(/^\./, "")} ${dim(i.count)}`).join("   ");
+    const more = ignored.length > 6 ? dim(`  and ${ignored.length - 6} more types`) : "";
+    say(`  ${dim("walked past")} ${n} ${n === 1 ? "file" : "files"} ${dim(`it cannot read, ${size(bytes)}`)}`);
+    say(`    ${top}${more}`);
+  }
+  if (barren?.length) {
+    const shown = barren.slice(0, 4).map((p) => dim(p)).join(", ");
+    const more = barren.length > 4 ? dim(` and ${barren.length - 4} more`) : "";
+    say(`  ${dim(`${barren.length} ${barren.length === 1 ? "folder holds" : "folders hold"} nothing it can read:`)} ${shown}${more}`);
+  }
 }
 
 function summarise(items, tags) {

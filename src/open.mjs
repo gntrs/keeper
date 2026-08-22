@@ -25,7 +25,13 @@ export async function buildIndex(root, { rescan = false, onPhase } = {}) {
   const existing = rescan ? null : await readIndex(root);
   if (existing?.items?.length) {
     const n = existing.items.length;
-    emit({ phase: "ready", done: n, total: n, frames: n });
+    // an index written before this travelled with it carries neither, and a
+    // missing census is not an empty one, so it says nothing rather than
+    // claiming the drive held nothing else
+    emit({
+      phase: "ready", done: n, total: n, frames: n,
+      ignored: existing.ignored, barren: existing.barren,
+    });
     return existing;
   }
 
@@ -33,15 +39,19 @@ export async function buildIndex(root, { rescan = false, onPhase } = {}) {
   const found = await scan(root, {
     onProgress: (n) => emit({ phase: "scanning", done: n, total: 0, frames: n }),
   });
-  const items = found.map((f) => ({ ...f, id: idFor(f.path) }));
+  // What the scan walked past travels with the index rather than only with
+  // the run that built it, because the question it answers, "is the thing I
+  // am looking for even on this drive", gets asked long after the scan.
+  const passed = { ignored: found.ignored, barren: found.barren };
+  const items = found.items.map((f) => ({ ...f, id: idFor(f.path) }));
 
   if (!items.length) {
     // a folder with nothing readable in it is an answer, not a failure. the
     // empty index gets written anyway so the shelf reads a real document
     // saying zero rather than a null it has to guess about.
-    const empty = { items: [], builtAt: new Date().toISOString(), root };
+    const empty = { items: [], builtAt: new Date().toISOString(), root, ...passed };
     await writeIndex(root, empty);
-    emit({ phase: "ready", done: 0, total: 0, frames: 0 });
+    emit({ phase: "ready", done: 0, total: 0, frames: 0, ...passed });
     return empty;
   }
 
@@ -52,7 +62,7 @@ export async function buildIndex(root, { rescan = false, onPhase } = {}) {
 
   const byId = new Map(res.meta.map((m) => [m.id, m]));
   const merged = items.map((i) => ({ ...i, ...(byId.get(i.id) ?? {}) }));
-  const index = { items: merged, builtAt: new Date().toISOString(), root };
+  const index = { items: merged, builtAt: new Date().toISOString(), root, ...passed };
   await writeIndex(root, index);
   emit({
     phase: "ready",
@@ -61,6 +71,7 @@ export async function buildIndex(root, { rescan = false, onPhase } = {}) {
     frames: items.length,
     failed: res.failed,
     filmSkipped: res.filmSkipped,
+    ...passed,
   });
   return index;
 }
