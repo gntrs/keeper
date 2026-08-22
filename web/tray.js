@@ -7,6 +7,9 @@ import { open as openPreview } from "/preview.js";
    all three of those places already lead through. */
 import "/dragout.js";
 
+import { flyToTray, leave, nope } from "/motion.js";
+import { feel } from "/feel.js";
+
 const $ = (s) => document.querySelector(s);
 
 /**
@@ -198,16 +201,27 @@ export async function toggle(id) {
   const t = cur();
   if (!t) return;
   const had = mark.has(id);
-  t.ids = had ? t.ids.filter((x) => x !== id) : [...t.ids, id];
-  remark();
-  paint();
-  renderShelf();
 
   /* The first frame anyone puts in a tray opens the panel, because a picture
      that vanishes into a shut drawer reads as a picture that did nothing.
      After that the panel obeys whatever the person last chose, so this
-     happens exactly once in the life of the app. */
+     happens exactly once in the life of the app.
+
+     It happens before the throw rather than after it, because there has to
+     be something on the far side of the window for the frame to be thrown
+     at. Nothing else here depends on the order. */
   if (!had && !localStorage.getItem("keeper.tray")) show(true);
+
+  /* Measured now, while the tile is still standing where the hand left it.
+     renderShelf below rebuilds the entire wall, and the copy that flies has
+     to be cut from the original before that happens. */
+  if (!had) flyToTray(id);
+  feel(had ? "tick" : "tap");
+
+  t.ids = had ? t.ids.filter((x) => x !== id) : [...t.ids, id];
+  remark();
+  paint();
+  renderShelf();
 
   await ask("/api/trays", { id: t.id, [had ? "remove" : "add"]: [id] }, "PATCH");
 }
@@ -248,6 +262,9 @@ export async function addMany(ids) {
   paint();
   renderShelf();
   if (!localStorage.getItem("keeper.tray")) show(true);
+  /* one sound for the whole drop. forty frames landing is one act, and forty
+     clicks in a tenth of a second is a noise rather than an answer. */
+  feel("thud");
 
   await ask("/api/trays", { id: t.id, add: fresh }, "PATCH");
 }
@@ -286,8 +303,9 @@ let armed = 0;
 async function wipe() {
   const t = cur();
   if (!t || !t.ids.length) return;
-  if (!armed) return arm();
+  if (!armed) { feel("tick"); return arm(); }
   disarm();
+  feel("thud");
   t.ids = [];
   remark();
   paint();
@@ -453,13 +471,17 @@ async function ship() {
   const out = $("#tray-result");
 
   $("#tray-export").disabled = true;
+  $("#tray-export").classList.add("busy");
   $("#tray-mode").disabled = true;
   out.textContent = VERB[mode][0];
   const d = await ask("/api/trays/export", { id: t.id, folder, mode });
   $("#tray-export").disabled = false;
+  $("#tray-export").classList.remove("busy");
   $("#tray-mode").disabled = false;
 
   if (!d?.ok) {
+    feel("no");
+    nope($("#tray-export"));
     out.textContent = d?.error
       ? `that export stopped: ${d.error}`
       : "that export did not finish. the console has the reason.";
@@ -475,6 +497,8 @@ async function ship() {
     `${VERB[d.mode ?? mode][1]} ${d.written} ${d.written === 1 ? "file" : "files"} to ${d.dest}` +
     (d.skipped ? `, skipped ${d.skipped}` : "") +
     ((d.mode ?? mode) === "copy" ? "" : ", nothing was copied");
+
+  feel("done");
 
   /* the server has just remembered the folder on the tray, so the next read
      prefills it. re-reading is how the panel finds that out rather than
@@ -504,6 +528,11 @@ let filled = { id: null, dest: null };
  * once per change no matter which path got here.
  */
 function paint() { repaint(); announce(); }
+
+/* the ids the panel drew last time, so a landing can be told from a repaint.
+   the panel rebuilds itself whenever anything in it changes, which includes
+   changing tray and renaming one. */
+let shown = new Set();
 
 function repaint() {
   const sel = $("#tray-pick");
@@ -552,6 +581,7 @@ function repaint() {
   }
 
   if (!ids.length) {
+    shown = new Set();
     const p = document.createElement("p");
     p.className = "dim";
     p.textContent = t
@@ -561,7 +591,12 @@ function repaint() {
     return;
   }
 
+  const before = shown;
+  shown = new Set(ids);
   grid.replaceChildren(...ids.map(tile));
+  for (const el of grid.children) {
+    if (!before.has(el.dataset.id)) el.dataset.fresh = "";
+  }
 }
 
 function calm(b) {
@@ -620,9 +655,14 @@ function tile(id) {
   kill.title = "take it out of the tray";
   kill.onclick = (e) => {
     e.stopPropagation();
-    if (kill.dataset.armed) return toggle(id);
+    /* the tile shrinks away first and the write follows a fifth of a second
+       later. it is the same trick the shelf plays when a frame goes in the
+       bin, and for the same reason: the panel repaints itself whole, so
+       without it the frame is simply not there on the next painted frame. */
+    if (kill.dataset.armed) return leave([fig], () => toggle(id));
     kill.dataset.armed = "1";
     kill.textContent = "sure?";
+    feel("tick");
     clearTimeout(kill.timer);
     kill.timer = setTimeout(() => calm(kill), 2400);
   };

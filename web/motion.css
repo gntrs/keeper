@@ -1,0 +1,152 @@
+/* ---------------------------------------------------------------------
+   motion.
+
+   Separate from style.css for the same reason drop.css is: this is a layer
+   over the whole app rather than the look of any one part of it, and a
+   layer you can read in one sitting is a layer you can turn down when it
+   turns out to be too much.
+
+   Three rules hold everything in here together.
+
+   One, only transform and opacity are animated. Everything else goes
+   through layout or paint on every frame, and a wall of two thousand
+   thumbnails is exactly where that shows up as a stutter.
+
+   Two, one easing family. `--ease` is the house curve and does the ordinary
+   work. `--spring` overshoots by a few percent and is only for something a
+   hand just did, because overshoot is what a physical control does when you
+   let go of it. `--snap` is symmetrical and is for a thing travelling under
+   the pointer.
+
+   Three, in and out along the same path. A tile that arrives by growing
+   leaves by shrinking, in the same corner, on the same curve.
+   --------------------------------------------------------------------- */
+:root {
+  /* the overshoot is small on purpose. 1.42 on the third handle is about
+     four percent past the mark, which reads as weight. anything springier
+     reads as a toy, and this app is a darkroom. */
+  --spring: cubic-bezier(.34, 1.42, .48, 1);
+  --snap: cubic-bezier(.4, 0, .2, 1);
+  --slow: .55s;
+  /* the press. it goes down in a frame and comes back on the spring, which
+     is the whole trick: a control that returns slower than it depressed is
+     a control with mass. */
+  --press: .06s;
+}
+
+/* --- the press ------------------------------------------------------ */
+/* Every control in the app, in one rule. `button:active` already scaled,
+   with no transition on the transform, so it snapped down and snapped back
+   and the two felt identical. Now the return is the part you feel. */
+/* On `scale` rather than on `transform`, and that is the whole reason this
+   works. A dozen component rules in style.css set their own `transition`
+   shorthand on a button, and a shorthand replaces the property wholesale:
+   put the press in `transform` and every one of those rules silently drops
+   it. `scale` is an independent property, no component rule touches it, and
+   the transition for it can be declared once here and inherited by nothing
+   and overridden by nobody. */
+button, .chip, [role="button"] { transition: scale .28s var(--spring); }
+button:active, .chip:active, [role="button"]:active {
+  scale: .97;
+  transition-duration: var(--press);
+}
+/* a control that is a photograph is already doing its own scaling */
+.tray-item:active, figure:active { scale: 1; }
+
+/* --- arriving and leaving ------------------------------------------- */
+@keyframes tile-in { from { opacity: 0; transform: translateY(9px) scale(.94); } }
+@keyframes tile-out { to { opacity: 0; transform: translateY(-4px) scale(.86); } }
+@keyframes pop { from { opacity: 0; transform: scale(.62); } }
+
+/* A tag landing on a frame. It is the one piece of feedback in a tagging
+   run: the hand is on the keyboard, the eyes are on the photograph, and
+   nothing else on screen moves. Down first, then past the mark, then home. */
+@keyframes thump {
+  0% { transform: scale(1); }
+  28% { transform: scale(.955); }
+  62% { transform: scale(1.022); }
+  100% { transform: scale(1); }
+}
+
+/* No. Small enough to be felt rather than watched, and it stays inside the
+   tile so a row of them does not shove the grid around. */
+@keyframes nope {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  80% { transform: translateX(-2px); }
+}
+
+/* something the app is doing and has not finished */
+@keyframes breathe { 50% { opacity: .55; } }
+
+/* --- the wall ------------------------------------------------------- */
+/* Only frames that were not on the wall a moment ago. A tag keystroke
+   repaints the whole grid, so animating every tile on every render would
+   mean the entire archive breathing once per keypress, which is the exact
+   opposite of what motion is for here.
+
+   The stagger is capped in shelf.js rather than here: `--i` never goes past
+   a couple of dozen, so opening a folder of two thousand frames takes the
+   same quarter second as opening a folder of thirty. */
+#grid figure[data-fresh] {
+  animation: tile-in .42s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 14ms);
+}
+#grid figure.going {
+  animation: tile-out .22s var(--ease) both;
+  pointer-events: none;
+}
+#grid figure.hit { animation: thump .34s var(--ease); }
+/* anything at all can refuse: a chip, an export button, a tile */
+.nope { animation: nope .3s var(--ease); }
+
+/* the tray marker, which appears the instant a frame joins a tray */
+figure .add::before { transition: transform .3s var(--spring); }
+figure.intray .add::before { animation: pop .3s var(--spring); }
+
+/* --- the tray ------------------------------------------------------- */
+/* A frame that lands in the tray grows into place, because something just
+   flew across the window and stopped here and the landing has to be where
+   the eye already is. */
+.tray-item[data-fresh] { animation: pop .34s var(--spring) both; }
+.tray-item.going { animation: tile-out .2s var(--ease) both; pointer-events: none; }
+
+/* the thing that flies. it is a clone, it is never in the layout, and it is
+   thrown away the moment the animation ends. */
+.flier {
+  position: fixed; z-index: 80;
+  margin: 0; border-radius: 3px;
+  object-fit: cover;
+  pointer-events: none;
+  will-change: transform, opacity;
+  box-shadow: 0 18px 44px #000000a6;
+}
+
+/* --- switching views ------------------------------------------------ */
+/* Shallower and faster than anything on the wall. The whole screen is
+   changing, so the movement has to be the smallest thing in the room or it
+   reads as a page load. */
+@keyframes view-in { from { opacity: 0; transform: translateY(6px); } }
+#shelf[data-in], #bench[data-in] { animation: view-in .26s var(--ease); }
+
+/* --- the sentence at the end of a job -------------------------------- */
+@keyframes said-in { from { opacity: 0; transform: translateY(5px); } }
+.said-go, #bench-export-result:not(:empty), #tray-result:not(:empty) {
+  animation: said-in var(--fast) var(--ease);
+}
+button.busy { animation: breathe 1.1s ease-in-out infinite; }
+
+/* --- reduced motion -------------------------------------------------- */
+/* The global rule in style.css already flattens durations. This adds the
+   two things a blanket rule cannot know: a stagger is still a stagger at
+   0.01ms times two thousand, and an animation that ends somewhere other
+   than where it started must not be flattened into a jump. */
+@media (prefers-reduced-motion: reduce) {
+  #grid figure[data-fresh] { animation: none !important; }
+  .tray-item[data-fresh] { animation: none !important; }
+  #grid figure.hit, .nope { animation: none !important; }
+  .flier { display: none !important; }
+  #shelf[data-in], #bench[data-in] { animation: none !important; }
+  button.busy { animation: none !important; opacity: .6; }
+}

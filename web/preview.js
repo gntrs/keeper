@@ -213,7 +213,7 @@ export function mountPreview() {
   addEventListener("keydown", (e) => {
     if (!cur) return;
     if (e.key === "Escape") { close(); return e.preventDefault(); }
-    if (e.target.matches("input, select, textarea")) return;
+    if (e.target instanceof Element && e.target.matches("input, select, textarea")) return;
     if (e.key === "ArrowRight") { step(1); return e.preventDefault(); }
     if (e.key === "ArrowLeft") { step(-1); return e.preventDefault(); }
   });

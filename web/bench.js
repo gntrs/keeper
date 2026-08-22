@@ -2,6 +2,9 @@ import { S, post, tally } from "/app.js";
 import { inTray } from "/tray.js";
 import { CENTERED, clamp, coverWidth, isAtCover, resolve, toObjectPosition } from "/geometry.mjs";
 
+import { nope } from "/motion.js";
+import { feel } from "/feel.js";
+
 const $ = (s) => document.querySelector(s);
 const els = new Map();          // slotId -> { root, box, img, empty, nums }
 let active = null;              // the slot a picked frame lands in
@@ -415,6 +418,8 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
      that no longer exist. */
   const has = only ? !!S.placements[only] : S.slots.some((sl) => S.placements[sl.id]);
   if (!has) {
+    feel("no");
+    nope(btn);
     out.textContent = only
       ? "nothing in this slot yet."
       : "nothing is placed yet. drag a frame onto a slot first.";
@@ -423,6 +428,7 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
 
   const was = btn.textContent;
   btn.disabled = true;
+  btn.classList.add("busy");
   out.textContent = "cutting...";
   let d = null;
   try {
@@ -436,9 +442,12 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
     console.error("[keeper] /api/export", e);
   }
   btn.disabled = false;
+  btn.classList.remove("busy");
   btn.textContent = was;
 
   if (!d?.ok) {
+    feel("no");
+    nope(btn);
     out.textContent = d?.error
       ? `that export stopped: ${d.error}`
       : "that export did not finish. the console has the reason.";
@@ -455,9 +464,15 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
   const file = only ? d.files?.[0] : null;
 
   if (only && !file) {
+    feel("no");
+    nope(btn);
     out.textContent = `nothing came out${lost}${bad}`;
     return;
   }
+
+  /* the one place in the app that gets two notes rather than one click. a
+     job that wrote files to a disk is the only thing here with an end. */
+  feel("done");
 
   /* "wrote yt-thumb.jpg" is a claim, and a claim is not the same thing as a
      file. So the answer is the finder: press it, the folder opens with the
@@ -660,7 +675,11 @@ function onWheel(e) {
 }
 
 function onKey(e) {
-  if (S.view !== "bench" || e.target.matches("input")) return;
+  /* `instanceof Element` first, because a keydown dispatched on window has
+     window as its target and window has no `matches`: the handler would die
+     on the way past. Same loose wire the shelf and the app had. */
+  if (S.view !== "bench") return;
+  if (e.target instanceof Element && e.target.matches("input")) return;
 
   if (e.key === "Escape") {
     /* The preview card is a window standing over this one and it owns escape

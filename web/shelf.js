@@ -2,6 +2,9 @@ import { S, post, tally, reveal, typed } from "/app.js";
 import { open, previewOpen, current, close as shut } from "/preview.js";
 import { MIME, inTray, addMany as trayAddMany, toggle as trayToggle } from "/tray.js";
 
+import { fresh, hit as thump, leave, nope } from "/motion.js";
+import { feel } from "/feel.js";
+
 const $ = (s) => document.querySelector(s);
 const F = { tag: new Set(), dir: new Set(), star: false, untagged: false, q: "", binned: false };
 let visible = [];
@@ -32,6 +35,18 @@ const sel = new Set();
 
 /** where a shift range measures from. an id, for the same reason. */
 let anchor = null;
+
+/**
+ * What the wall was showing at the end of the last render, and which frames
+ * a key just struck.
+ *
+ * Both exist for motion and for nothing else. The shelf repaints in full on
+ * every keystroke, so "which of these tiles is new" cannot be read off the
+ * dom: every tile is new to the dom and almost none of them are new to the
+ * person looking at it. `drawn` is the difference between those two facts.
+ */
+let drawn = new Set();
+let struck = [];
 
 const at = (id) => visible.findIndex((i) => i.id === id);
 
@@ -135,6 +150,7 @@ function chip(v, label, count, key) {
     F[key].has(v) ? F[key].delete(v) : F[key].add(v);
     b.classList.toggle("on");
     quiet(b);
+    feel("tick");
     renderShelf();
   };
   quiet(b);
@@ -218,8 +234,8 @@ export function mountShelf() {
   chips($("#f-dir"), places.slice(0, DIRS), leaf, countPlace, "dir");
   if (places.length > DIRS) more($("#f-dir"), places.slice(DIRS));
 
-  $("#f-star").onclick = (e) => { F.star = !F.star; e.currentTarget.classList.toggle("on"); renderShelf(); };
-  $("#f-untagged").onclick = (e) => { F.untagged = !F.untagged; e.currentTarget.classList.toggle("on"); renderShelf(); };
+  $("#f-star").onclick = (e) => { F.star = !F.star; e.currentTarget.classList.toggle("on"); feel("tick"); renderShelf(); };
+  $("#f-untagged").onclick = (e) => { F.untagged = !F.untagged; e.currentTarget.classList.toggle("on"); feel("tick"); renderShelf(); };
   $("#f-q").oninput = (e) => { F.q = e.target.value.trim().toLowerCase(); renderShelf(); };
   mountClear();
 
@@ -587,7 +603,17 @@ export function renderShelf() {
       : "no frames.";
   }
 
-  $("#grid").replaceChildren(...visible.map((item, n) => tile(item, n)));
+  const grid = $("#grid");
+  const before = drawn;
+  drawn = new Set(visible.map((i) => i.id));
+  grid.replaceChildren(...visible.map((item, n) => tile(item, n)));
+  fresh(grid, visible, before);
+  /* the frames a key just changed, thumped after the repaint rather than
+     before it, because the tile that was under the hand a moment ago is not
+     the same element any more: this whole grid was rebuilt in the line
+     above. the ids survive the rebuild and the elements do not. */
+  for (const id of struck) thump(grid.querySelector(`figure[data-id="${CSS.escape(id)}"]`));
+  struck = [];
   /* after the grid, because what the trash would take depends on what the
      filters just left standing */
   sayBin();
@@ -1109,22 +1135,33 @@ export function binCancel() {
 
 const many = (n) => `${n} ${n === 1 ? "frame" : "frames"}`;
 
+/* the tiles currently standing for a set of ids. only motion uses this: the
+   model has already been changed by the time it is called. */
+const tilesFor = (ids) =>
+  ids.map((id) => $(`#grid figure[data-id="${CSS.escape(id)}"]`)).filter(Boolean);
+
 async function bin(ids) {
+  const going = tilesFor(ids);
   const ok = await post("/api/bin", { ids });
-  if (!ok) { sayBin("that did not go in the bin."); return; }
+  if (!ok) { feel("no"); nope($("#f-bin")); sayBin("that did not go in the bin."); return; }
   for (const id of ids) { S.binned.add(id); sel.delete(id); }
-  renderShelf();
-  tally();
+  /* the frames are already out of the model here. this holds them on the
+     wall for a fifth of a second while they shrink away, because a frame
+     that disappears between two rendered frames leaves no evidence that
+     anything happened except a number changing in the far corner. */
+  feel("thud");
+  leave(going, () => { renderShelf(); tally(); });
   sayBin(`${many(ids.length)} set aside. nothing was deleted.`);
   setTimeout(() => sayBin(), 6000);
 }
 
 async function unbin(ids) {
+  const going = tilesFor(ids);
   const ok = await post("/api/bin", { ids, put: true });
-  if (!ok) { sayBin("that did not come back out."); return; }
+  if (!ok) { feel("no"); nope($("#f-bin")); sayBin("that did not come back out."); return; }
   for (const id of ids) { S.binned.delete(id); sel.delete(id); }
-  renderShelf();
-  tally();
+  feel("tap");
+  leave(going, () => { renderShelf(); tally(); });
   sayBin(`${many(ids.length)} back on the shelf.`);
   setTimeout(() => sayBin(), 6000);
 }
@@ -1154,8 +1191,14 @@ function nukePress() {
 
 async function nuke(ids) {
   armed = null;
+  const going = tilesFor(ids);
   const ok = await post("/api/trash", { ids });
-  if (!ok) { sayBin("that did not go to the trash. the file may be on a drive that is gone."); return; }
+  if (!ok) {
+    feel("no");
+    nope($("#f-nuke"));
+    sayBin("that did not go to the trash. the file may be on a drive that is gone.");
+    return;
+  }
 
   /* The server has already dropped them from the index, so the page drops
      them from its own copy rather than asking for the whole state again:
@@ -1165,8 +1208,8 @@ async function nuke(ids) {
   S.items = S.items.filter((i) => !gone.has(i.id));
   S.byId = new Map(S.items.map((i) => [i.id, i]));
   for (const id of gone) { sel.delete(id); S.binned.delete(id); }
-  renderShelf();
-  tally();
+  feel("thud");
+  leave(going, () => { renderShelf(); tally(); });
   sayBin(`${many(ids.length)} in the macos trash. finder can put them back.`);
   setTimeout(() => sayBin(), 6000);
 }
@@ -1245,11 +1288,15 @@ async function collect() {
 async function flip(item) {
   const star = S.tags[item.id]?.star ? 0 : 1;
   S.tags[item.id] = { ...S.tags[item.id], star };
+  struck = [item.id];
+  feel("tap");
   await post("/api/tag", { id: item.id, star });
 }
 
 async function mark(item, code) {
   S.tags[item.id] = { ...S.tags[item.id], tag: code };
+  struck = [item.id];
+  feel("tick");
   await post("/api/tag", { id: item.id, tag: code });
 }
 
@@ -1262,6 +1309,8 @@ async function mark(item, code) {
  */
 async function markAll(ids, code) {
   for (const id of ids) S.tags[id] = { ...S.tags[id], tag: code };
+  struck = ids;
+  feel("tick");
   renderShelf();
   tally();
   await Promise.all(ids.map((id) => post("/api/tag", { id, tag: code })));
@@ -1276,6 +1325,8 @@ async function markAll(ids, code) {
 async function keepAll(ids) {
   const star = ids.some((id) => !S.tags[id]?.star) ? 1 : 0;
   for (const id of ids) S.tags[id] = { ...S.tags[id], star };
+  struck = ids;
+  feel("tap");
   renderShelf();
   tally();
   await Promise.all(ids.map((id) => post("/api/tag", { id, star })));

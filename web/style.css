@@ -103,7 +103,9 @@ body {
 
 button, input, select { font: inherit; color: inherit; }
 button { transition: color var(--fast) var(--ease), background var(--fast) var(--ease); }
-button:active { transform: scale(.97); }
+/* the press itself lives in motion.css, on `scale` rather than `transform`,
+   because a component rule here that sets its own transition shorthand would
+   otherwise throw the press away without saying so. */
 
 /* keeper is a keyboard tool and had no visible focus at all, which meant
    tabbing through it was flying blind. the ring is the accent because the
@@ -187,12 +189,36 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
   font: 500 .85rem/1.3 var(--sans); white-space: nowrap;
 }
 .chip:hover { color: var(--ink); background: var(--raise); }
-.chip.on { background: var(--hot); color: #fff; }
+
+/* A chip that is on used to be a solid slab of the accent, and four of them
+   next to each other stopped being four chips. They ran together into one
+   red bar across the top of the window, which is both wrong about what it
+   is saying, since each one is a separate filter you can drop on its own,
+   and a great deal of the loudest colour in the building sitting directly
+   above a wall of photographs.
+
+   So it is a wash, a hairline and the accent in the type instead. It reads
+   as on from across the room, six of them in a row still read as six, and
+   the red on screen goes from four filled rectangles to four outlines. The
+   solid fill is not gone: it still belongs to the bin and to the armed
+   delete, which are the two chips where the colour means "careful" rather
+   than "chosen", and those set it themselves further down.
+
+   The text is a lighter red than the accent because #e1062c is a fill
+   colour: at fourteen pixels on near black it is muddy, and a label you
+   have to lean in to read is not a state. */
+.chip.on {
+  background: #e1062c1c;
+  color: #ff5d75;
+  box-shadow: inset 0 0 0 1px #e1062c59;
+}
+.chip.on:hover { background: #e1062c2e; color: #ff7b8e; }
 .chip i {
   font-style: normal; margin-left: var(--s2);
   font-size: .72rem; opacity: .6;
   font-variant-numeric: tabular-nums;
 }
+.chip.on i { opacity: .8; }
 
 /* The magnifier. It stands in front of the field rather than inside it,
    because inside means padding-left on an input whose width is already the
@@ -1358,12 +1384,14 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
    the only state in keeper where red means "you have to deal with this"
    rather than "you chose this", and it is earned here and nowhere else. */
 #f-nuke.armed,
-#f-nuke.armed:hover { background: var(--hot); color: #fff; }
+#f-nuke.armed:hover { background: var(--hot); color: #fff; box-shadow: none; }
 /* the bin itself is a filter and wears a filter's clothes, because going to
    look at what you set aside is not a destructive act */
 #f-binned { color: var(--ink-3); }
 #f-binned:hover { color: var(--ink); background: var(--raise); }
-#f-binned.on { background: var(--hot); color: #fff; }
+/* solid, and deliberately unlike every other chip on the row. this is not
+   a filter you added to a set, it is the other room. */
+#f-binned.on { background: var(--hot); color: #fff; box-shadow: none; }
 
 /* ---------------------------------------------------------------------
    The full stop.

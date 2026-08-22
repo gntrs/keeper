@@ -13,6 +13,11 @@
 -->
 <link rel="stylesheet" href="/drop.css">
 <link rel="stylesheet" href="/dragout.css">
+<!--
+  the motion layer, last, so a rule in here always wins over the component
+  it is animating without either file needing a specificity fight.
+-->
+<link rel="stylesheet" href="/motion.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23e1062c'/></svg>">
 </head>
 <body>
@@ -186,6 +191,12 @@
   <div class="keys-head">
     <span class="label">shortcuts</span>
     <span class="grow"></span>
+    <!--
+      not haptics. a mac gives a web page no route to the taptic engine, so
+      this is the click that stands in for one, and it is off until asked.
+    -->
+    <button class="chip" id="feel-toggle" type="button" aria-pressed="false"
+            title="a short click when a key lands. no api on a mac gives a page real haptics, so this is a sound.">sound off</button>
     <button id="keys-shut" type="button" data-icon="only" title="close"></button>
   </div>
   <div class="keys-cols">

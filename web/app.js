@@ -6,6 +6,8 @@ import { mountPreview, previewOpen } from "/preview.js";
    be here rather than inside a view: a folder can be dropped on the bench
    just as well as on the shelf. */
 import "/drop.js";
+import { viewIn } from "/motion.js";
+import { feel, mountFeel } from "/feel.js";
 
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
@@ -81,10 +83,15 @@ export function setView(v) {
   for (const b of document.querySelectorAll("header nav button")) {
     b.classList.toggle("on", b.dataset.view === v);
   }
+  const was = $("#shelf").hidden ? "bench" : "shelf";
   $("#shelf").hidden = v !== "shelf";
   $("#bench").hidden = v !== "bench";
   trayView(v);
   if (v === "bench") renderBench();
+  /* only when the view actually changed. setView runs on every hashchange
+     and once at boot, and a section that re animates when nothing moved is
+     a flicker rather than a transition. */
+  if (was !== v) { viewIn($(`#${v}`)); feel("tap"); }
 }
 addEventListener("hashchange", () => setView(location.hash.slice(1)));
 for (const b of document.querySelectorAll("header nav button")) {
@@ -101,6 +108,7 @@ for (const b of document.querySelectorAll("header nav button")) {
 export function showKeys(on) {
   $("#keys").hidden = !on;
   $("#keys-toggle").setAttribute("aria-expanded", String(!!on));
+  feel("tick");
 }
 $("#keys-toggle").onclick = () => showKeys($("#keys").hidden);
 $("#keys-shut").onclick = () => showKeys(false);
@@ -239,6 +247,7 @@ if (S.items.length) {
 }
 mountBench();
 mountPreview();
+mountFeel();
 await mountTray();
 tally();
 setView(location.hash.slice(1) || "shelf");
