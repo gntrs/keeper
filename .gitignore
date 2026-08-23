@@ -4,3 +4,8 @@ keeper-out/
 keeper.config.json
 .DS_Store
 *.log
+
+# the working agreement, which is ours and not the product's. ignored rather
+# than committed because this repo is public today: it goes into the private
+# dev repo once that exists, and never into the public one.
+CLAUDE.md
