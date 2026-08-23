@@ -1,5 +1,6 @@
 import { typed } from "/app.js";
 import { feel } from "/feel.js";
+import { pick as chord } from "/host.js";
 
 /**
  * Two stacks, and where you are is the gap between them.
@@ -168,7 +169,7 @@ export const redo = () =>
  */
 export function mountUndo() {
   addEventListener("keydown", (e) => {
-    if (e.code !== "KeyZ" || !(e.metaKey || e.ctrlKey) || e.altKey) return;
+    if (e.code !== "KeyZ" || !chord(e) || e.altKey) return;
     if (typed(e)) return;
     e.preventDefault();
     if (e.shiftKey) redo(); else undo();

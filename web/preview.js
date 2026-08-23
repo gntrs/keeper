@@ -1,4 +1,5 @@
 import { S, reveal } from "/app.js";
+import { files } from "/host.js";
 import { filtered, focus } from "/shelf.js";
 import { toggle as trayToggle, inTray } from "/tray.js";
 
@@ -162,7 +163,7 @@ function meta(item) {
   const finder = document.createElement("button");
   finder.className = "chip";
   finder.type = "button";
-  finder.textContent = "reveal in finder";
+  finder.textContent = `reveal in ${files()}`;
   finder.onclick = () => reveal(item);
 
   const keep = document.createElement("button");

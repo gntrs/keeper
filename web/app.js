@@ -8,6 +8,7 @@ import { mountPreview, previewOpen } from "/preview.js";
 import "/drop.js";
 import { viewIn } from "/motion.js";
 import { feel, mountFeel } from "/feel.js";
+import { paintKeys, pick as chord } from "/host.js";
 import { mountUndo } from "/undo.js";
 
 export const S = {
@@ -139,7 +140,7 @@ addEventListener("keydown", (e) => {
    * option+f as "ƒ", option+r as "®". The physical key is the only stable
    * thing in the event.
    */
-  if (e.metaKey || e.altKey) {
+  if (chord(e) || e.altKey) {
     const k = e.code;
 
     /* The views on the numbers they already answer to, and these two work
@@ -250,6 +251,9 @@ mountBench();
 mountPreview();
 mountFeel();
 mountUndo();
+
+/* the key legend is written in the mac spelling, so a pc reads it back */
+paintKeys();
 await mountTray();
 tally();
 setView(location.hash.slice(1) || "shelf");

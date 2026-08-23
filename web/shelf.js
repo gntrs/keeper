@@ -1,5 +1,6 @@
 import { S, post, tally, reveal, typed } from "/app.js";
 import { open, previewOpen, current, close as shut, walkHome } from "/preview.js";
+import { bin as wastebasket, files, pick as chord, restore } from "/host.js";
 import { did, didFinal } from "/undo.js";
 import { MIME, inTray, addMany as trayAddMany, toggle as trayToggle } from "/tray.js";
 
@@ -500,7 +501,7 @@ function mountSweep() {
        the wrong one of the three should not get a different app. Option is
        also the only one of them that is not already spoken for by the
        system while the button is down. */
-    const held = e.metaKey || e.shiftKey || e.altKey;
+    const held = chord(e) || e.shiftKey || e.altKey;
     const onFrame = Boolean(e.target.closest("figure"));
     /**
      * In the bin a bare press on a photograph sweeps, and this is the only
@@ -585,7 +586,7 @@ function mountSweep() {
        case has to leave the grid alone: see the repaint at the bottom. */
     const swept = live;
     let changed = false;
-    if (!live && !e.metaKey && !e.shiftKey && !e.altKey) changed = drop();
+    if (!live && !chord(e) && !e.shiftKey && !e.altKey) changed = drop();
     /* A sweep that began on a photograph and ended on the same one is still
        a click as far as the document is concerned, and that click would run
        the tile's handler and collapse the set that was just swept up. One
@@ -900,7 +901,7 @@ function tile(item, n) {
 
        Letting it bubble is the whole fix: the figure's own handler is the
        one place the modifiers are read, and it is now the only one. */
-    if (e.metaKey || e.shiftKey || e.altKey) return;
+    if (chord(e) || e.shiftKey || e.altKey) return;
     e.stopPropagation();
     trayToggle(item.id);
   };
@@ -962,7 +963,7 @@ function tile(item, n) {
    */
   fig.onclick = (e) => {
     e.preventDefault();
-    if (e.metaKey || e.altKey) {
+    if (chord(e) || e.altKey) {
       sel.has(item.id) ? sel.delete(item.id) : sel.add(item.id);
       anchor = item.id;
     } else if (e.shiftKey) {
@@ -1061,7 +1062,7 @@ async function onKey(e) {
      sat in front of the tag table, so resting, one of the sixteen, could not
      be typed at all, and putting find on f would have taken food the same
      way. The rule frees both letters and every letter after them. */
-  if (e.metaKey || e.altKey) return command(e);
+  if (chord(e) || e.altKey) return command(e);
   if (S.view !== "shelf" || typed(e)) return;
 
   /**
@@ -1441,8 +1442,8 @@ async function nuke(ids) {
    * before it, which would look exactly like the delete having been undone.
    */
   didFinal(`deleting ${many(ids.length)}`,
-    "that one is in the macos trash. put it back from finder, not from here.");
-  sayBin(`${many(ids.length)} in the macos trash. finder can put them back.`);
+    `that one is in ${wastebasket()}. ${restore()} it from ${files()}, not from here.`);
+  sayBin(`${many(ids.length)} in ${wastebasket()}. ${files()} can ${restore()} them.`);
   setTimeout(() => sayBin(), 6000);
 }
 

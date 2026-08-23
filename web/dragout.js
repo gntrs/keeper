@@ -22,6 +22,7 @@
    --------------------------------------------------------------------- */
 
 import { S } from "/app.js";
+import { files } from "/host.js";
 
 /* The same string shelf.js, bench.js and tray.js write, spelled out again
    for the same reason they spell it out: nobody owns it, and a module
@@ -186,7 +187,7 @@ function note(n = 1) {
      half the story: the forty paths really are going, and into most things
      that is the useful half. */
   p.textContent = n > 1
-    ? `${n} paths are going. finder takes one file per drag, that is chrome's limit, and the tray export writes the whole set at once.`
+    ? `${n} paths are going. ${files()} takes one file per drag, that is chrome's limit, and the tray export writes the whole set at once.`
     : "one file per drag, that is chrome's limit. the tray export writes the whole tray at once.";
   document.body.append(p);
 
