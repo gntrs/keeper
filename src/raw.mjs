@@ -33,10 +33,10 @@ import { paths } from "./store.mjs";
  * narrower than the slot the exporter is upscaling somebody's photograph and
  * calling it a 2560px file.
  *
- * 3072 clears 2560 by a fifth and costs about 0.9MB a frame, measured on the
- * owner's ILCE-7M4 files. Full size is 4.5MB a frame: across the 1,076 raws
- * on his drive that is the difference between roughly 1GB of cache and
- * roughly 5GB, for pixels no export would ever have used.
+ * 3072 clears 2560 by a fifth and costs about 0.9MB a frame, measured on
+ * full frame 33MP files. Full size is 4.5MB a frame, so across a thousand
+ * raws that is the difference between roughly 1GB of cache and roughly 5GB,
+ * for pixels no export would ever have used.
  */
 export const PROXY_LONG_EDGE = 3072;
 
@@ -48,9 +48,9 @@ const SIPS_TIMEOUT_MS = 120_000;
 
 const run = (args) =>
   new Promise((ok, no) => {
-    // execFile and never exec: these paths hold spaces, hashes and brackets,
-    // and one of the owner's folders is called `2026-06-21 (casino)`. An argv
-    // list has no quoting to get wrong and no shell to get through.
+    // execFile and never exec: an archive that files by day is full of
+    // folders with spaces, hashes and brackets in the name. An argv list has
+    // no quoting to get wrong and no shell to get through.
     execFile("sips", args, { timeout: SIPS_TIMEOUT_MS, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
       if (!err) return ok(String(stdout));
       // sips puts its refusals on stderr and its progress on stdout, and the
