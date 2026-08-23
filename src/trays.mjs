@@ -1,9 +1,9 @@
 import { copyFile, lstat, mkdir, readFile, realpath, symlink, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
-import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import path from "node:path";
 
+import { host } from "./os/index.mjs";
 import { paths } from "./store.mjs";
 
 /**
@@ -30,13 +30,18 @@ const FIRST = { id: "tray-1", name: "tray 1" };
  *   copy     real files. the only one you can put on a stick and post.
  *   symlink  an absolute link to the original. zero bytes, and it dies if
  *            the original is moved or renamed.
- *   alias    a finder alias, which is the same idea except macOS tracks the
- *            file by its id and follows it when it moves.
+ *   the third is the platform's own, and it is the one the machine's file
+ *            manager understands: a finder alias on a mac, which tracks the
+ *            file by its id and follows it when it moves, or a .lnk shortcut
+ *            on windows, which holds a path and finds a moved target only
+ *            sometimes.
  *
  * copy is first and is the default, because it is the only one of the three
- * that is still true when the folder is handed to somebody else.
+ * that is still true when the folder is handed to somebody else. The third
+ * one's name is read off the platform rather than spelled here, so nobody is
+ * ever offered an export mode their machine has never heard of.
  */
-export const MODES = ["copy", "symlink", "alias"];
+export const MODES = ["copy", "symlink", ...(host?.LINKS.filter((m) => m !== "symlink") ?? [])];
 
 /**
  * There is always a tray, and it is not written to disk until something goes
@@ -197,9 +202,7 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
   if (!MODES.includes(how)) {
     throw new Error(`no export mode called ${how}. it is one of ${MODES.join(", ")}.`);
   }
-  if (how === "alias" && process.platform !== "darwin") {
-    throw new Error("finder aliases are macOS only. symlink does the same job and works everywhere.");
-  }
+  if (!host) throw new Error("export needs macos or windows");
 
   const asked = String(folder ?? "").trim();
   if (!asked) throw new Error("export needs a folder to write to");
@@ -228,7 +231,9 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
     return taken.has(first) ? [`${stem}-${id}${ext}`] : [first, `${stem}-${id}${ext}`];
   };
 
-  if (how === "alias") return aliases({ root, tray, byId, dest, taken, skipped, candidates });
+  if (how !== "copy" && how !== "symlink") {
+    return shortcuts({ root, tray, byId, dest, taken, skipped, candidates, how });
+  }
 
   /**
    * copy and symlink are the same loop because both calls refuse to touch a
@@ -260,6 +265,14 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
         done = true;
         break;
       } catch (e) {
+        /* Windows only hands out symlinks to an administrator, or to anyone
+           once developer mode is on. It is worth saying which of those it is,
+           because the raw errno reads like a permissions problem with the
+           photograph rather than with the machine, and the tray has two other
+           modes that need neither. */
+        if (e.code === "EPERM" && how === "symlink" && process.platform === "win32") {
+          throw new Error("windows only makes symlinks for an administrator, or for anyone with developer mode turned on in settings. copy and shortcut both work as you are.");
+        }
         if (e.code !== "EEXIST") throw e;
         taken.add(name);
       }
@@ -271,23 +284,22 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
 }
 
 /**
- * A finder alias is not a file this process can write. Only Finder makes
- * them, and it makes them one at a time through apple events, so the naive
- * version is one osascript per frame: two hundred processes, each paying its
- * own interpreter startup and its own round trip to Finder, and a tray that
- * takes a minute to export nothing. So the whole tray becomes one script
- * with a repeat loop in it and osascript runs once.
+ * The platform's own shortcut, made for a whole tray in one call.
  *
- * The script is fed on stdin rather than through -e. A tray of a few hundred
- * paths is tens of kilobytes of argument otherwise, and an argument list has
- * a ceiling while a pipe does not.
+ * Neither machine lets a process write one of these as bytes. A finder alias
+ * is made by the finder over apple events and a .lnk is made by the windows
+ * shell over com, so both are one subprocess that loops internally rather
+ * than one subprocess per frame: two hundred processes, each paying its own
+ * interpreter startup, is a tray that takes a minute to export nothing. The
+ * how of that is in os/, and what is left here is the part that is the same
+ * on both, which is deciding what each file gets called.
  *
- * Finder cannot create exclusively, so this is the one mode where the name
- * is chosen by looking first. lstat and not stat: a broken symlink already
- * sitting in the destination still occupies the name, and stat would follow
- * it, find nothing, and report the name free.
+ * The name is chosen by looking first, because neither of them can create
+ * exclusively the way copyFile and symlink can. lstat and not stat: a broken
+ * link already sitting in the destination still occupies the name, and stat
+ * would follow it, find nothing, and report the name free.
  */
-async function aliases({ root, tray, byId, dest, taken, skipped, candidates }) {
+async function shortcuts({ root, tray, byId, dest, taken, skipped, candidates, how }) {
   const free = async (p) => {
     try { await lstat(p); return false; } catch { return true; }
   };
@@ -299,7 +311,8 @@ async function aliases({ root, tray, byId, dest, taken, skipped, candidates }) {
 
     let name = null;
     for (const c of candidates(item, id)) {
-      if (await free(path.join(dest, c))) { name = c; break; }
+      const asked = host.linkName(c);
+      if (await free(path.join(dest, asked))) { name = asked; break; }
       taken.add(c);
     }
     if (!name) { skipped.push(id); continue; }
@@ -307,49 +320,10 @@ async function aliases({ root, tray, byId, dest, taken, skipped, candidates }) {
     jobs.push({ id, name, src: path.join(root, item.path) });
   }
 
-  if (!jobs.length) return { written: 0, skipped, dest, mode: "alias" };
+  if (!jobs.length) return { written: 0, skipped, dest, mode: how };
 
-  /* AppleScript string literals take the same two escapes a javascript one
-     does, and a photographer's folder name is exactly the place a stray
-     quote turns a script into a syntax error. */
-  const q = (s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-
-  /* Everything but the one make call is kept outside the tell block. POSIX
-     file and its coercion are AppleScript's own, and Finder is only asked
-     the thing that is actually Finder's job, which is the shortest version
-     of this script that cannot be tripped up by terminology. */
-  const script = [
-    `set srcs to {${jobs.map((j) => q(j.src)).join(", ")}}`,
-    `set nms to {${jobs.map((j) => q(j.name)).join(", ")}}`,
-    `set d to (POSIX file ${q(dest)}) as alias`,
-    "set bad to {}",
-    "repeat with i from 1 to count of srcs",
-    "  try",
-    "    set f to (POSIX file (item i of srcs)) as alias",
-    "    tell application \"Finder\" to make new alias file at d to f with properties {name:(item i of nms)}",
-    "  on error",
-    // one frame Finder would not alias, a file gone from the disk since the
-    // index was built, is a skip and not a reason to abandon the other
-    // hundred and ninety nine
-    "    set end of bad to i",
-    "  end try",
-    "end repeat",
-    "return bad",
-  ].join("\n");
-
-  const out = await new Promise((done, fail) => {
-    const child = execFile("osascript", ["-"], (err, stdout, stderr) => {
-      if (err) return fail(new Error(String(stderr || err.message).trim().toLowerCase() || "finder would not make the aliases"));
-      done(String(stdout));
-    });
-    child.stdin.end(script);
-  });
-
-  /* AppleScript prints a list of integers as "1, 4, 9" and an empty list as
-     nothing at all, so the count of matches is the count of failures and no
-     parse is needed beyond pulling the numbers out. */
-  const bad = new Set((out.match(/\d+/g) ?? []).map((n) => Number(n) - 1));
+  const bad = await host.links(jobs, dest);
   for (const i of bad) if (jobs[i]) skipped.push(jobs[i].id);
 
-  return { written: jobs.length - bad.size, skipped, dest, mode: "alias" };
+  return { written: jobs.length - bad.size, skipped, dest, mode: how };
 }
