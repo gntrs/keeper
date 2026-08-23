@@ -1,6 +1,3 @@
-<img src="docs/media/banner.jpg" alt="a dark contact sheet of several hundred
-frames with one marked in red" width="100%">
-
 # keeper
 
 <!-- one badge is red and the rest are the ground, for the same reason one
