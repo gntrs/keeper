@@ -27,6 +27,28 @@ export const previewOpen = () => cur !== null;
 export const current = () => cur;
 
 /**
+ * The run the arrows walk, and it is whatever opened the card rather than
+ * whatever the grid happens to be showing.
+ *
+ * A frame opened from the shelf steps through the shelf's filter, because
+ * that filter is the question being asked. A frame opened from a tray steps
+ * through the tray, because a tray is a pile you have already decided on and
+ * arrowing out of it into the other two thousand frames answers a question
+ * nobody asked. The caller passes the run it belongs to and the card holds
+ * on to it until something else opens.
+ */
+let walk = filtered;
+
+/**
+ * Where the card was opened from, as a word: "shelf" or "tray".
+ *
+ * The run carries it on itself, because the run and its home are the same
+ * fact and passing them separately is two arguments that can disagree. The
+ * shelf never sets one, so its run is the default and the default is shelf.
+ */
+export const walkHome = () => walk?.home ?? "shelf";
+
+/**
  * This used to be a full screen lightbox and it is not one any more, on
  * purpose. Blacking out the whole window to look at one photograph is a
  * viewer's gesture, not a worker's: it throws away the row of frames you
@@ -35,8 +57,9 @@ export const current = () => cur;
  * keeps all of that in the corner of your eye while still being unambiguous
  * about what has your attention, which is the whole trick Quick Look pulls.
  */
-export function open(item) {
+export function open(item, run = filtered) {
   if (!item) return;
+  walk = run;
   cur = item;
   real = { w: item.w ?? 0, h: item.h ?? 0 };
 
@@ -182,19 +205,24 @@ export function close() {
 }
 
 /**
- * Left and right walk the set the shelf is currently filtered down to, not
- * the whole archive, because the filter is the question you are asking and
- * arrowing out of it would answer a different one. The shelf cursor comes
- * along, so closing the preview leaves you standing on the frame you were
- * last looking at rather than back where you started.
+ * Left and right walk whatever the card was opened from, not the whole
+ * archive, because that run is the question you are asking and arrowing out
+ * of it would answer a different one.
+ *
+ * The shelf cursor only comes along when the shelf is what is being walked,
+ * so closing the preview leaves you standing on the frame you were last
+ * looking at rather than back where you started. Walking a tray leaves the
+ * shelf exactly where you left it: you are checking a pile you already made,
+ * and coming back to a grid that has moved underneath you, carrying a
+ * selection you did not make, is not what checking it should cost.
  */
 function step(dir) {
-  const list = filtered();
+  const list = walk();
   const at = list.findIndex((i) => i.id === cur.id);
   const next = list[at + dir];
   if (!next) return;
-  focus(next.id);
-  open(next);
+  if (walk === filtered) focus(next.id);
+  open(next, walk);
 }
 
 export function mountPreview() {

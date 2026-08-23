@@ -182,6 +182,44 @@ const announce = () => dispatchEvent(new CustomEvent("keeper:tray"));
 const cur = () => T.list.find((t) => t.id === T.active) ?? null;
 const remark = () => (mark = new Set(cur()?.ids ?? []));
 
+/**
+ * The tray as a run the preview can walk, in the order the panel draws it,
+ * and missing the frames the index has since lost for the same reason the
+ * panel does not draw those either.
+ */
+const run = () => (cur()?.ids ?? []).filter((id) => S.byId.has(id)).map((id) => S.byId.get(id));
+/* so the card, and through it the keyboard, can tell a pile from a wall */
+run.home = "tray";
+
+/**
+ * The shape every tray inverse takes: name the tray by id, say the edit, then
+ * re read the whole document.
+ *
+ * By id and not by `cur()`, because an undo can land after the active tray
+ * has been switched, and putting a frame back into whichever pile happens to
+ * be showing is worse than not putting it back at all. The re read is one
+ * request and it cannot be half right, which is the same reason `pick` uses
+ * it after a create.
+ */
+async function edit(id, patch) {
+  await ask("/api/trays", { id, ...patch }, "PATCH");
+  await refresh();
+  renderShelf();
+}
+
+/**
+ * Put a tray's pile back to exactly a list, in exactly that order.
+ *
+ * `add` on its own appends, and it refuses a frame the tray already holds,
+ * so it can restore a set but not an arrangement: undoing the removal of a
+ * frame from the middle of a pile would put it back on the end. A tray is
+ * the order you pulled the frames in and the export walks it in that order,
+ * so the end is the wrong place. Clearing first costs the same one request
+ * and makes both directions of every tray step the same operation: here is
+ * the pile, be this.
+ */
+const setIds = (trayId, ids) => edit(trayId, { clear: true, add: ids });
+
 /** the shelf asks this to decide whether a frame wears the intray mark */
 export function inTray(id) {
   return mark.has(id);
@@ -674,7 +712,7 @@ function tile(id) {
      same preview a frame in the shelf does. It is the only way to answer
      "was that the sharp one" without going back to hunt for it in the grid. */
   fig.title = frame.path.split("/").pop();
-  fig.onclick = () => openPreview(frame);
+  fig.onclick = () => openPreview(frame, run);
   return fig;
 }
 
