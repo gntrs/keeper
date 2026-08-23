@@ -1,5 +1,6 @@
 import { S, post, tally, reveal, typed } from "/app.js";
 import { open, previewOpen, current, close as shut, walkHome } from "/preview.js";
+import { did, didFinal } from "/undo.js";
 import { MIME, inTray, addMany as trayAddMany, toggle as trayToggle } from "/tray.js";
 
 import { fresh, hit as thump, leave, nope } from "/motion.js";
@@ -1369,6 +1370,7 @@ async function bin(ids) {
      anything happened except a number changing in the far corner. */
   feel("thud");
   leave(going, () => { renderShelf(); tally(); });
+  did(`setting aside ${many(ids.length)}`, () => unbin(ids), () => bin(ids));
   sayBin(`${many(ids.length)} set aside. nothing was deleted.`);
   setTimeout(() => sayBin(), 6000);
 }
@@ -1380,6 +1382,7 @@ async function unbin(ids) {
   for (const id of ids) { S.binned.delete(id); sel.delete(id); }
   feel("tap");
   leave(going, () => { renderShelf(); tally(); });
+  did(`putting back ${many(ids.length)}`, () => bin(ids), () => unbin(ids));
   sayBin(`${many(ids.length)} back on the shelf.`);
   setTimeout(() => sayBin(), 6000);
 }
@@ -1428,6 +1431,17 @@ async function nuke(ids) {
   for (const id of gone) { sel.delete(id); S.binned.delete(id); }
   feel("thud");
   leave(going, () => { renderShelf(); tally(); });
+  /**
+   * The one wall in the stack.
+   *
+   * The file has left the archive and keeper cannot fetch it back: the whole
+   * point of going through finder is that finder holds the Put Back record,
+   * and finder is where it is undone. So cmd z stops here and says that,
+   * rather than stepping over it and quietly taking back the tag you made
+   * before it, which would look exactly like the delete having been undone.
+   */
+  didFinal(`deleting ${many(ids.length)}`,
+    "that one is in the macos trash. put it back from finder, not from here.");
   sayBin(`${many(ids.length)} in the macos trash. finder can put them back.`);
   setTimeout(() => sayBin(), 6000);
 }
@@ -1547,18 +1561,48 @@ async function collect() {
    and neither of them repaints: on the shelf the repaint is step()'s, one
    frame later, and doing it here as well would paint the whole grid twice
    for every keystroke of a run that is a keystroke every half second. */
+/**
+ * Put a set of tag rows back exactly as they were, for the undo of anything
+ * that wrote one. `[id, tag, star]` each, and an empty string is what the
+ * server reads as untagged, so a frame that had no tag before gets none back
+ * rather than keeping whatever it was given.
+ */
+async function restoreTags(rows) {
+  for (const [id, tag, star] of rows) {
+    S.tags[id] = { ...S.tags[id], tag: tag || undefined, star };
+  }
+  renderShelf();
+  tally();
+  await Promise.all(rows.map(([id, tag, star]) =>
+    post("/api/tag", { id, tag: tag ?? "", star })));
+}
+
+/** what a set of frames is wearing right now, in the shape restoreTags reads */
+const tagRows = (ids) =>
+  ids.map((id) => [id, S.tags[id]?.tag, S.tags[id]?.star ? 1 : 0]);
+
+const someFrames = (n) => `${n} ${n === 1 ? "frame" : "frames"}`;
+
 async function flip(item) {
+  const was = tagRows([item.id]);
   const star = S.tags[item.id]?.star ? 0 : 1;
   S.tags[item.id] = { ...S.tags[item.id], star };
+  const now = tagRows([item.id]);
   struck = [item.id];
   feel("tap");
+  did(star ? "keeping a frame" : "letting a frame go",
+      () => restoreTags(was), () => restoreTags(now));
   await post("/api/tag", { id: item.id, star });
 }
 
 async function mark(item, code) {
+  const was = tagRows([item.id]);
   S.tags[item.id] = { ...S.tags[item.id], tag: code };
+  const now = tagRows([item.id]);
   struck = [item.id];
   feel("tick");
+  did(`tagging a frame ${S.vocab[code]?.[0] ?? code}`,
+      () => restoreTags(was), () => restoreTags(now));
   await post("/api/tag", { id: item.id, tag: code });
 }
 
@@ -1570,11 +1614,14 @@ async function mark(item, code) {
  * built around is a keystroke every half second.
  */
 async function markAll(ids, code) {
+  const was = tagRows(ids);
   for (const id of ids) S.tags[id] = { ...S.tags[id], tag: code };
   struck = ids;
   feel("tick");
   renderShelf();
   tally();
+  did(`tagging ${someFrames(ids.length)} ${S.vocab[code]?.[0] ?? code}`,
+      () => restoreTags(was), () => restoreTags(tagRows(ids)));
   await Promise.all(ids.map((id) => post("/api/tag", { id, tag: code })));
 }
 
@@ -1585,12 +1632,15 @@ async function markAll(ids, code) {
  * is let go, so the key still undoes itself.
  */
 async function keepAll(ids) {
+  const was = tagRows(ids);
   const star = ids.some((id) => !S.tags[id]?.star) ? 1 : 0;
   for (const id of ids) S.tags[id] = { ...S.tags[id], star };
   struck = ids;
   feel("tap");
   renderShelf();
   tally();
+  did(`${star ? "keeping" : "letting go"} ${someFrames(ids.length)}`,
+      () => restoreTags(was), () => restoreTags(tagRows(ids)));
   await Promise.all(ids.map((id) => post("/api/tag", { id, star })));
 }
 

@@ -4,6 +4,7 @@ import { CENTERED, clamp, coverWidth, isAtCover, resolve, toObjectPosition } fro
 
 import { nope } from "/motion.js";
 import { feel } from "/feel.js";
+import { did } from "/undo.js";
 
 const $ = (s) => document.querySelector(s);
 const els = new Map();          // slotId -> { root, box, img, empty, nums }
@@ -338,10 +339,39 @@ function strip() {
   }));
 }
 
+/**
+ * Put one slot back to exactly what it held, including holding nothing.
+ *
+ * The empty case is a delete rather than a write of null, because that is
+ * what the route has and because a slot with a null in it is a different
+ * thing from a slot with nothing in it the next time this file reads one.
+ */
+async function restoreSlot(slotId, was) {
+  if (was) {
+    S.placements[slotId] = was;
+    await post("/api/place", { slot: slotId, id: was.id, place: was.place });
+  } else {
+    delete S.placements[slotId];
+    await post(`/api/place?slot=${encodeURIComponent(slotId)}`, null, "DELETE");
+  }
+  /* The crop write is on a timer, so an undo arriving inside that window
+     would be followed a fifth of a second later by the very write it just
+     took back, landing on the server after the restore and silently undoing
+     the undo. Whatever was queued for this slot describes a crop that no
+     longer exists, so it is dropped rather than raced. */
+  clearTimeout(saveTimer[slotId]);
+  paint(slotId);
+  tally();
+}
+
 /** the slot is always named. there is no path that fills whichever one is on. */
 async function assign(item, slotId) {
-  S.placements[slotId] = { id: item.id, place: { ...CENTERED } };
+  const was = S.placements[slotId];
+  const now = { id: item.id, place: { ...CENTERED } };
+  S.placements[slotId] = now;
   setActive(slotId);
+  did(`placing a frame in ${slotId}`,
+      () => restoreSlot(slotId, was), () => restoreSlot(slotId, now));
   await post("/api/place", { slot: slotId, id: item.id, place: CENTERED });
   paint(slotId);
   tally();
@@ -706,7 +736,12 @@ function onKey(e) {
     0: { cx: 0.5, cy: 0.5, cw: max },
   };
   if (e.key === "Backspace" || e.key === "Delete") {
+    const was = S.placements[active];
     delete S.placements[active];
+    if (was) {
+      did(`emptying ${active}`,
+          () => restoreSlot(active, was), () => restoreSlot(active, null));
+    }
     post(`/api/place?slot=${encodeURIComponent(active)}`, null, "DELETE");
     paint(active); tally();
     return e.preventDefault();
@@ -721,7 +756,15 @@ function set(slotId, raw) {
   const c = ctx(slotId);
   if (!c) return;
   const place = clamp(raw, c.item.w, c.item.h, c.aspect);
-  S.placements[slotId] = { ...c.p, place };
+  /* One run of arrows is one thing you did, so the whole burst folds into a
+     single step keyed on the slot, and the closure it keeps is the one made
+     by the first press: the crop as it stood before the nudging started. A
+     step per keypress would mean forty presses of cmd z to get back to a
+     crop you could see two seconds ago. */
+  const next = { ...c.p, place };
+  did(`nudging the crop in ${slotId}`,
+      () => restoreSlot(slotId, c.p), () => restoreSlot(slotId, next), `crop:${slotId}`);
+  S.placements[slotId] = next;
   paint(slotId);
   clearTimeout(saveTimer[slotId]);
   saveTimer[slotId] = setTimeout(

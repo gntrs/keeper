@@ -8,6 +8,7 @@ import { mountPreview, previewOpen } from "/preview.js";
 import "/drop.js";
 import { viewIn } from "/motion.js";
 import { feel, mountFeel } from "/feel.js";
+import { mountUndo } from "/undo.js";
 
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
@@ -248,6 +249,7 @@ if (S.items.length) {
 mountBench();
 mountPreview();
 mountFeel();
+mountUndo();
 await mountTray();
 tally();
 setView(location.hash.slice(1) || "shelf");

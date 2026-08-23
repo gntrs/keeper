@@ -8,6 +8,7 @@ import { open as openPreview } from "/preview.js";
 import "/dragout.js";
 
 import { flyToTray, leave, nope } from "/motion.js";
+import { did } from "/undo.js";
 import { feel } from "/feel.js";
 
 const $ = (s) => document.querySelector(s);
@@ -256,6 +257,7 @@ export async function toggle(id) {
   const t = cur();
   if (!t) return;
   const had = mark.has(id);
+  const was = [...t.ids];
 
   /* The first frame anyone puts in a tray opens the panel, because a picture
      that vanishes into a shut drawer reads as a picture that did nothing.
@@ -274,9 +276,13 @@ export async function toggle(id) {
   feel(had ? "tick" : "tap");
 
   t.ids = had ? t.ids.filter((x) => x !== id) : [...t.ids, id];
+  const now = [...t.ids];
   remark();
   paint();
   renderShelf();
+
+  did(had ? "taking a frame out of the tray" : "putting a frame in the tray",
+      () => setIds(t.id, was), () => setIds(t.id, now));
 
   await ask("/api/trays", { id: t.id, [had ? "remove" : "add"]: [id] }, "PATCH");
 }
@@ -312,7 +318,9 @@ export async function addMany(ids) {
   const fresh = ids.filter((id) => !mark.has(id));
   if (!fresh.length) return;
 
+  const was = [...t.ids];
   t.ids = [...t.ids, ...fresh];
+  const now = [...t.ids];
   remark();
   paint();
   renderShelf();
@@ -320,6 +328,12 @@ export async function addMany(ids) {
   /* one sound for the whole drop. forty frames landing is one act, and forty
      clicks in a tenth of a second is a noise rather than an answer. */
   feel("thud");
+
+  /* only the ones that actually went in. taking back a drop of forty onto a
+     tray that already held ten of them must not remove those ten, which is
+     what naming the whole pile before and after says without having to. */
+  did(`adding ${fresh.length} to the tray`,
+      () => setIds(t.id, was), () => setIds(t.id, now));
 
   await ask("/api/trays", { id: t.id, add: fresh }, "PATCH");
 }
@@ -361,10 +375,16 @@ async function wipe() {
   if (!armed) { feel("tick"); return arm(); }
   disarm();
   feel("thud");
+  /* captured before the array is thrown away, and in order, because a tray
+     is the pile in the order you pulled it and putting it back shuffled
+     would not be putting it back. */
+  const was = [...t.ids];
   t.ids = [];
   remark();
   paint();
   renderShelf();
+  did(`emptying the tray of ${was.length}`,
+      () => setIds(t.id, was), () => setIds(t.id, []));
   await ask("/api/trays", { id: t.id, clear: true }, "PATCH");
 }
 
@@ -439,6 +459,28 @@ async function pick(value) {
      tray, which this one does, means the whole document has moved and not
      just one row of it. One read costs nothing and cannot be half right. */
   await refresh();
+
+  /* A tray made by mistake is taken back by deleting it, and it is safe to
+     do that blind only because it is one press away from being made: nothing
+     can have gone into it yet at the moment it is created, and if something
+     has by the time cmd z arrives, the delete says how many it cleared. */
+  const born = made.tray?.id;
+  if (born) {
+    did(`making the tray ${made.tray.name}`,
+      async () => {
+        await ask(`/api/trays?id=${encodeURIComponent(born)}`, null, "DELETE");
+        await refresh();
+        renderShelf();
+      },
+      /* made again by name and not by id, because the id is the server's to
+         mint. it comes back the same one in practice, since the slug it is
+         built from is free again the moment the delete goes through. */
+      async () => {
+        await ask("/api/trays", { name: made.tray.name });
+        await refresh();
+        renderShelf();
+      });
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -514,7 +556,12 @@ async function setMode(mode) {
   const t = cur();
   $("#tray-mode-note").textContent = meansOf(mode);
   if (!t) return;
+  const was = t.mode;
   t.mode = mode;
+  if (was && was !== mode) {
+    did(`the tray exporting as ${mode}`,
+        () => edit(t.id, { mode: was }), () => edit(t.id, { mode }));
+  }
   await ask("/api/trays", { id: t.id, mode }, "PATCH");
 }
 

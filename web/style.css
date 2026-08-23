@@ -1076,6 +1076,21 @@ body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
 #bin-bar #f-nuke { color: var(--hot); border-color: #e1062c4d; }
 #bin-bar #f-nuke:hover { background: #e1062c1f; }
 
+/* What cmd z just did. Bottom left, out of the way of the bin's bar, which
+   it steps above when that is up. Mono, because it is a report rather than a
+   control and nothing in it is meant to be clicked. */
+#undo-say {
+  position: fixed; left: var(--s5); bottom: var(--s5); z-index: 7;
+  margin: 0; padding: var(--s2) var(--s4);
+  background: var(--raise); border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  font: 500 .85rem/1.2 var(--mono); color: var(--ink-2);
+  box-shadow: 0 10px 28px #0000008a;
+  pointer-events: none;
+}
+#undo-say[hidden] { display: none; }
+body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
+
 /* the drop state. the accent, one hairline in from the edge, so the panel
    lights up without the layout moving by a pixel. */
 #tray[data-over] { background: #17171a; }
