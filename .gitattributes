@@ -1,0 +1,13 @@
+# One line ending everywhere, decided here rather than per clone.
+#
+# git's own default is to convert on checkout when core.autocrlf is on, which
+# is the usual setting on windows. Without this the first commit made from a
+# windows machine rewrites every line of every file it touches, and the diff
+# that should have been four lines is four thousand.
+* text=auto eol=lf
+
+# Binary, so git never looks inside them for lines to convert.
+*.jpg binary
+*.png binary
+*.gif binary
+*.woff2 binary
