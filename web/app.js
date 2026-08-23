@@ -210,9 +210,9 @@ S.byId = new Map(S.items.map((i) => [i.id, i]));
    
    Wrapped in a left to right embedding. The path is truncated from its left
    end, which css does by setting the box to rtl, and rtl then moves the
-   leading slash of `/Volumes/...` around to the far end: the button read
-   `Volumes/Crucial X9 Pro For Mac/` and the root slash had quietly walked to
-   the back. U+202A holds the string itself ltr inside an rtl box. */
+   leading slash of an absolute path around to the far end: `/Volumes/disk/`
+   rendered as `Volumes/disk/` with the root slash quietly walked to the
+   back. U+202A holds the string itself ltr inside an rtl box. */
 $("#root").dataset.path = `\u202A${S.root}\u202C`;
 if (!S.slots.length) document.querySelector('[data-view="bench"]').title =
   "no keeper.config.json, so there are no slots yet";

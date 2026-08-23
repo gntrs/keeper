@@ -424,8 +424,8 @@ function buildExport() {
   /* Where a crop lands, said before one exists. It is the only thing about
      this button nobody can guess, and the answer used to arrive in the
      sentence after the files were already written. Home is a tilde because
-     the whole point is that a person reads it, and /Users/gince is eleven
-     characters of nothing. */
+     the whole point is that a person reads it, and the full path to a home
+     directory is a dozen characters of nothing. */
   $("#bench-out").textContent = S.out ? `into ${nice(S.out)}` : "";
 }
 
