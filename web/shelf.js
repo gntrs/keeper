@@ -337,10 +337,27 @@ function mountSize() {
   addEventListener("resize", () => sayColumns());
 }
 
+/**
+ * How much smaller a frame is in the tray than on the wall.
+ *
+ * 96 over the slider's 208 default, so a tray nobody has touched the slider
+ * for looks exactly as it always did, and the two move together from there.
+ * The floor keeps the remove button on a thumbnail rather than over it, and
+ * the ceiling keeps a panel at its narrowest from falling to one column.
+ */
+const TRAY_RATIO = 0.46, TRAY_MIN = 72, TRAY_MAX = 176;
+
 function applySize(save) {
   const slider = $("#f-size");
   const px = Number(slider.value);
   $("#grid")?.style.setProperty("--tile", `${px}px`);
+  /* On the root, not on the panel, because that is the channel the tray
+     already uses in the other direction with --tray-w: one number moves and
+     everything reading it follows, and neither module has to import the
+     other to say so. It is set even when the panel is shut, so opening it
+     is not a repaint at the wrong size. */
+  const t = Math.max(TRAY_MIN, Math.min(Math.round(px * TRAY_RATIO), TRAY_MAX));
+  document.documentElement.style.setProperty("--tray-tile", `${t}px`);
   /* a track cannot know where its own thumb is, so the filled half is a
      gradient stop handed to it. the half thumb width keeps the paint under
      the middle of the knob rather than under its leading edge. */

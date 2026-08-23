@@ -959,10 +959,15 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
 #tray-clear:hover { color: var(--hot); }
 #tray-clear[disabled] { color: #ffffff26; cursor: default; }
 
+/* The pile is read at whatever size the wall is read at. The shelf's size
+   slider writes --tray-tile alongside its own --tile, so one control moves
+   both and the panel stops being the one place on screen where a thumbnail
+   is always 96px whatever you asked for. The fallback is that old 96, so a
+   panel painted before the slider has run still looks like itself. */
 #tray-grid {
   flex: 1; min-height: 0; overflow-y: auto; overflow-x: clip;
   display: grid; align-content: start; gap: var(--s1);
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--tray-tile, 96px), 1fr));
   padding: var(--s3) var(--s4) var(--s6);
 }
 /* an empty tray says what to do with it once, quietly. the sentence comes
