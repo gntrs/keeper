@@ -62,6 +62,19 @@ function range(id) {
 /** true when anything is picked, which is the only thing most callers ask */
 const picked = () => sel.size > 0;
 
+/**
+ * The one frame and nothing else, which is what every way of opening a frame
+ * means by it. A click said this in three lines of its own once, and then
+ * space and return opened a card without saying it at all, so the comfiest
+ * path through the shelf, hover to the frame and hit space, was the one path
+ * that left the selection standing somewhere else.
+ */
+function pickOne(id) {
+  sel.clear();
+  sel.add(id);
+  anchor = id;
+}
+
 function drop() {
   if (!sel.size) return false;
   sel.clear();
@@ -699,6 +712,10 @@ export function focus(id) {
   const at = visible.findIndex((i) => i.id === id);
   if (at < 0) return;
   cursor = at;
+  /* The preview is the only caller, and it calls on every arrow. The pick
+     comes with it or arrowing once off the frame space just picked would
+     leave the selection on a photograph that is no longer on screen. */
+  pickOne(id);
   renderShelf();
   $("#grid").children[cursor]?.scrollIntoView({ block: "nearest" });
 }
@@ -923,9 +940,7 @@ function tile(item, n) {
          click had nothing left to do but the thing you meant by it. It also
          picks the frame, so that whatever you do next is about the one you
          are looking at. */
-      sel.clear();
-      sel.add(item.id);
-      anchor = item.id;
+      pickOne(item.id);
       cursor = n;
       renderShelf();
       return open(item);
@@ -1088,8 +1103,20 @@ async function onKey(e) {
 
   const item = visible[cursor];
   /* Both open the card. Space because that is quick look, return because
-     that is what return does to a selected file in finder. */
-  if (e.key === "Enter" || e.key === " ") { open(item); return e.preventDefault(); }
+     that is what return does to a selected file in finder.
+
+     Both pick it too, the same way a click does. Hover puts the cursor on a
+     frame and space looks at it, and that pair is the most comfortable thing
+     in the app, comfortable enough that it gets used instead of clicking and
+     the selection is then quietly a frame behind. Opening a frame is how a
+     decision about it gets made, so the frame you are looking at is the
+     frame the next keystroke is about. */
+  if (e.key === "Enter" || e.key === " ") {
+    pickOne(item.id);
+    renderShelf();
+    open(item);
+    return e.preventDefault();
+  }
 
   if (e.key === "k" || e.key === "K") {
     if (picked()) { await keepAll([...sel]); return e.preventDefault(); }
