@@ -97,6 +97,20 @@
   </div>
   <div id="grid"></div>
   <p id="none" hidden>nothing matches that.</p>
+  <!--
+    The bin's own bar, and it is empty on purpose.
+
+    `put back` and `delete off the drive` are not written here. They are the
+    same two buttons that sit in the filter row on the shelf, moved into this
+    bar when you enter the bin and moved back when you leave. One element
+    each, so there is one set of handlers, one label that already knows how
+    to say `put back` in here and `set aside` out there, and no second copy
+    of the arming logic that guards the one control that touches a file.
+  -->
+  <div id="bin-bar" hidden>
+    <span id="bin-n" class="num"></span>
+  </div>
+  <!--
 </section>
 
 <section id="bench" class="view" hidden>

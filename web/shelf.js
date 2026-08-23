@@ -501,11 +501,26 @@ function mountSweep() {
        system while the button is down. */
     const held = e.metaKey || e.shiftKey || e.altKey;
     const onFrame = Boolean(e.target.closest("figure"));
-    if (onFrame && !held) return;
+    /**
+     * In the bin a bare press on a photograph sweeps, and this is the only
+     * place in the app where that is true.
+     *
+     * The modifier rule exists because a press on a frame is worth more to
+     * the drag than to the sweep: dragging frames to the tray and the bench
+     * is how they get there. In the bin nothing is going anywhere. It is a
+     * pile you are deciding about as a pile, the two things you can do to it
+     * both take a set, and there is nothing on the far end of a drag out of
+     * it. So the press goes to the sweep, and the gesture people already
+     * tried first is the one that works.
+     */
+    if (onFrame && !held && !F.binned) return;
     stop();
     from = spot(e);
     base = held ? new Set(sel) : new Set();
-    held4drag = held && onFrame;
+    /* a bare sweep in the bin still has to call off the native drag, or the
+       first pixel of the gesture hands the frame to the drag machine and the
+       rectangle never appears. */
+    held4drag = onFrame && (held || F.binned);
     live = false;
   });
 
@@ -1445,6 +1460,50 @@ function sayBin(text) {
       : "delete off the drive";
     bigAsk(big ? n : 0);
   }
+  /* last, because it moves the two elements the lines above just wrote to */
+  binBar();
+}
+
+/**
+ * Where the bin's two controls are standing right now.
+ *
+ * They are one pair of buttons, not two, and they move. On the shelf they
+ * are a chip in the filter row, because out there `set aside` is one more
+ * thing you can do to a frame among a row of things. In the bin they are the
+ * only two things there are to do, so they come down to a bar across the
+ * bottom, next to the photographs and under the hand, and they take an icon
+ * each on the way.
+ *
+ * Moving the element rather than drawing a second one is the whole point:
+ * every handler, every id lookup, the label that already knows to read `put
+ * back` in here, and the two press arming on delete all carry across
+ * untouched, because it is the same button in a different parent.
+ */
+let binHome = null;
+
+function binBar() {
+  const bar = $("#bin-bar"), back = $("#f-bin"), kill = $("#f-nuke");
+  if (!bar || !back || !kill) return;
+  /* where they live on the shelf, read once, before anything has moved */
+  binHome ??= { parent: back.parentNode, before: kill.nextSibling };
+
+  if (F.binned) {
+    if (back.parentNode !== bar) bar.append(back, kill);
+    /* the icon rule in icons.css is the attribute and a --ph, nothing else */
+    back.dataset.icon = "";
+    kill.dataset.icon = "";
+  } else if (back.parentNode === bar) {
+    binHome.parent.insertBefore(back, binHome.before);
+    binHome.parent.insertBefore(kill, binHome.before);
+    delete back.dataset.icon;
+    delete kill.dataset.icon;
+  }
+
+  /* The bar is for a set. One frame under the cursor is still backspace, the
+     way it is everywhere else in this app. */
+  const n = sel.size;
+  $("#bin-n").textContent = n ? `${many(n)} selected` : "";
+  bar.hidden = !F.binned || !n;
 }
 
 /** the full stop in the middle of the screen, and only for a real pile */

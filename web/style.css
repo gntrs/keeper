@@ -1042,6 +1042,40 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
 .tray-remove[data-armed] { opacity: 1; }
 .tray-remove[data-armed]::before { display: none; }
 
+/* ---------------------------------------------------------------------
+   The bin's bar.
+
+   Fixed to the bottom rather than sitting at the end of the pile, because
+   the pile scrolls and the two decisions about it must not scroll away with
+   it. It steps aside for the tray the same way everything else does, off the
+   one --tray-w number, and the grid grows a bottom padding while it is up so
+   the last row of photographs is never underneath it.
+   --------------------------------------------------------------------- */
+#bin-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3) var(--s5);
+  background: var(--raise);
+  border-top: 1px solid var(--line-strong);
+  box-shadow: 0 -14px 34px #0000007a;
+}
+#bin-bar[hidden] { display: none; }
+body:has(#tray:not([hidden])) #bin-bar { right: var(--tray-w); }
+body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
+
+/* the count is a number, so it is set in the mono cut like every other
+   number in this app, and it pushes the two buttons to the far end. */
+#bin-n { margin-right: auto; font-family: var(--mono); color: var(--ink-2); }
+
+/* An icon each, and both keep their words. Delete keeps its whole sentence:
+   it is the one control in keeper that touches an original file, and the
+   argument in icons.css for spelling that out has not changed just because
+   the button moved to the bottom of the window. */
+#bin-bar #f-bin::before { --ph: var(--ph-undo); }
+#bin-bar #f-nuke::before { --ph: var(--ph-trash); }
+#bin-bar #f-nuke { color: var(--hot); border-color: #e1062c4d; }
+#bin-bar #f-nuke:hover { background: #e1062c1f; }
+
 /* the drop state. the accent, one hairline in from the edge, so the panel
    lights up without the layout moving by a pixel. */
 #tray[data-over] { background: #17171a; }
