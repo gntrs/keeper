@@ -1,5 +1,5 @@
 import { S, post, tally, reveal, typed } from "/app.js";
-import { open, previewOpen, current, close as shut } from "/preview.js";
+import { open, previewOpen, current, close as shut, walkHome } from "/preview.js";
 import { MIME, inTray, addMany as trayAddMany, toggle as trayToggle } from "/tray.js";
 
 import { fresh, hit as thump, leave, nope } from "/motion.js";
@@ -1000,7 +1000,21 @@ function tile(item, n) {
  * a repaint fires by itself when a new tile appears under a still pointer.
  */
 let byPointer = true;
-addEventListener("pointermove", () => { byPointer = true; }, { passive: true });
+/**
+ * Where the pointer actually is, kept because a hover flag written onto a
+ * tile cannot be trusted to survive that tile.
+ *
+ * The tray repaints itself whole on every add, every remove and every arrow,
+ * so a frame marked as hovered is replaced by a brand new element under a
+ * hand that has not moved, and no enter event fires for it. Asking the
+ * document what is under this point, at the moment the key is pressed, has
+ * no state to go stale.
+ */
+let point = { x: -1, y: -1 };
+addEventListener("pointermove", (e) => {
+  byPointer = true;
+  point = { x: e.clientX, y: e.clientY };
+}, { passive: true });
 
 /**
  * Moving the ring without rebuilding the grid.
@@ -1256,8 +1270,28 @@ let armedAt = 0;
    every other keystroke is harmless and repeats fast. */
 const MANY = 6;
 
+/** the frame the pointer is resting on in the tray, if it is resting on one */
+function overTray() {
+  if (point.x < 0) return null;
+  const el = document.elementFromPoint(point.x, point.y);
+  return el?.closest("#tray .tray-item")?.dataset.id ?? null;
+}
+
+/**
+ * The frame the tray owns the keyboard for, or null when it owns nothing.
+ *
+ * A card that is up wins, because it was opened on purpose, and it counts as
+ * the tray's only when the tray is what opened it. With no card up it is
+ * whatever the pointer is resting on in the panel.
+ */
+function trayContext() {
+  if (previewOpen()) return walkHome() === "tray" ? current()?.id ?? null : null;
+  return overTray();
+}
+
 /** what the bin would take right now: the selection, the frame the preview
-    is showing, or the one under the cursor, in that order */
+    is showing, or the one under the cursor, in that order. the tray is not
+    in this list, because a frame the tray owns never reaches it. */
 function binTargets() {
   if (picked()) return [...sel];
   const shown = previewOpen() ? current() : null;
@@ -1283,6 +1317,14 @@ function binTargets() {
  * something you cannot undo, and this is not that.
  */
 function binPress() {
+  /* In the tray the key means take it out of the pile. It is checked before
+     anything else because a frame in the tray is a frame you already decided
+     to keep, and setting that same frame aside is the opposite answer. */
+  const held = trayContext();
+  if (held) {
+    dispatchEvent(new CustomEvent("keeper:untray", { detail: { id: held } }));
+    return;
+  }
   const ids = binTargets();
   if (!ids.length) return;
   return F.binned ? unbin(ids) : bin(ids);

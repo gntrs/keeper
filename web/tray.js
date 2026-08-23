@@ -60,6 +60,23 @@ export async function mountTray() {
   buildMode();
   mountGrip();
 
+  /**
+   * Backspace, when the frame it means is a frame in here.
+   *
+   * In the tray that key means take it out of the pile, not set it aside on
+   * the shelf. Putting a frame in a tray and pressing backspace over it is
+   * one gesture undoing the other, and answering it by hiding the photograph
+   * from the wall instead is an answer to a question nobody asked.
+   *
+   * An event rather than an export because shelf.js is upstream of this file
+   * and importing back would make a cycle. It is the channel the bench
+   * already uses in the other direction.
+   */
+  addEventListener("keeper:untray", (e) => {
+    const id = e.detail?.id;
+    if (id && mark.has(id)) toggle(id);
+  });
+
   /* A drop target that only lights up for our own mime type. A dragover
      handler that preventDefaults everything would make the panel accept a
      file off the desktop, a link from another tab and a run of selected
