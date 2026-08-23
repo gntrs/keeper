@@ -114,6 +114,25 @@ const QUIET_EXT = new Set([".ini", ".lnk", ".tmp", ".part", ".download"]);
  * the empty string, and without this the commonest file on a mac drive lands
  * in a bucket called "(no extension)".
  */
+/**
+ * WHERE A FRAME SITS IN THE ARCHIVE, WRITTEN WITH FORWARD SLASHES ON EVERY
+ * MACHINE.
+ *
+ * This is not cosmetic and it is not about how the path looks in the shelf.
+ * A frame's id is a hash of this string, so the separator is part of the id:
+ * the same photograph on the same external drive would hash one way plugged
+ * into a mac and another way plugged into a windows machine, and every tag,
+ * star, tray and placement written on one would point at nothing on the
+ * other. One drive carried between two desks is the ordinary way a
+ * photographer works, so the two have to agree.
+ *
+ * Forward slashes are the right side of that argument to land on, because
+ * path.join and the whole node fs api accept them on windows, while nothing
+ * on a mac accepts a backslash. It also means the path a person reads in the
+ * shelf and types into the search box is the same string on both.
+ */
+const inside = (root, full) => path.relative(root, full).split(path.sep).join("/");
+
 const QUIET_NAMES = new Set([".ds_store", ".localized", "thumbs.db", "desktop.ini", "icon\r"]);
 
 /** skipped wherever they appear, at any depth */
@@ -177,12 +196,12 @@ export async function scan(root, { onProgress } = {}) {
           continue;
         }
         if (!s || s.size < 1024) continue; // a sub-1KB "image" is not one
-        out.push({ path: path.relative(root, full), bytes: s.size, kind });
+        out.push({ path: inside(root, full), bytes: s.size, kind });
         found += 1;
         if (++seen % 250 === 0) onProgress?.(seen);
       }
     }
-    if (!found && dir !== root) barren.push(path.relative(root, dir));
+    if (!found && dir !== root) barren.push(inside(root, dir));
     return found;
   }
 
