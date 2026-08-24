@@ -32,11 +32,22 @@ const CACHE = path.join(HERE, "cache");
 
 const NODE = "v24.19.0";
 
-/* On windows npm is npm.cmd, a batch file, and execFile without a shell can
-   only start a real executable. Spelling the extension out is what makes
-   this script runnable on the machine it builds for, and it is cheaper than
-   turning a shell on for one call. */
-const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
+/**
+ * npm, in the two different things it is on the two machines.
+ *
+ * On windows it is npm.cmd, a batch file, and node has refused to start one
+ * of those without a shell since it was made to: running a .cmd through the
+ * bare spawn was a command injection, so node closed it and the refusal
+ * comes back as the least helpful error in the set, `spawn EINVAL`.
+ *
+ * So the shell goes on, for this one call, on that one platform. Every
+ * argument below is a literal written in this file. Nothing a person typed
+ * and nothing off a network reaches it, which is the condition that makes
+ * turning a shell on fine here and would make it careless anywhere else.
+ */
+const NPM = process.platform === "win32"
+  ? { cmd: "npm.cmd", shell: true }
+  : { cmd: "npm", shell: false };
 const SHIP = ["bin", "src", "web", "package.json", "package-lock.json", "keeper.config.example.json"];
 
 const say = (s) => console.log(s);
@@ -111,8 +122,9 @@ async function main() {
   await cp(path.join(OUT, "keeper.ico"), path.join(folder, "keeper.ico"));
 
   say(`  installing dependencies for win32 ${arch}`);
-  await run(NPM, ["install", "--omit=dev", "--no-audit", "--no-fund", "--os=win32", `--cpu=${arch}`], {
+  await run(NPM.cmd, ["install", "--omit=dev", "--no-audit", "--no-fund", "--os=win32", `--cpu=${arch}`], {
     cwd: path.join(folder, "app"),
+    shell: NPM.shell,
   });
 
   /* Every text file windows will ever show in notepad gets crlf, because
