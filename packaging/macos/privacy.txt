@@ -1,0 +1,21 @@
+Heyo. you like privacy? we do too.
+
+so that's why it's local and private. no account, no key, no
+upload, no telemetry, no crash reports, no analytics. the server binds to
+127.0.0.1, which means it cannot be reached from another machine on your
+own wifi, never mind from anywhere else.
+
+keeper writes one folder, .keeper, next to your photographs. thumbnails,
+your tags, your crops. delete it and the archive is exactly as it was. no
+original is ever edited. one key can move a file, it asks first every time,
+and it goes through the trash so the machine can put it back.
+
+there is exactly one thing in here that can reach the network, and it is
+off. keeper can check github for a newer keeper, it asks you once before it
+ever does, and saying no means it never asks again and never makes the
+request. when you say yes it is one GET for one small file: no identifier,
+no archive, no counts, no cookie.
+
+you found this by turning on hidden files, which is a reasonable thing to
+do to something you just downloaded. all of the above is checkable: it is
+open source, apache 2.0, github.com/gntrs/keeper

@@ -129,11 +129,20 @@ async function main() {
   await run("codesign", ["--force", "--deep", "--sign", "-", app]);
 
   /* --- the disk image -------------------------------------------------- */
-  /* No background picture and no arranged icons, because arranging them
-     means driving the finder through applescript, and an app that needs
-     automation permission to BUILD is an app that fails to build on a fresh
-     machine for a reason nobody will guess. Two items and a plain window. */
+  /* The window has a picture behind it and its icons in known places, and
+     none of that is arranged here. A layout is a .DS_Store, the only thing
+     that writes one is the finder, and asking the finder means apple events
+     on a machine with a desktop and a permission somebody granted by hand.
+     A build that needs that fails on a release runner for a reason nobody
+     would guess. So it was made once by packaging/macos/layout.mjs, it is
+     committed, and this copies it in. */
   await run("ln", ["-s", "/Applications", path.join(stage, "Applications")]);
+  await mkdir(path.join(stage, ".background"), { recursive: true });
+  await cp(path.join(HERE, "macos", "dmg-background.png"), path.join(stage, ".background", "dmg-background.png"));
+  await cp(path.join(HERE, "macos", "dmg.DS_Store"), path.join(stage, ".DS_Store"));
+  /* for whoever turns hidden files on, which is a reasonable thing to do to
+     something you just downloaded */
+  await cp(path.join(HERE, "macos", "privacy.txt"), path.join(stage, ".privacy.txt"));
 
   const dmg = path.join(OUT, `keeper-${pkg.version}-macos-${arch}.dmg`);
   await rm(dmg, { force: true });
