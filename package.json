@@ -19,7 +19,8 @@
     "keeper": "node bin/keeper.mjs",
     "icons": "node packaging/icons.mjs",
     "dmg": "node packaging/build-mac.mjs",
-    "portable": "node packaging/build-windows.mjs"
+    "portable": "node packaging/build-windows.mjs",
+    "payload": "node packaging/payload.mjs"
   },
   "dependencies": {
     "sharp": "^0.34.5"

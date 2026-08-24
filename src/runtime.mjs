@@ -91,6 +91,22 @@ export async function lastArchive() {
 export const rememberArchive = (root) => reseat({ root });
 
 /**
+ * Whether keeper may ask github if there is a newer keeper.
+ *
+ * Three states and not two, because the third one is the honest one: until
+ * somebody has been asked, the answer is not no and it is certainly not yes.
+ * `ask` means no request has been made and none will be until the question
+ * on the page is answered. It is the default, and a fresh install therefore
+ * touches the network zero times.
+ */
+export async function updatePolicy() {
+  const said = (await seat()).updates;
+  return said === "on" || said === "off" ? said : "ask";
+}
+
+export const setUpdatePolicy = (yes) => reseat({ updates: yes ? "on" : "off" });
+
+/**
  * The first port from `from` upwards that this machine will actually let go
  * of. A fixed port is right for a command someone typed and wrong for an
  * icon someone clicked twice: the second click used to die on EADDRINUSE,
@@ -169,4 +185,32 @@ export async function forgetRun() {
  */
 export function forgetRunSync() {
   try { unlinkSync(RUN()); } catch { /* already gone, which is the goal */ }
+}
+
+/**
+ * A note the old keeper leaves for the new one during an update: come up,
+ * but do not open a browser, because there is already a tab open and it is
+ * watching this port and will reload itself the moment you answer.
+ *
+ * A file rather than a flag because of what sits in between the two
+ * processes. The new one is started through the platform's own launcher, a
+ * bundle on macos and a batch file on windows, and neither of those passes
+ * arguments through. A file is the one channel both of them cannot lose.
+ */
+const HUSH = () => path.join(appDir(), "hush");
+
+export async function hush() {
+  await mkdir(appDir(), { recursive: true });
+  await writeFile(HUSH(), "");
+}
+
+/** true once, and never twice: reading it is what clears it */
+export async function hushed() {
+  try {
+    await readFile(HUSH());
+  } catch {
+    return false;
+  }
+  await rm(HUSH(), { force: true }).catch(() => {});
+  return true;
 }

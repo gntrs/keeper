@@ -1107,6 +1107,48 @@ body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
   pointer-events: none;
 }
 #undo-say[hidden] { display: none; }
+
+/* ---------------------------------------------------------------------
+   the update notice. bottom right, opposite the undo report, so the two
+   can never sit on top of each other, and it steps up over the bin's bar
+   the same way that one does.
+
+   It is a card and not a bar across the window on purpose. It is the only
+   thing in keeper that is about keeper rather than about the photographs,
+   and it should be the size of that.
+   --------------------------------------------------------------------- */
+.up {
+  position: fixed; right: var(--s5); bottom: var(--s5); z-index: 7;
+  width: min(360px, calc(100vw - var(--s5) * 2));
+  padding: var(--s4);
+  background: var(--raise); border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  box-shadow: 0 14px 34px #0000008a;
+}
+.up[hidden] { display: none; }
+body:has(#bin-bar:not([hidden])) .up { bottom: 76px; }
+body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
+
+.up-kicker { margin: 0 0 var(--s2); }
+.up-line { margin: 0; font-size: .92rem; line-height: 1.5; color: var(--ink-2); }
+.up-acts { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+.up-acts[hidden] { display: none; }
+
+/* A chip in the filter row sits among other chips and reads as a control
+   because of them. Alone in a card it reads as a sentence, so both get an
+   edge, and the one that does the thing gets the accent. It is the same
+   treatment the bin's own two buttons have, for the same reason: two
+   choices, and only one of them is the answer. */
+.up-acts .chip { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.up-acts .chip:hover { color: var(--ink); background: #ffffff0f; }
+.up-acts .up-go {
+  color: #ff5d75;
+  background: #e1062c1c;
+  box-shadow: inset 0 0 0 1px #e1062c59;
+}
+.up-acts .up-go:hover { background: #e1062c2e; color: #ff8e9f; }
+body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
+
 /* the drop state. the accent, one hairline in from the edge, so the panel
    lights up without the layout moving by a pixel. */
 #tray[data-over] { background: #17171a; }

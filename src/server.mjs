@@ -17,7 +17,7 @@ import { HOSTS, host as machine } from "./os/index.mjs";
 import { readableSource } from "./raw.mjs";
 import { clock } from "./film.mjs";
 import { loadConfig } from "./config.mjs";
-import { rememberArchive } from "./runtime.mjs";
+import { rememberArchive, setUpdatePolicy, updatePolicy } from "./runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "..", "web");
@@ -152,7 +152,7 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
     const route = url.pathname;
 
     try {
-      if (["/api/open", "/api/locate", "/api/choose", "/api/export", "/api/quit"].includes(route) && !ownOrigin(req)) {
+      if (["/api/open", "/api/locate", "/api/choose", "/api/export", "/api/quit", "/api/update/allow", "/api/update/apply"].includes(route) && !ownOrigin(req)) {
         return json(res, 403, { error: "that request came from another page" });
       }
 
@@ -330,6 +330,64 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
        */
       if (route === "/api/ping") {
         return json(res, 200, { keeper: true, pid: process.pid, root, launched });
+      }
+
+      /**
+       * Is there a newer keeper, and may we even ask.
+       *
+       * The permission is checked before the request rather than after, so
+       * a keeper nobody has said yes to answers this without a single packet
+       * leaving the machine. That ordering is the whole promise.
+       */
+      if (route === "/api/update" && req.method === "GET") {
+        const { check, isClone, version } = await import("./update.mjs");
+        const policy = await updatePolicy();
+        if (policy !== "on") {
+          return json(res, 200, { policy, current: await version(), clone: isClone() });
+        }
+        return json(res, 200, { policy, ...(await check()) });
+      }
+
+      /* the answer to the question the page asks once */
+      if (route === "/api/update/allow" && req.method === "POST") {
+        const b = await body(req).catch(() => ({}));
+        await setUpdatePolicy(!!b?.yes);
+        return json(res, 200, { ok: true, policy: (await updatePolicy()) });
+      }
+
+      /**
+       * Install it and start the new one.
+       *
+       * The reply goes first for the same reason quit's does: everything
+       * after it kills the process this socket belongs to. If the swap
+       * throws, nothing has changed on disk and the error is the reply.
+       */
+      if (route === "/api/update/apply" && req.method === "POST") {
+        if ((await updatePolicy()) !== "on") return json(res, 403, { error: "updates are turned off" });
+        const { apply, relaunch } = await import("./update.mjs");
+        let done;
+        try {
+          done = await apply();
+        } catch (e) {
+          return json(res, 409, { error: e.message });
+        }
+        const restarts = launched === "app";
+        json(res, 200, { ok: true, ...done, restarts });
+        if (restarts) {
+          /* Close first, then start the new one. The other order looks
+             identical and is not: the new process would try to bind while
+             this one still held the port, land on the next port up, and the
+             tab waiting on this one would wait for ever. Keep alive sockets
+             have to be dropped by hand or close waits on the browser. */
+          setTimeout(() => {
+            server.closeAllConnections?.();
+            server.close(async () => {
+              await relaunch().catch(() => {});
+              process.exit(0);
+            });
+          }, 200);
+        }
+        return;
       }
 
       /**

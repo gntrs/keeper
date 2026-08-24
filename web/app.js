@@ -11,6 +11,7 @@ import { feel, mountFeel } from "/feel.js";
 import { paintKeys, pick as chord } from "/host.js";
 import { mountUndo } from "/undo.js";
 import { mountQuit } from "/quit.js";
+import { mountUpdate } from "/update.js";
 
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
@@ -259,5 +260,6 @@ await mountTray();
 /* after the state, because whether there is a quit at all is something
    only the server knows. */
 mountQuit();
+mountUpdate();
 tally();
 setView(location.hash.slice(1) || "shelf");

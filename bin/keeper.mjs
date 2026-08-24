@@ -14,7 +14,7 @@ import { serve } from "../src/server.mjs";
 import { readTrays, trayById, exportTray, MODES } from "../src/trays.mjs";
 import { startOpen } from "../src/open.mjs";
 import {
-  appDir, blankRoot, claimRun, forgetRunSync, freePort, lastArchive, rememberArchive, running,
+  appDir, blankRoot, claimRun, forgetRunSync, freePort, hushed, lastArchive, rememberArchive, running,
 } from "../src/runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -311,7 +311,10 @@ async function main() {
     process.on("exit", forgetRunSync);
     for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));
 
-    if (!flags["no-open"]) await openIn(url);
+    /* An update restarts keeper with a tab already open and watching, and
+       that tab reloads itself. Opening a second one would leave two pages
+       against one server, one of them stale. */
+    if (!flags["no-open"] && !(await hushed())) await openIn(url);
     say(`  ${hot(url)}`);
     say(dim(`  state in ${nice(appDir())}`));
 
