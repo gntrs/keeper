@@ -57,7 +57,11 @@ async function node(arch) {
 
   const file = path.join(CACHE, zip);
   await writeFile(file, bytes);
-  await run("unzip", ["-q", "-o", file, "-d", CACHE]);
+  /* tar and not unzip, because this script has to run on windows too and
+     windows has no unzip. it does have tar: bsdtar has shipped in the box
+     since windows 10 and it reads a zip as readily as it reads a tar, which
+     is the only reason one command can serve both machines here. */
+  await run("tar", ["-xf", file, "-C", CACHE]);
   await rm(file, { force: true });
   return path.dirname(kept);
 }
@@ -118,7 +122,11 @@ async function main() {
 
   const zip = path.join(OUT, `keeper-${pkg.version}-windows-${arch}.zip`);
   await rm(zip, { force: true });
-  await run("zip", ["-r", "-q", "-X", zip, "keeper"], { cwd: stage });
+  /* and the same tar writing a zip, for the same reason: windows has no zip
+     command either. `--format zip` is libarchive's, it deflates by default,
+     and what comes out is an ordinary zip that windows explorer opens by
+     double click with nothing installed. */
+  await run("tar", ["-c", "-f", zip, "--format", "zip", "keeper"], { cwd: stage });
 
   const bytes = await readFile(zip);
   const sum = createHash("sha256").update(bytes).digest("hex");

@@ -81,17 +81,25 @@ async function main() {
   const winSvg = await readFile(win);
 
   /* --- macos ---------------------------------------------------------- */
-  const set = path.join(OUT, "keeper.iconset");
-  await mkdir(set, { recursive: true });
-  for (const size of MAC) {
-    const buf = await png(macSvg, size);
-    await writeFile(path.join(set, `icon_${size}x${size}.png`), buf);
-    /* the retina name for the size below it, which is the same file. an
-       iconset missing its @2x entries builds, and then looks soft on every
-       display made in the last decade. */
-    if (MAC.includes(size / 2)) await writeFile(path.join(set, `icon_${size / 2}x${size / 2}@2x.png`), buf);
+  /* An icns is made by iconutil, which ships with macos and exists nowhere
+     else, so this half is skipped rather than attempted on a pc. It used to
+     be attempted: the windows job in the release workflow calls this script
+     for the ico and died on `spawn iconutil ENOENT` before it had drawn a
+     single icon. Nothing on windows wants an icns anyway. */
+  const onMac = process.platform === "darwin";
+  if (onMac) {
+    const set = path.join(OUT, "keeper.iconset");
+    await mkdir(set, { recursive: true });
+    for (const size of MAC) {
+      const buf = await png(macSvg, size);
+      await writeFile(path.join(set, `icon_${size}x${size}.png`), buf);
+      /* the retina name for the size below it, which is the same file. an
+         iconset missing its @2x entries builds, and then looks soft on every
+         display made in the last decade. */
+      if (MAC.includes(size / 2)) await writeFile(path.join(set, `icon_${size / 2}x${size / 2}@2x.png`), buf);
+    }
+    await run("iconutil", ["-c", "icns", set, "-o", path.join(OUT, "keeper.icns")]);
   }
-  await run("iconutil", ["-c", "icns", set, "-o", path.join(OUT, "keeper.icns")]);
 
   /* --- windows -------------------------------------------------------- */
   const images = [];
@@ -104,7 +112,8 @@ async function main() {
   await writeFile(path.join(OUT, "keeper-512.png"), await png(macSvg, 512));
 
   console.log(`  wrote ${path.relative(process.cwd(), OUT)}`);
-  console.log("    keeper.icns   macos app bundle");
+  if (onMac) console.log("    keeper.icns   macos app bundle");
+  else console.log("    no keeper.icns, because iconutil is a macos program");
   console.log("    keeper.ico    windows exe and shortcuts");
   console.log("    keeper-512.png");
 }
