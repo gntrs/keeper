@@ -9,3 +9,8 @@ keeper.config.json
 # than committed because this repo is public today: it goes into the private
 # dev repo once that exists, and never into the public one.
 CLAUDE.md
+
+# the empty folder keeper.cmd starts on while it waits for a drag. it is made
+# on first run and it fills with a .keeper of its own, and neither belongs in
+# the repo.
+start/
