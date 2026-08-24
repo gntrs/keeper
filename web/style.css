@@ -143,6 +143,24 @@ header.bar nav button:hover { color: var(--ink); }
    keeper now means one of two things and only these: you chose this, or you
    have to deal with this. a tab is neither. */
 header.bar nav button.on { background: #ffffff12; color: var(--ink); }
+
+/* ---------------------------------------------------------------------
+   quit, which exists only when keeper was opened from its icon.
+
+   Kept quiet at rest and loud only once armed. It is the last control in
+   the bar and the only one that ends the session, so it reads as a word
+   rather than a symbol and it changes that word rather than opening
+   anything.
+   --------------------------------------------------------------------- */
+#quit {
+  border: 0; background: none; color: var(--ink-3);
+  padding: var(--s2) var(--s3); border-radius: var(--r); cursor: pointer;
+  font: 500 .95rem/1 var(--sans); letter-spacing: 0;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+#quit:hover { color: var(--ink); }
+#quit.armed { background: var(--hot); color: #fff; }
+#quit:disabled { color: var(--ink-3); cursor: default; }
 /* the running count. numbers you glance at rather than read, so they are
    mono and they hold their column while they change. */
 #tally { font-size: .85rem; font-variant-numeric: tabular-nums; }
@@ -1089,8 +1107,6 @@ body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
   pointer-events: none;
 }
 #undo-say[hidden] { display: none; }
-body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
-
 /* the drop state. the accent, one hairline in from the edge, so the panel
    lights up without the layout moving by a pixel. */
 #tray[data-over] { background: #17171a; }

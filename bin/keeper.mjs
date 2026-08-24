@@ -12,6 +12,10 @@ import { loadConfig, CONFIG_NAME } from "../src/config.mjs";
 import { exportCrops } from "../src/crops.mjs";
 import { serve } from "../src/server.mjs";
 import { readTrays, trayById, exportTray, MODES } from "../src/trays.mjs";
+import { startOpen } from "../src/open.mjs";
+import {
+  appDir, blankRoot, claimRun, forgetRunSync, freePort, lastArchive, rememberArchive, running,
+} from "../src/runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TTY = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -73,6 +77,9 @@ const HELP = `
 ${hot("keeper")}  find the frames worth keeping, and crop them into the holes they fill
 
   keeper <folder>                 scan, thumbnail, and open the shelf
+  keeper app [folder]             the way the icon opens it: remembers the
+                                  last archive, picks its own port, and
+                                  reuses a copy that is already running
   keeper sheets <folder>          contact sheets for a coding agent to read
   keeper tag <folder> <file>      apply the tags that agent wrote
   keeper export <folder>          write the placed crops out
@@ -190,9 +197,32 @@ function summarise(items, tags) {
   }
 }
 
+/**
+ * Hand the url to whatever browser this person actually uses.
+ *
+ * Detached and unreferenced in every branch, because the browser must not
+ * become a child this process is waiting on: keeper opened from an icon has
+ * to be able to outlive the launch, and keeper opened from a terminal has to
+ * be able to die on ctrl-c without taking a window full of tabs with it.
+ */
+async function openIn(url) {
+  const { spawn } = await import("node:child_process");
+  if (process.platform === "win32") {
+    /* `start` is a cmd builtin rather than a program, so it needs a shell,
+       and its first quoted argument is taken as the window title rather
+       than the thing to open. The empty pair is that title. Without it a
+       url that ever needs quoting opens a console window called after
+       itself and nothing else happens. */
+    spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true, windowsHide: true }).unref();
+  } else {
+    const cmd = process.platform === "darwin" ? "open" : "xdg-open";
+    spawn(cmd, [url], { stdio: "ignore", detached: true }).unref();
+  }
+}
+
 async function main() {
   const { flags, rest } = parseArgs(process.argv.slice(2));
-  const known = ["sheets", "tag", "export", "trays", "init", "doctor", "help"];
+  const known = ["app", "sheets", "tag", "export", "trays", "init", "doctor", "help"];
   const cmd = known.includes(rest[0]) ? rest.shift() : "shelf";
   const root = path.resolve(rest[0] ?? ".");
 
@@ -219,6 +249,77 @@ async function main() {
       ? hot(`  ${broken} of ${rows.length} would stop something working. the lines above say which.`)
       : dim(`  all ${rows.length} clear. point keeper at a folder and it will run.`));
     say("");
+    return;
+  }
+
+  /**
+   * Keeper opened from an icon rather than from a sentence.
+   *
+   * It is the same server and the same page. What is different is everything
+   * around them, because nobody typed anything: there is no folder in the
+   * command, no port, no terminal to print the url into and no ctrl-c to
+   * stop it with. So this path answers those four on its own and then gets
+   * out of the way.
+   *
+   * The order matters and is not the order the shelf uses. The shelf indexes
+   * and then serves, which is right when a progress bar is being watched in
+   * the terminal it is printing to. Here there is nowhere to print, so it
+   * serves first and opens the browser immediately, and the scan runs behind
+   * the page that is already up and reports itself through the same progress
+   * the drop panel polls. A person who double clicked an icon should see
+   * their own app inside a second, not a bouncing dock icon and then nothing
+   * for a minute while ten thousand thumbnails are made.
+   */
+  if (cmd === "app") {
+    const asked = rest[0] ? path.resolve(rest[0]) : null;
+
+    /* A second double click is not a request for a second keeper. It is
+       somebody who lost the window, and the useful answer is the tab they
+       already had rather than a rival server on 7778 writing to the same
+       archive from a second index. */
+    const live = await running();
+    if (live) {
+      if (asked) {
+        await fetch(`${live.url}/api/open`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ path: asked }),
+        }).catch(() => {});
+      }
+      if (!flags["no-open"]) await openIn(live.url);
+      say(`  ${hot(live.url)}`);
+      return;
+    }
+
+    /* Where you were, unless where you were was on a drive that is not
+       plugged in this morning. An archive that has gone is not an error
+       worth an error message: it is the ordinary life of an external disk,
+       and the right response is the empty page that asks for a folder. */
+    const remembered = asked ?? (await lastArchive());
+    const here = remembered && existsSync(remembered) ? remembered : await blankRoot();
+
+    const port = await freePort(Number(flags.port) || 7777);
+    const config = await loadConfig(here);
+    const { url } = await serve({ root: here, config, port, launched: "app" });
+    await claimRun(port);
+    if (here !== (await blankRoot())) await rememberArchive(here);
+
+    /* The run file describes a process, so it dies with the process, by
+       every route out including the quit button and a machine shutting
+       down. `exit` covers the ordinary returns and the two signals cover
+       being asked to stop, which `exit` alone does not. */
+    process.on("exit", forgetRunSync);
+    for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));
+
+    if (!flags["no-open"]) await openIn(url);
+    say(`  ${hot(url)}`);
+    say(dim(`  state in ${nice(appDir())}`));
+
+    /* An archive with an index already opens instantly and is left alone. One
+       without gets scanned now, behind the page, because the alternative is a
+       shelf that sits empty until somebody works out that they were supposed
+       to drop the folder they had already chosen. */
+    if (!(await readIndex(here))) startOpen(here);
     return;
   }
 
@@ -409,20 +510,7 @@ async function main() {
   /* Opening is the default and staying put is the flag. A tool that prints a
      url and waits has asked a person who ran one command to go and do a
      second thing, and the terminal is not where any of the work happens. */
-  if (!flags["no-open"]) {
-    const { spawn } = await import("node:child_process");
-    if (process.platform === "win32") {
-      /* `start` is a cmd builtin rather than a program, so it needs a shell,
-         and its first quoted argument is taken as the window title rather
-         than the thing to open. The empty pair is that title. Without it a
-         url that ever needs quoting opens a console window called after
-         itself and nothing else happens. */
-      spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true, windowsHide: true }).unref();
-    } else {
-      const cmd = process.platform === "darwin" ? "open" : "xdg-open";
-      spawn(cmd, [url], { stdio: "ignore", detached: true }).unref();
-    }
-  }
+  if (!flags["no-open"]) await openIn(url);
 }
 
 main().catch((e) => { console.error(`\n  ${hot("!")} ${e.message}\n`); process.exit(1); });

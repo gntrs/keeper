@@ -75,18 +75,16 @@ if not exist "node_modules\sharp" (
 
 rem --- which folder ----------------------------------------------------
 rem  A folder dragged onto this file, if there was one. Otherwise keeper
-rem  starts on an empty folder and waits, and the page says to drag one on.
+rem  opens the archive you had last, and on a first run there is no last, so
+rem  it opens an empty one and the page asks you to drag a folder on.
 set "ARCHIVE=%~1"
-if "!ARCHIVE!"=="" (
-  if not exist "%~dp0start\" mkdir "%~dp0start"
-  set "ARCHIVE=%~dp0start"
-)
-
-if not exist "!ARCHIVE!\" (
-  echo.
-  echo   that is not a folder:  !ARCHIVE!
-  echo.
-  goto :stop
+if not "!ARCHIVE!"=="" (
+  if not exist "!ARCHIVE!\" (
+    echo.
+    echo   that is not a folder:  !ARCHIVE!
+    echo.
+    goto :stop
+  )
 )
 
 rem --- go --------------------------------------------------------------
@@ -97,7 +95,12 @@ echo   drag a folder of photographs onto the page to read it.
 echo.
 echo   leave this window open while you work. close it when you are done.
 echo.
-node bin\keeper.mjs "!ARCHIVE!"
+rem  `app` rather than the folder on its own, because this file is double
+rem  clicked and a double click happens twice. The plain command would bind
+rem  7777, and the second click would die on the port being taken with the
+rem  error scrolling past in a window that closes. `app` finds the keeper
+rem  that is already running and opens the tab again.
+node bin\keeper.mjs app "!ARCHIVE!"
 
 rem keeper exits when the window is closed or on ctrl c, and a batch file
 rem that vanishes takes its error message with it.

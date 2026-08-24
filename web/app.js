@@ -10,6 +10,7 @@ import { viewIn } from "/motion.js";
 import { feel, mountFeel } from "/feel.js";
 import { paintKeys, pick as chord } from "/host.js";
 import { mountUndo } from "/undo.js";
+import { mountQuit } from "/quit.js";
 
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
@@ -255,5 +256,8 @@ mountUndo();
 /* the key legend is written in the mac spelling, so a pc reads it back */
 paintKeys();
 await mountTray();
+/* after the state, because whether there is a quit at all is something
+   only the server knows. */
+mountQuit();
 tally();
 setView(location.hash.slice(1) || "shelf");

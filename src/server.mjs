@@ -16,6 +16,8 @@ import { exportCrops, DEFAULT_OUT } from "./crops.mjs";
 import { HOSTS, host as machine } from "./os/index.mjs";
 import { readableSource } from "./raw.mjs";
 import { clock } from "./film.mjs";
+import { loadConfig } from "./config.mjs";
+import { rememberArchive } from "./runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "..", "web");
@@ -120,7 +122,14 @@ async function sendFile(res, file, { cache = "no-store", req } = {}) {
  * binds to the loopback address on purpose, and that is not a default anyone
  * should relax without meaning it.
  */
-export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
+export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", launched = "cli" }) {
+  /* The config belongs to the archive, not to the process, so it moves when
+     the archive moves. It used to be captured once at boot, which was right
+     while the folder was fixed at boot too. Opened from the icon it is always
+     wrong: the app starts on an empty folder and is pointed at the real
+     archive a second later, so a person with slots of their own would have
+     had every one of them ignored for the whole session. */
+  let config = opened;
   // root moves. /api/open re-points the whole server at another folder, so
   // anything derived from it has to be derived again per request: paths(root)
   // was hoisted out here once and every thumbnail after the first open came
@@ -143,7 +152,7 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
     const route = url.pathname;
 
     try {
-      if (["/api/open", "/api/locate", "/api/choose", "/api/export"].includes(route) && !ownOrigin(req)) {
+      if (["/api/open", "/api/locate", "/api/choose", "/api/export", "/api/quit"].includes(route) && !ownOrigin(req)) {
         return json(res, 403, { error: "that request came from another page" });
       }
 
@@ -231,6 +240,11 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
           // that is already in without asking a second time per thumbnail
           trays: membership(trays),
           slots: config.slots,
+          // whether there is anything on screen that can stop this process.
+          // an icon launch has no terminal behind it, so the page carries the
+          // only quit there is; a terminal launch already has one and a
+          // button that killed it would be a surprise, not a convenience.
+          app: launched === "app",
           /**
            * What this machine calls the things keeper hands back to it.
            *
@@ -297,7 +311,45 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
           return json(res, 409, { error: e.message });
         }
         root = target;
+        config = await loadConfig(target);
+        /* only the icon needs this. someone who typed the folder will type it
+           again, and writing their history to a file they never asked for is
+           not a service. */
+        if (launched === "app") await rememberArchive(target);
         return json(res, 200, { ok: true, root });
+      }
+
+      /**
+       * Proof that the thing on this port is keeper and not whatever else
+       * happened to want 7777 today.
+       *
+       * It exists for the launcher, which finds a port written in a file and
+       * has to decide between opening a browser at it and starting a second
+       * server. A file cannot answer that question and a port can, so the
+       * file is only ever a rumour and this route is what confirms it.
+       */
+      if (route === "/api/ping") {
+        return json(res, 200, { keeper: true, pid: process.pid, root, launched });
+      }
+
+      /**
+       * Stop.
+       *
+       * Only reachable when keeper was opened from its icon, because that is
+       * the only case where there is no terminal to press ctrl-c in. Someone
+       * who started it by typing already has a way to stop it and would not
+       * thank a web page for taking the process down under them.
+       *
+       * The reply goes out before the shutdown, and the shutdown is a beat
+       * late on purpose: closing the server inside the handler kills the
+       * socket carrying the answer, so the page never hears that it worked
+       * and shows a failure for the one action that did not fail.
+       */
+      if (route === "/api/quit" && req.method === "POST") {
+        if (launched !== "app") return json(res, 403, { error: "started from a terminal, so ctrl-c owns this" });
+        json(res, 200, { ok: true });
+        setTimeout(() => { server.close(); process.exit(0); }, 120);
+        return;
       }
 
       // scanning ten thousand frames takes a minute, so the answer is a job
