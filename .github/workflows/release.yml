@@ -1,0 +1,113 @@
+# ---------------------------------------------------------------------
+#  Builds keeper for both machines and attaches the results to a release.
+#
+#  It runs on a version tag, `v0.3.0` and so on, and it can be run by hand
+#  from the actions tab to check a build without cutting a release.
+#
+#  The mac half has to run on a mac, because a dmg is made by hdiutil. The
+#  windows half has to run on windows, because an installer is compiled by
+#  inno setup. The zip in between could be built anywhere and is built there
+#  anyway, so that everything a person downloads came off the same runner as
+#  the checksum beside it.
+#
+#  NOTHING HERE IS SIGNED. The mac app is signed ad hoc, which identifies
+#  nobody, and the windows installer is not signed at all. Both will be
+#  warned about on first open. The day there is a developer id and a
+#  certificate, this file grows two secrets and two flags, and nothing else
+#  about it changes.
+# ---------------------------------------------------------------------
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - name: apple silicon
+        run: node packaging/build-mac.mjs --arch arm64
+      - name: intel
+        run: node packaging/build-mac.mjs --arch x64
+      # what an already installed keeper downloads when it updates itself. it
+      # holds no runtime and no compiled anything, so it is built once here
+      # rather than once per platform, and both platforms install the same one.
+      - name: the update payload
+        run: node packaging/payload.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            packaging/out/*.dmg
+            packaging/out/*.dmg.sha256
+            packaging/out/keeper-app-*.tar.gz
+            packaging/out/keeper-app-*.tar.gz.sha256
+            packaging/out/latest.json
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - name: the folder, and a zip of it
+        run: node packaging/build-windows.mjs --arch x64
+      - name: inno setup
+        run: choco install innosetup --no-progress -y
+      - name: the installer
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json | ConvertFrom-Json).version
+          $stage = Join-Path (Get-Location) "packaging\out\stage\keeper"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=$v" "/DStage=$stage" packaging\windows\keeper.iss
+      - name: checksum the installer
+        shell: pwsh
+        run: |
+          Get-ChildItem packaging\out\*setup.exe | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$h  $($_.Name)" | Out-File -Encoding ascii "$($_.FullName).sha256"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            packaging/out/*.zip
+            packaging/out/*.exe
+            packaging/out/*.sha256
+
+  release:
+    needs: [macos, windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: built }
+      # gh rather than a release action from the marketplace. it is one line,
+      # it is already installed on the runner, and it is one less thing with
+      # a token that nobody here has read the source of.
+      # A DRAFT, WHICH MEANS NOBODY UPDATES TO IT YET. `latest/download`, the
+      # address a running keeper asks, only ever resolves to a published
+      # release, so every copy out there stays where it is until the notes are
+      # written and the release is published by hand. That is the intended
+      # order: a release nobody has read is not a release.
+      - name: draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --draft \
+            --title "keeper ${GITHUB_REF_NAME}" \
+            --notes "the notes are written by hand before this is published." \
+            $(find built -type f | sort)
