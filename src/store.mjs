@@ -34,7 +34,10 @@ export async function adopt(root) {
  * Position based ids would have silently slid by 200 and repointed the lot.
  */
 export function idFor(relPath) {
-  return createHash("sha1").update(relPath).digest("hex").slice(0, 12);
+  /* Separators are normalised here as well as at the scan, so an index
+     written by an older build, or a path that reached this from anywhere
+     else, still hashes to the one id. On a mac this is a no-op. */
+  return createHash("sha1").update(relPath.split("\\").join("/")).digest("hex").slice(0, 12);
 }
 
 export const paths = (root) => ({

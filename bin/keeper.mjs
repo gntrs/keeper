@@ -78,6 +78,7 @@ ${hot("keeper")}  find the frames worth keeping, and crop them into the holes th
   keeper export <folder>          write the placed crops out
   keeper trays <folder>           what is in the trays, and how much
   keeper init [folder]            create ${CONFIG_NAME}
+  keeper doctor                   check this machine can run all of it
 
 ${dim("options")}
   --port <n>        default 7777
@@ -191,11 +192,35 @@ function summarise(items, tags) {
 
 async function main() {
   const { flags, rest } = parseArgs(process.argv.slice(2));
-  const known = ["sheets", "tag", "export", "trays", "init", "help"];
+  const known = ["sheets", "tag", "export", "trays", "init", "doctor", "help"];
   const cmd = known.includes(rest[0]) ? rest.shift() : "shelf";
   const root = path.resolve(rest[0] ?? ".");
 
   if (cmd === "help" || flags.help) { say(HELP); return; }
+
+  /**
+   * What works on this machine, before anybody has an archive to be
+   * disappointed by. It takes no folder and touches none: the whole point is
+   * that it is the one command somebody can run the minute they have cloned
+   * this, on a machine nobody else can see, and paste the answer back.
+   */
+  if (cmd === "doctor") {
+    const { doctor, OK, NO } = await import("../src/doctor.mjs");
+    say("");
+    const rows = await doctor();
+    const wide = Math.max(...rows.map((r) => r.what.length));
+    for (const r of rows) {
+      const mark = r.state === OK ? "  ok  " : r.state === NO ? hot("  no  ") : hot(" warn ");
+      say(`${mark}${r.what.padEnd(wide)}  ${r.said}`);
+    }
+    const broken = rows.filter((r) => r.state === NO).length;
+    say("");
+    say(broken
+      ? hot(`  ${broken} of ${rows.length} would stop something working. the lines above say which.`)
+      : dim(`  all ${rows.length} clear. point keeper at a folder and it will run.`));
+    say("");
+    return;
+  }
 
   /* A bare `keeper` used to resolve to "." and start indexing it. Typed in a
      home folder, which is where a terminal opens, that is a thumbnail of
@@ -386,8 +411,17 @@ async function main() {
      second thing, and the terminal is not where any of the work happens. */
   if (!flags["no-open"]) {
     const { spawn } = await import("node:child_process");
-    const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-    spawn(cmd, [url], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref();
+    if (process.platform === "win32") {
+      /* `start` is a cmd builtin rather than a program, so it needs a shell,
+         and its first quoted argument is taken as the window title rather
+         than the thing to open. The empty pair is that title. Without it a
+         url that ever needs quoting opens a console window called after
+         itself and nothing else happens. */
+      spawn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true, windowsHide: true }).unref();
+    } else {
+      const cmd = process.platform === "darwin" ? "open" : "xdg-open";
+      spawn(cmd, [url], { stdio: "ignore", detached: true }).unref();
+    }
   }
 }
 

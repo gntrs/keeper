@@ -29,6 +29,8 @@
    nothing out of the app and touches no markup it did not make.
    --------------------------------------------------------------------- */
 
+import { files } from "/host.js";
+
 /* about two and a half polls a second. fast enough that a percentage moves
    while you watch it, slow enough that a thumbnail pass is not answering
    http requests instead of resizing pictures. */
@@ -395,9 +397,9 @@ function withheld(name, why) {
   paint({
     mode: "pick",
     eyebrow: "one more step",
-    line: "the path stayed in finder",
+    line: `the path stayed in ${files()}`,
     note: name
-      ? `a browser is only ever told the name, ${name}, and spotlight could not place it on the disk.`
+      ? `a browser is only ever told the name, ${name}, and the search index could not place it on the disk.`
       : "a browser is never told where a dropped thing lives on the disk.",
     hint: why || "point at the folder once and keeper has it from there.",
     acts: [askFinder(), dismiss()],
@@ -433,7 +435,7 @@ async function chooser() {
   stop();
   paint({
     mode: "work",
-    eyebrow: "finder",
+    eyebrow: files(),
     line: "pick the folder",
     note: "the dialog is open in front of this window. keeper is waiting for it.",
   });

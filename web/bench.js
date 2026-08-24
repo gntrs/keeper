@@ -5,6 +5,7 @@ import { CENTERED, clamp, coverWidth, isAtCover, resolve, toObjectPosition } fro
 import { nope } from "/motion.js";
 import { feel } from "/feel.js";
 import { did } from "/undo.js";
+import { files } from "/host.js";
 
 const $ = (s) => document.querySelector(s);
 const els = new Map();          // slotId -> { root, box, img, empty, nums }
@@ -517,7 +518,7 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
   seen.textContent = file
     ? `done · ${file}`
     : `done · ${d.written} ${d.written === 1 ? "crop" : "crops"}`;
-  seen.title = file ? "show it in finder" : "open the folder in finder";
+  seen.title = file ? `show it in ${files()}` : `open the folder in ${files()}`;
   seen.onclick = (e) => {
     e.stopPropagation();
     post("/api/reveal-export", file ? { file } : {});

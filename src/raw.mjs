@@ -1,8 +1,8 @@
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { mkdir, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 
+import { host } from "./os/index.mjs";
 import { needsProxy } from "./scan.mjs";
 import { paths } from "./store.mjs";
 
@@ -13,9 +13,11 @@ import { paths } from "./store.mjs";
  * sharp is the decoder everywhere else in here and it cannot read an ARW, a
  * CR3 or an NEF at all: libvips ships no raw decoder, so the call throws
  * before a thumbnail, a sheet cell or a crop exists. A bmp and a jxl die the
- * same death for a duller reason. macOS decodes every one of them itself
- * through Image I/O, and `sips` is the front door to that, on a machine this
- * tool already refuses to run anywhere but.
+ * same death for a duller reason.
+ *
+ * Which decoder answers instead is the platform's business and lives in
+ * os/, because the two machines are not equally equipped here: one of them
+ * ships a decoder for all of this and the other ships none.
  *
  * So each of those files gets exactly one jpeg proxy, written once into
  * .keeper/proxy and then used by the thumbnail, the contact sheet, the
@@ -44,30 +46,7 @@ export const PROXY_LONG_EDGE = 3072;
 const PROXY_QUALITY = 82;
 
 /** a raw that takes this long is a raw that is never coming back */
-const SIPS_TIMEOUT_MS = 120_000;
-
-const run = (args) =>
-  new Promise((ok, no) => {
-    // execFile and never exec: an archive that files by day is full of
-    // folders with spaces, hashes and brackets in the name. An argv list has
-    // no quoting to get wrong and no shell to get through.
-    execFile("sips", args, { timeout: SIPS_TIMEOUT_MS, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
-      if (!err) return ok(String(stdout));
-      // sips puts its refusals on stderr and its progress on stdout, and the
-      // first stderr line is the only one that says anything: the two after
-      // it are a numbered code and an advert for --help.
-      const said = String(stderr || err.message).split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? "sips failed";
-      no(new Error(said.replace(/^error:\s*/i, "").toLowerCase()));
-    });
-  });
-
-/** the source's own pixels, as sips reports them, which is sensor order */
-async function measure(srcAbs) {
-  const out = await run(["-g", "pixelWidth", "-g", "pixelHeight", srcAbs]);
-  const w = Number(/pixelWidth:\s*(\d+)/.exec(out)?.[1]);
-  const h = Number(/pixelHeight:\s*(\d+)/.exec(out)?.[1]);
-  return w && h ? { w, h } : null;
-}
+const DECODE_TIMEOUT_MS = 120_000;
 
 export const proxyPath = (root, id) => path.join(paths(root).proxy, `${id}.jpg`);
 
@@ -91,52 +70,20 @@ export async function proxyFor(root, id, srcAbs) {
   await mkdir(dir, { recursive: true });
 
   /**
-   * TWO TRAPS IN `--out`, BOTH SILENT.
-   *
-   * 1. If the folder above the named file does not exist, sips does not fail
-   *    and does not create it. It writes the image AT that path, as a file,
-   *    named after the missing folder. So the mkdir above is not tidiness,
-   *    it is the difference between .keeper/proxy/<id>.jpg and a file called
-   *    .keeper/proxy holding one photograph.
-   * 2. If the named path is an existing folder, sips writes into it under the
-   *    source's own basename, which would put DSC02478.jpg where <id>.jpg was
-   *    asked for.
-   *
    * The write goes to a temp name and is then renamed, because eight
    * thumbnail workers run at once and a run killed mid-encode must not leave
    * a half jpeg behind that every later run then trusts.
+   *
+   * The mkdir above is not tidiness either. A decoder handed an out path
+   * whose parent does not exist either fails outright or, on the mac, quietly
+   * writes the image AT that path: the difference is .keeper/proxy/<id>.jpg
+   * against a file called .keeper/proxy holding one photograph.
    */
   const tmp = path.join(dir, `.${id}.${randomBytes(4).toString("hex")}.tmp.jpg`);
 
-  /**
-   * `--resampleHeightWidthMax` IS NOT A CAP, whatever the name says. It sets
-   * the long edge to that number in both directions: a 1600px flatbed scan
-   * comes back at 3072px, six times the pixels and twelve times the bytes,
-   * every one of them invented, and the index then reports a resolution the
-   * file has never had. Measured, not assumed: 500x333 in, 3072x2046 out.
-   *
-   * So the source is measured first and the flag is only passed when there
-   * is something to lose by keeping it. That is a second sips call, about
-   * 100ms, paid once per file for the life of the archive, and it cannot be
-   * folded into the first: sips refuses to read properties and write a file
-   * in one invocation, by name, with error 6.
-   *
-   * A source that cannot even be measured still gets the flag. It is about
-   * to fail the convert anyway, and the failure is the useful answer.
-   */
-  const size = await measure(srcAbs).catch(() => null);
-  const resample = !size || Math.max(size.w, size.h) > PROXY_LONG_EDGE
-    ? ["--resampleHeightWidthMax", String(PROXY_LONG_EDGE)]
-    : [];
-
   try {
-    await run([
-      "-s", "format", "jpeg",
-      "-s", "formatOptions", String(PROXY_QUALITY),
-      ...resample,
-      "--out", tmp,
-      srcAbs,
-    ]);
+    if (!(await host.canDecode())) throw new Error(host.decodeHint);
+    await host.decode(srcAbs, tmp, PROXY_LONG_EDGE, PROXY_QUALITY, DECODE_TIMEOUT_MS);
     await rename(tmp, dst);
   } catch (e) {
     await unlink(tmp).catch(() => {});
@@ -162,15 +109,15 @@ export async function readableSource(root, item) {
 /**
  * How big the original really is, for the record written next to an export.
  *
- * `sips -g` reports the sensor, which is landscape even on a frame shot
- * upright: the turn lives in the exif orientation tag, which sips neither
- * applies to a raw nor reports for one. `oriented` is the proxy as the index
+ * A raw decoder reports the sensor, which is landscape even on a frame shot
+ * upright: the turn lives in the exif orientation tag, which neither of these
+ * two applies to a raw nor reports for one. `oriented` is the proxy as the index
  * already recorded it, after sharp had applied that tag, so the original is
  * turned the same way whenever that is the way round the two aspects agree.
  * A bmp has no orientation to argue about and falls through untouched.
  */
 export async function originalSize(srcAbs, oriented) {
-  const size = await measure(srcAbs);
+  const size = await host.measure(srcAbs);
   if (!size) return null;
   const { w, h } = size;
   if (!oriented?.w || !oriented?.h) return size;

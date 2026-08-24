@@ -25,7 +25,7 @@ row of tag filters" width="100%">
 in a readme.</sub>
 
 it scans, writes thumbnails, and **opens the browser itself**. pass
-`--no-open` and it prints the url instead. **mac only.** nothing is uploaded,
+`--no-open` and it prints the url instead. **macos or windows.** nothing is uploaded,
 the server binds to loopback, and **no original is ever edited.** no key
 touches a file on your drive: `delete` sets a frame aside in keeper's own bin
 and the photograph stays exactly where it was. one button, at the bottom of
@@ -37,7 +37,7 @@ it.
 | | |
 |---|---|
 | what it is | a culling and cropping bench for a photo and video archive |
-| runs on | macos, node 20 or newer |
+| runs on | macos or windows, node 20 or newer |
 | dependencies | one, `sharp` |
 | network | none. it binds to `127.0.0.1` and talks to nothing |
 | who tags the photographs | the coding agent you already pay for |
@@ -162,8 +162,9 @@ back and delete off the drive" width="100%">
 
 `in the bin` shows you what you set aside. in there the same key puts a frame
 back, and `delete off the drive` is the other decision entirely: it asks, it
-stops the screen over a real pile, and it uses finder's own delete so the put
-back record survives. the server refuses to trash any frame that is not
+stops the screen over a real pile, and it goes through the machine's own
+delete, so the file lands in the trash or the recycle bin with the record that
+puts it back. the server refuses to trash any frame that is not
 already in the bin, so there is no path from a keystroke on a photograph to a
 file.
 
@@ -329,6 +330,22 @@ npm install
 node bin/keeper.mjs ~/Archive
 ```
 
+**on windows, without a terminal:** install node from
+[nodejs.org](https://nodejs.org), then double click `keeper.cmd`. it starts
+keeper and opens the browser, and you drag a folder of photographs onto the
+page. dragging a folder onto `keeper.cmd` itself works too.
+
+`keeper doctor` says what works on this machine and what does not, in
+sentences, and takes no folder. it is the thing to run and send on when
+something turns out to be missing.
+
+the two machines differ in four places and only four: the file manager, the
+wastebasket, the shortcut a tray exports as, and the search index that turns
+a dropped folder back into a path. those live in `src/os/` and everything
+above them is one codebase. **raw is the uneven one.** macos decodes every
+negative itself, windows decodes none, so on windows keeper uses ffmpeg if it
+is on the path and says which frames it could not read if it is not.
+
 reads jpg, png, webp, avif, tif, heic and dng, and mov, mp4, m4v, mkv, avi,
 webm and mts. raw files come in through their embedded preview, which is all a
 contact sheet needs.
@@ -342,7 +359,7 @@ drive is touched by anything you can reach with a keystroke. `delete` writes
 an id to `binned.json` and nothing else: the frame leaves the shelf, the file
 does not leave the folder. the only thing in keeper that moves a file is
 `delete off the drive`, which lives inside the bin, asks first, and uses
-finder's own delete so the put back record survives.
+the machine's own delete so the record that puts it back survives.
 
 **this is the second design and the first one was wrong.** `delete` used to go
 straight to the macos trash. a bad shot can still be the only copy of itself,

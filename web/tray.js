@@ -8,6 +8,7 @@ import { open as openPreview } from "/preview.js";
 import "/dragout.js";
 
 import { flyToTray, leave, nope } from "/motion.js";
+import { mac } from "/host.js";
 import { did } from "/undo.js";
 import { feel } from "/feel.js";
 
@@ -514,7 +515,11 @@ const where = (t) => `~/Desktop/${t.id}`;
 const MODES = [
   ["copy", "copy", "real files, yours to hand to anyone. the archive is untouched."],
   ["symlink", "link", "pointers to the originals. nothing is copied, and they break if you move the originals."],
+  /* The third one is whichever of these the machine underneath actually has,
+     and the server says which in /api/state. Only one of the two rows is ever
+     shown, so nobody is offered an export their machine has never heard of. */
   ["alias", "alias", "finder aliases. nothing is copied, and finder follows the originals if they move."],
+  ["shortcut", "shortcut", "windows shortcuts. nothing is copied, and they hold a path rather than the file itself."],
 ];
 
 /* what the button says while it works, and what the result line says after */
@@ -522,6 +527,7 @@ const VERB = {
   copy: ["copying...", "wrote"],
   symlink: ["linking...", "linked"],
   alias: ["making aliases...", "aliased"],
+  shortcut: ["making shortcuts...", "linked"],
 };
 
 /**
@@ -534,7 +540,11 @@ function buildMode() {
   sel.id = "tray-mode";
   sel.className = "tray-mode";
   sel.title = "how the frames leave the archive";
-  sel.append(...MODES.map(([value, label]) => new Option(label, value)));
+  /* the platform's own link mode, and never the other machine's */
+  const own = mac() ? "shortcut" : "alias";
+  sel.append(...MODES
+    .filter(([value]) => value !== own)
+    .map(([value, label]) => new Option(label, value)));
   sel.onchange = () => setMode(sel.value);
   $("#tray-folder").after(sel);
 

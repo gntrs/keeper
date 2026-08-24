@@ -203,10 +203,15 @@
 
   One rule still holds the list together: a bare letter tags, a modifier
   plus a key commands. The glyphs are the ones printed on the keys, because
-  nobody on a mac reads the word "cmd" faster than the symbol. Option and
-  not command on finder, open and the views: chrome resolves cmd+r, cmd+o
-  and cmd+1 through cmd+9 above the page, so preventDefault runs and the tab
-  reloads anyway.
+  nobody on a mac reads the word "cmd" faster than the symbol. It is written
+  in the mac spelling once and host.js reads it back into words on a pc,
+  which has no glyph for any of these and where a placed square is read by
+  nobody.
+
+  Option and not the picking key on finder, open and the views: chrome
+  resolves cmd+r, cmd+o and cmd+1 through cmd+9 above the page on a mac, and
+  the control versions of all three above the page on a pc, so preventDefault
+  runs and the tab reloads anyway. Same problem both sides, same answer.
 -->
 <footer id="keys" hidden>
   <div class="keys-head">
@@ -228,7 +233,7 @@
       <div class="k"><span class="ks"><kbd>⌥1</kbd><kbd>⌥2</kbd></span><span>shelf, bench</span></div>
       <div class="k"><span class="ks"><kbd>⌘F</kbd></span><span>search</span></div>
       <div class="k"><span class="ks"><kbd>⌥O</kbd></span><span>another folder</span></div>
-      <div class="k"><span class="ks"><kbd>⌥R</kbd></span><span>show it in finder</span></div>
+      <div class="k"><span class="ks"><kbd>⌥R</kbd></span><span data-files>show it in finder</span></div>
     </section>
     <section>
       <h4 class="label">tagging</h4>

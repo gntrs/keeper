@@ -13,9 +13,9 @@ import {
 import { VOCAB } from "./tags.mjs";
 import { placeOf } from "./places.mjs";
 import { exportCrops, DEFAULT_OUT } from "./crops.mjs";
+import { HOSTS, host as machine } from "./os/index.mjs";
 import { readableSource } from "./raw.mjs";
 import { clock } from "./film.mjs";
-import { execFile } from "node:child_process";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "..", "web");
@@ -202,8 +202,8 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
         try {
           file = await readableSource(root, hit);
         } catch (e) {
-          // one negative macos cannot decode, said plainly, rather than a
-          // 500 that reads as the server having fallen over
+          // one negative the decoder cannot read, said plainly, rather than
+          // a 500 that reads as the server having fallen over
           return json(res, 415, { error: String(e.message).toLowerCase() });
         }
         return sendFile(res, file, { cache: "max-age=3600" });
@@ -231,6 +231,27 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
           // that is already in without asking a second time per thumbnail
           trays: membership(trays),
           slots: config.slots,
+          /**
+           * What this machine calls the things keeper hands back to it.
+           *
+           * The browser needs these because it writes the sentences: "put it
+           * back from finder" and "put it back from the recycle bin" are the
+           * same sentence with the machine's own word in it, and a page that
+           * guessed from the user agent would get it wrong for anyone running
+           * keeper on one machine and reading it on another, which is a thing
+           * a loopback server on a home network makes easy to do.
+           *
+           * `keys` is here rather than sniffed for the same reason. It says
+           * which modifier is the picking one, and the answer belongs to the
+           * machine the files are on, not the one the browser is on.
+           */
+          host: machine && {
+            name: machine.name,
+            files: machine.files,
+            bin: machine.bin,
+            restore: machine.restore,
+            keys: machine.name === "macos" ? "mac" : "pc",
+          },
           // whether there is a keeper.config.json at all. the bench prints an
           // object-position line only for someone who has one, because that
           // line is a thing to paste into a stylesheet and only a person who
@@ -291,51 +312,32 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
       }
 
       /**
-       * What is left when spotlight comes back with nothing, which happens on
-       * an unindexed external drive. This is the real Finder folder chooser,
-       * so the path it returns is not a guess.
-       *
-       * The request stays open for as long as the dialog is up. That is not a
-       * hang: the browser has nothing to do until a folder is picked, and the
-       * dialog is the answer it is waiting on.
+       * What is left when the search index comes back with nothing, which
+       * happens on an external drive that was never indexed. This is the
+       * machine's real folder chooser, so the path it returns is not a guess.
        */
       if (route === "/api/choose" && req.method === "POST") {
-        if (process.platform !== "darwin") {
-          return json(res, 400, { error: "the folder chooser is macOS only" });
-        }
-        const picked = await new Promise((done) => {
-          execFile("osascript", ["-e", "POSIX path of (choose folder)"], (err, stdout, stderr) => {
-            // cancel comes back as exit 1 with "User canceled" on stderr, and
-            // it is the ordinary outcome of putting a dialog up, not an error
-            // to report to someone who just changed their mind.
-            if (err) return done(/User canceled/i.test(String(stderr)) ? { cancelled: true } : { error: String(stderr || err.message).trim() });
-            // a POSIX path of a folder comes back with a trailing slash. it
-            // goes straight back into /api/open and then into path.join, and
-            // both of those read cleaner without it.
-            done({ path: stdout.trim().replace(/\/+$/, "") || "/" });
-          });
-        });
-        if (picked.error) return json(res, 500, { error: picked.error.toLowerCase() });
+        if (!machine) return json(res, 400, { error: `the folder chooser needs ${HOSTS}` });
+        const picked = await machine.chooseFolder();
+        if (picked.error) return json(res, 500, { error: picked.error });
         return json(res, 200, picked);
       }
 
       /**
-       * Mac only, and unapologetically. The moment you find the frame you
-       * were looking for, the next thing you want is the file, and the way
-       * you get a file on this machine is Finder with it already selected.
-       * `open -R` does exactly that and nothing else: it cannot run an
-       * arbitrary command, and the path is checked against the index first
-       * so it can only ever reveal a file keeper already scanned.
+       * The moment you find the frame you were looking for, the next thing
+       * you want is the file itself, and the way you get a file on either of
+       * these machines is the file manager with it already selected. The call
+       * underneath cannot run an arbitrary command, and the path is checked
+       * against the index first, so this can only ever reveal a file keeper
+       * has already scanned.
        */
       if (route === "/api/reveal" && req.method === "POST") {
-        if (process.platform !== "darwin") {
-          return json(res, 400, { error: "reveal is macOS only" });
-        }
+        if (!machine) return json(res, 400, { error: `reveal needs ${HOSTS}` });
         const b = await body(req);
         const index = await readIndex(root);
         const hit = index?.items?.find((i) => i.id === b.id);
         if (!hit) return json(res, 404, { error: "unknown frame" });
-        execFile("open", ["-R", path.join(root, hit.path)], () => {});
+        machine.reveal(path.join(root, hit.path));
         return json(res, 200, { ok: true });
       }
 
@@ -372,20 +374,18 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
        * The one thing in keeper that touches an original, and it moves it
        * rather than removing it.
        *
-       * Finder's own delete is used, through osascript, for one reason: it
-       * puts the file in the Trash with its "Put Back" record intact, so the
-       * whole thing is undone from Finder in one keystroke. `unlink` would
-       * be one line and it would be permanent, and permanent is not a thing
-       * a culling tool gets to do to somebody's negatives.
+       * The machine's own delete is used, and never `unlink`, for one reason:
+       * it puts the file in the wastebasket with the record that lets it be
+       * put back afterwards. `unlink` would be one line and it would be
+       * permanent, and permanent is not a thing a culling tool gets to do to
+       * somebody's negatives.
        *
        * Every id is checked against the index first, so this can only ever
-       * name a file keeper has already scanned, and the paths go to
-       * osascript as an argv list rather than inside a built string.
+       * name a file keeper has already scanned, and no path is ever written
+       * into the text of the script that moves it.
        */
       if (route === "/api/trash" && req.method === "POST") {
-        if (process.platform !== "darwin") {
-          return json(res, 400, { error: "the trash is macOS only" });
-        }
+        if (!machine) return json(res, 400, { error: `deleting needs ${HOSTS}` });
         if (!ownOrigin(req)) return json(res, 403, { error: "that request came from another page" });
 
         const b = await body(req);
@@ -408,22 +408,10 @@ export function serve({ root, config, port = 7777, host = "127.0.0.1" }) {
           return json(res, 409, { error: "only frames already in the bin can be deleted" });
         }
 
-        const files = hits.map((h) => path.join(root, h.path));
-        const script = `on run argv
-  set l to {}
-  repeat with p in argv
-    set end of l to POSIX file (p as text)
-  end repeat
-  tell application "Finder" to delete l
-end run`;
-
         try {
-          await new Promise((ok, no) => {
-            execFile("osascript", ["-e", script, ...files], (err, _o, stderr) =>
-              err ? no(new Error(String(stderr || err.message).trim())) : ok());
-          });
+          await machine.trash(hits.map((h) => path.join(root, h.path)));
         } catch (e) {
-          return json(res, 500, { error: e.message });
+          return json(res, 500, { error: e.message.toLowerCase() });
         }
 
         /* The index is the app's copy of what is on the drive, so it has to
@@ -601,17 +589,15 @@ end run`;
        * foot of the bench asks for after writing nineteen of them.
        */
       if (route === "/api/reveal-export" && req.method === "POST") {
-        if (process.platform !== "darwin") {
-          return json(res, 400, { error: "reveal is macOS only" });
-        }
+        if (!machine) return json(res, 400, { error: `reveal needs ${HOSTS}` });
         const b = await body(req).catch(() => ({}));
         const dir = config.out ? path.resolve(config.out) : DEFAULT_OUT;
         const name = typeof b?.file === "string" ? b.file : "";
         if (name && (name.includes("/") || name.includes("\\") || name.startsWith("."))) {
           return json(res, 400, { error: "that is not a file this export wrote" });
         }
-        if (name) execFile("open", ["-R", path.join(dir, name)], () => {});
-        else execFile("open", [dir], () => {});
+        if (name) machine.reveal(path.join(dir, name));
+        else machine.openDir(dir);
         return json(res, 200, { ok: true });
       }
 
