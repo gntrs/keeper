@@ -3,16 +3,20 @@
 <!-- one badge is red and the rest are the ground, for the same reason one
      thing on the shelf is red: the accent marks the claim that matters, and
      a row of five red badges marks nothing. -->
-![no api key](https://img.shields.io/badge/no_api_key-e1062c?style=flat-square)
+![local only](https://img.shields.io/badge/local_only-e1062c?style=flat-square)
+![no api key](https://img.shields.io/badge/no_api_key-131315?style=flat-square)
 ![mac and windows](https://img.shields.io/badge/mac_and_windows-131315?style=flat-square)
 ![node 20+](https://img.shields.io/badge/node_20+-131315?style=flat-square)
 ![one dependency](https://img.shields.io/badge/one_dependency-131315?style=flat-square)
-![offline](https://img.shields.io/badge/offline-131315?style=flat-square)
 ![apache 2.0](https://img.shields.io/badge/apache_2.0-131315?style=flat-square)
 
 a shoot comes back as 1,768 frames and a website has sixteen holes. every
 hour between those two numbers goes on scrolling a finder window at 200px a
 thumbnail, and that is the hour this takes back.
+
+**it runs on your machine and it talks to nothing.** your photographs do not
+leave the drive they are on, there is no account and no key, and it works with
+the wifi off.
 
 ```
 keeper ~/Archive
@@ -45,6 +49,44 @@ would rather not take that on trust, this is the whole source and the builds
 come out of [one workflow](.github/workflows/release.yml) from three scripts
 in `packaging/` you can run yourself.
 
+## local, and what that actually means
+
+it is the first thing to check about anything you point at an archive, so it
+is written out rather than claimed in a badge.
+
+**the server binds to `127.0.0.1`.** not `0.0.0.0`, which means it cannot be
+reached from the other laptop on your own wifi, never mind from outside. one
+browser, one machine.
+
+**there is no account, no login, no key and no licence check.** nothing to
+sign up for, nothing to activate, and no file on your drive that has to be
+phoned home about.
+
+**no telemetry, no analytics, no crash reports.** not off by default, not
+there at all. every `fetch` in the source names either a path on this machine
+or github, and the github ones are the update check in the next paragraph.
+the only other web address in here is the link you click to read what
+changed. `grep -rn "fetch(" src web bin` is the whole audit.
+
+**exactly one thing here can reach the network, and it asks first.** keeper
+can check github whether there is a newer keeper. a card asks you once, in
+words, and until you answer no request is made. say no and it never asks
+again. say yes and it is one GET for one small json file, carrying no
+identifier, no archive, no counts and no cookie.
+
+**your photographs are read and never written.** keeper makes one folder,
+`<archive>/.keeper/`, holding thumbnails, your tags and your crops. delete it
+and the archive is exactly as it was. one key in the whole app can move an
+original file, it asks every time, and it goes through the machine's own
+delete so the trash can put it back.
+
+**nothing is uploaded, and nothing is generated.** no model runs here and no
+image is sent anywhere to be looked at by one. the tagging is done by the
+coding agent you already pay for, reading contact sheets, on your terms.
+
+all of it is checkable. the source is here, the builds come out of a workflow
+you can read, and every download has its sha256 beside it.
+
 it scans, writes thumbnails, and **opens the browser itself**. pass
 `--no-open` and it prints the url instead. **macos or windows.** nothing is uploaded,
 the server binds to loopback, and **no original is ever edited.** no key
@@ -57,10 +99,10 @@ it.
 
 | | |
 |---|---|
-| what it is | a culling and cropping bench for a photo and video archive |
+| what it is | a culling and cropping bench for a photo and video archive, on your own machine |
 | runs on | macos or windows, node 20 or newer |
 | dependencies | one, `sharp` |
-| network | none, unless you turn on the update check, and it asks first |
+| network | binds to `127.0.0.1` and talks to nothing, unless you turn on the update check, which asks first |
 | who tags the photographs | the coding agent you already pay for |
 | what it writes | one folder, `<archive>/.keeper/`, and nothing else |
 | licence | apache 2.0 |
