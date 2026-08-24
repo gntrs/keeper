@@ -31,6 +31,12 @@ const OUT = path.join(HERE, "out");
 const CACHE = path.join(HERE, "cache");
 
 const NODE = "v24.19.0";
+
+/* On windows npm is npm.cmd, a batch file, and execFile without a shell can
+   only start a real executable. Spelling the extension out is what makes
+   this script runnable on the machine it builds for, and it is cheaper than
+   turning a shell on for one call. */
+const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 const SHIP = ["bin", "src", "web", "package.json", "package-lock.json", "keeper.config.example.json"];
 
 const say = (s) => console.log(s);
@@ -105,7 +111,7 @@ async function main() {
   await cp(path.join(OUT, "keeper.ico"), path.join(folder, "keeper.ico"));
 
   say(`  installing dependencies for win32 ${arch}`);
-  await run("npm", ["install", "--omit=dev", "--no-audit", "--no-fund", "--os=win32", `--cpu=${arch}`], {
+  await run(NPM, ["install", "--omit=dev", "--no-audit", "--no-fund", "--os=win32", `--cpu=${arch}`], {
     cwd: path.join(folder, "app"),
   });
 
