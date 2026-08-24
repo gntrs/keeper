@@ -4,11 +4,11 @@
      thing on the shelf is red: the accent marks the claim that matters, and
      a row of five red badges marks nothing. -->
 ![no api key](https://img.shields.io/badge/no_api_key-e1062c?style=flat-square)
-![mac](https://img.shields.io/badge/mac-131315?style=flat-square)
+![mac and windows](https://img.shields.io/badge/mac_and_windows-131315?style=flat-square)
 ![node 20+](https://img.shields.io/badge/node_20+-131315?style=flat-square)
 ![one dependency](https://img.shields.io/badge/one_dependency-131315?style=flat-square)
 ![offline](https://img.shields.io/badge/offline-131315?style=flat-square)
-![mit](https://img.shields.io/badge/mit-131315?style=flat-square)
+![apache 2.0](https://img.shields.io/badge/apache_2.0-131315?style=flat-square)
 
 a shoot comes back as 1,768 frames and a website has sixteen holes. every
 hour between those two numbers goes on scrolling a finder window at 200px a
@@ -23,6 +23,27 @@ row of tag filters" width="100%">
 
 <sub>every frame in these shots is a generated stand in. real work does not go
 in a readme.</sub>
+
+## or download it and never see a terminal
+
+builds for both machines are on the
+[releases page](https://github.com/gntrs/keeper/releases), with node inside
+them, so there is nothing to install alongside.
+
+| | |
+|---|---|
+| **mac** | open the dmg, drag keeper to applications, open it |
+| **windows** | run the setup, or unzip the folder and double click `keeper.cmd` |
+
+it opens in your browser, you drag a folder of photographs onto the page, and
+it opens that folder again next time. **both builds are unsigned**, which
+costs money per year on each platform and that money has not been paid, so
+the first open needs one deliberate step: macos says the developer cannot be
+verified and wants system settings, privacy and security, open anyway;
+windows says it protected your pc and wants more info, run anyway. if you
+would rather not take that on trust, this is the whole source and the builds
+come out of [one workflow](.github/workflows/release.yml) from three scripts
+in `packaging/` you can run yourself.
 
 it scans, writes thumbnails, and **opens the browser itself**. pass
 `--no-open` and it prints the url instead. **macos or windows.** nothing is uploaded,
@@ -39,20 +60,24 @@ it.
 | what it is | a culling and cropping bench for a photo and video archive |
 | runs on | macos or windows, node 20 or newer |
 | dependencies | one, `sharp` |
-| network | none. it binds to `127.0.0.1` and talks to nothing |
+| network | none, unless you turn on the update check, and it asks first |
 | who tags the photographs | the coding agent you already pay for |
 | what it writes | one folder, `<archive>/.keeper/`, and nothing else |
-| licence | mit |
+| licence | apache 2.0 |
 
 ## the commands
 
 ```
 keeper <folder>                 scan, thumbnail, and open the shelf
+keeper app [folder]             the way the icon opens it: remembers the last
+                                archive, takes its own port, and reuses the
+                                copy that is already running
 keeper sheets <folder>          contact sheets for a coding agent to read
 keeper tag <folder> <file>      apply the tags that agent wrote
 keeper export <folder>          write the placed crops out
 keeper trays <folder>           what is in the trays, and how much
 keeper init [folder]            create keeper.config.json
+keeper doctor                   what this machine can and cannot do
 ```
 
 `--port` defaults to 7777, `--cols` and `--rows` set the contact sheet grid at
@@ -330,7 +355,10 @@ npm install
 node bin/keeper.mjs ~/Archive
 ```
 
-**on windows, without a terminal:** install node from
+that is the route for somebody who already has node. everybody else takes
+the dmg or the windows folder at the top of this file, which carry their own.
+
+**from a clone on windows, without a terminal:** install node from
 [nodejs.org](https://nodejs.org), then double click `keeper.cmd`. it starts
 keeper and opens the browser, and you drag a folder of photographs onto the
 page. dragging a folder onto `keeper.cmd` itself works too.
@@ -350,12 +378,39 @@ reads jpg, png, webp, avif, tif, heic and dng, and mov, mp4, m4v, mkv, avi,
 webm and mts. raw files come in through their embedded preview, which is all a
 contact sheet needs.
 
+## updating
+
+a downloaded keeper can update itself, and **it asks before it ever looks.**
+the first launch says so in a card in the corner: keeper can ask github
+whether there is a newer keeper. say no and it never asks again and never
+makes the request. say yes and it checks on each launch, names the version,
+links what changed, and updates on a button.
+
+what comes down is a quarter of a megabyte, because it is keeper and not the
+runtime under it: `bin`, `src` and `web`, and nothing else. it is checked
+against the sha256 the release published before a file moves, the copy being
+replaced is set aside rather than deleted so a failure puts it back, and
+`node_modules` is never touched. a release that changes what keeper depends
+on cannot be installed this way, says so, and sends you to the downloads
+instead of installing half of something. then it hands the port over, starts
+the new one, and the page you are reading comes back on its own.
+
+**the request carries nothing.** it is a GET for one small json file: no
+identifier, no archive, no counts, no cookie. a git clone is told none of
+this, because `git pull` is its update.
+
 ## where things live
 
 everything keeper writes goes in `<archive>/.keeper/`: the index, the
 thumbnails, the contact sheets, your tags, your placements and your trays.
 delete that folder and the archive is exactly as it was. nothing else on the
-drive is touched by anything you can reach with a keystroke. `delete` writes
+drive is touched by anything you can reach with a keystroke.
+
+opened from its icon rather than typed, it keeps two more files, and they are
+everything it has ever written outside an archive: which archive was open
+last, and which port it is on. `~/Library/Application Support/keeper` on
+macos, `%LOCALAPPDATA%\keeper` on windows. deleting them loses the memory of
+where you were and nothing else. `delete` writes
 an id to `binned.json` and nothing else: the frame leaves the shelf, the file
 does not leave the folder. the only thing in keeper that moves a file is
 `delete off the drive`, which lives inside the bin, asks first, and uses
@@ -385,4 +440,10 @@ sentence.
 
 ## licence
 
-mit.
+apache 2.0.
+
+it was mit until there was something to download. a dmg is not source: it
+carries node, sharp and libvips, and libvips is lgpl, so shipping that binary
+means saying whose work is inside it and letting somebody swap it.
+[`NOTICE`](NOTICE) does both and names the file. nothing about how you may
+use keeper changed, and it is still free.
