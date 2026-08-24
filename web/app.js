@@ -1,5 +1,5 @@
 import { mountShelf, renderShelf } from "/shelf.js";
-import { mountBench, renderBench, setPick } from "/bench.js";
+import { mountBench, renderBench } from "/bench.js";
 import { mountTray, trayView } from "/tray.js";
 import { mountPreview, previewOpen } from "/preview.js";
 /* mounts itself and exports nothing. it listens on the window, so it has to

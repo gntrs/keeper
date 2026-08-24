@@ -1,9 +1,7 @@
-import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { host } from "./os/index.mjs";
 
-import { STILL_EXT, FILM_EXT } from "./scan.mjs";
 
 
 /** how many candidates ever come back, and how many file lookups are spent */
