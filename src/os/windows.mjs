@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -31,42 +32,90 @@ export const LINKS = ["symlink", "shortcut"];
  * NOTHING FROM OUTSIDE IS EVER WRITTEN INTO THE SCRIPT TEXT.
  *
  * This is the same rule the mac side keeps by handing osascript an argv list,
- * and powershell has no argv to hand a `-Command` string, so it is kept a
+ * and there is no argv to hand a powershell script either, so it is kept a
  * different way: the script is a constant, and every value it works on
  * arrives through the environment or through a file whose path arrives
  * through the environment. A folder called `'; rm -r C:\` is then just a
  * folder with a strange name, because the script was already compiled before
  * the value existed.
  *
+ * `-File` AND NOT `-Command -`, AND THIS IS NOT A PREFERENCE.
+ *
+ * Every script in this module is a multi line block, and a multi line block
+ * fed to `-Command -` down a pipe is thrown away without being run. Reading
+ * commands from a pipe, powershell 5.1 submits one line at a time as though
+ * somebody were typing them: a line ending in an open brace is an unfinished
+ * statement, a console would prompt for the rest, and a pipe cannot be
+ * prompted. The run then ends at exit 0 with an empty stdout and an empty
+ * stderr. Measured on windows 11: `foreach ($i in 1..2) { Write-Output $i }`
+ * on one line prints two numbers, and the same loop spread across three
+ * lines prints nothing at all and reports success.
+ *
+ * That is why none of this module had ever worked. The trash, the folder
+ * chooser, the shortcut export and the search each handed their script to a
+ * pipe that dropped it on the floor, and every one of them came back looking
+ * like it had succeeded. A file on disk has none of that: it is parsed whole,
+ * it runs, and `exit` sets the process exit code.
+ *
  * `powershell.exe` and not `pwsh`, because 5.1 ships with windows and 7 is
  * something a person had to go and install.
  */
-function ps(script, env = {}, timeout = 0, interactive = false) {
-  return new Promise((ok, no) => {
-    const child = execFile(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        /* Left off the one call that puts a window up. It is meant to stop a
-           cmdlet blocking on a prompt nobody can see, and a winforms dialog
-           is not that, but it is not worth finding out the hard way on the
-           one call whose whole job is to be interactive. */
-        ...(interactive ? [] : ["-NonInteractive"]),
-        "-ExecutionPolicy", "Bypass",
-        /* winforms will not run on a multithreaded apartment, and it costs
-           nothing on the calls that never open a window. */
-        "-STA",
-        "-Command", "-",
-      ],
-      { env: { ...process.env, ...env }, maxBuffer: 8 << 20, windowsHide: true, timeout },
-      (err, stdout, stderr) => {
-        if (err) return no(new Error(String(stderr || err.message).trim().split("\n")[0] || "powershell failed"));
-        ok(String(stdout));
-      },
-    );
-    child.stdin.end(script);
-  });
+async function ps(script, env = {}, timeout = 0, interactive = false) {
+  const dir = await mkdtemp(path.join(tmpdir(), "keeper-ps-"));
+  const file = path.join(dir, "run.ps1");
+  try {
+    /* the same BOM as the list file, and for the same reason: 5.1 reads a
+       .ps1 without one as the ANSI code page. */
+    await writeFile(file, "\uFEFF" + guarded(script), "utf8");
+    return await new Promise((ok, no) => {
+      execFile(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          /* Left off the one call that puts a window up. It is meant to stop a
+             cmdlet blocking on a prompt nobody can see, and a winforms dialog
+             is not that, but it is not worth finding out the hard way on the
+             one call whose whole job is to be interactive. */
+          ...(interactive ? [] : ["-NonInteractive"]),
+          "-ExecutionPolicy", "Bypass",
+          /* winforms will not run on a multithreaded apartment, and it costs
+             nothing on the calls that never open a window. */
+          "-STA",
+          "-File", file,
+        ],
+        { env: { ...process.env, ...env }, maxBuffer: 8 << 20, windowsHide: true, timeout },
+        (err, stdout, stderr) => {
+          if (err) return no(new Error(String(stderr || err.message).trim().split("\n")[0] || "powershell failed"));
+          ok(String(stdout));
+        },
+      );
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }
+
+/**
+ * A FAILED SCRIPT HAS TO COME BACK AS A FAILURE, AND IT DOES NOT BY DEFAULT.
+ *
+ * Running from a file fixed what never ran; it does not on its own make a
+ * failure loud. An error inside the script can still end the run at exit 0
+ * with an empty stderr, and `execFile` reads that as success, so a delete
+ * that happened and a delete that did not would arrive here as the same
+ * event. That is the shape of every bug in this file's history.
+ *
+ * So the script is wrapped rather than trusted. Anything reaching the catch
+ * writes one line to stderr and exits 1, which is what `ps` already reads,
+ * and the last line makes the success case stated rather than inherited.
+ */
+const guarded = (script) => `try {
+${script}
+} catch {
+  [Console]::Error.WriteLine($_.Exception.Message)
+  exit 1
+}
+exit 0
+`;
 
 /**
  * A list too long to be an environment variable, handed over as a file.
@@ -158,20 +207,49 @@ export function openDir(dir) {
  * the recycle bin and choose restore. Permanent is not a thing a culling tool
  * gets to do to somebody's negatives.
  *
- * DoNotShowDialogs and not OnlyErrorDialogs: this runs behind a browser
- * window, and a modal put up by a background process is a request that never
- * comes back and a dialog nobody can find.
+ * `OnlyErrorDialogs` because it is the quiet one, and because it is the only
+ * one there is. `UIOption` holds exactly `OnlyErrorDialogs` and `AllDialogs`.
+ * `DoNotShowDialogs`, which reads like the right answer and was the one here
+ * until this ran on a real windows machine, is not a member of that enum and
+ * never has been. It cost nothing to write and it deleted nothing for the
+ * whole life of the windows line: the argument would not bind, the run exited
+ * 0 with an empty stderr, and the route above took that for a delete and
+ * dropped the frames out of the index while every file sat where it was.
+ *
+ * The fear that put the wrong name there is real and is answered anyway. A
+ * hidden non interactive process puts up neither dialog; the delete either
+ * happens or it comes back, and it is checked below either way.
  */
 const TRASH = `
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName Microsoft.VisualBasic
 foreach ($p in [IO.File]::ReadAllLines($env:KEEPER_LIST)) {
-  if ($p) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($p, 'DoNotShowDialogs', 'SendToRecycleBin') }
+  if ($p) { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($p, 'OnlyErrorDialogs', 'SendToRecycleBin') }
 }
 `;
 
+/**
+ * Gone from where it was is the only claim worth making, so it is the one
+ * that gets tested. The shell delete is not reliably loud: a file another
+ * program is holding open comes back with no exception and no error text and
+ * is still on the drive afterwards. The caller reads a clean return as
+ * licence to drop those frames from the index, which is the one mistake this
+ * module must not let it make.
+ */
 export async function trash(paths) {
   await withList(paths, (list) => ps(TRASH, { KEEPER_LIST: list }));
+
+  const left = [];
+  for (const p of paths) {
+    try {
+      await access(p, constants.F_OK);
+      left.push(path.basename(p));
+    } catch { /* not there any more, which is the whole point */ }
+  }
+  if (!left.length) return;
+
+  const names = left.slice(0, 3).join(", ") + (left.length > 3 ? ", and more" : "");
+  throw new Error(`${left.length} of ${paths.length} did not reach the recycle bin and are still on the drive: ${names}`);
 }
 
 /* ------------------------------------------------------------------ */
