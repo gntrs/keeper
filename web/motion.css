@@ -169,3 +169,171 @@ body[data-dragging] #grid figure.picked::after {
 @media (prefers-reduced-motion: reduce) {
   body[data-dragging] #grid figure.picked { transition: none; }
 }
+
+/* --- leaving, the same way it arrived ------------------------------- */
+/* THE THIRD RULE AT THE TOP OF THIS FILE WAS ONLY HALF KEPT.
+ *
+ * Every panel in the app arrived on a keyframe and then left by having
+ * `hidden` set on it, which is `display: none` and is instant. So the card
+ * rose into place over a third of a second and vanished in a single frame,
+ * and the shortcuts sheet came up from the bottom edge under a comment
+ * promising it would go back down the same way, which it never did. A thing
+ * that fades in and cuts out does not read as faster. It reads as a crash.
+ *
+ * The fix is one mechanism rather than a keyframe each way. A transition
+ * that includes `display` with `allow-discrete` holds the element rendered
+ * until the rest of the transition has finished, and `@starting-style` gives
+ * it somewhere to come from on the way in. One declaration then describes
+ * both directions and they cannot drift apart, which is exactly the failure
+ * this is fixing.
+ *
+ * The enter keyframes they used to run are turned off here rather than
+ * deleted from style.css, so each panel's own look stays in one place and
+ * this file stays the layer you can lift out.
+ *
+ * A browser without `allow-discrete` ignores the display part and keeps the
+ * old instant hide, which is what happens today, so nothing regresses.
+ */
+
+/* the backdrop behind the card, and the older full screen viewer */
+#preview, #lb {
+  animation: none;
+  transition:
+    opacity var(--fast) var(--ease),
+    /* THE DISPLAY STEP IS THE SLOW ONE ON PURPOSE, AND IT IS NOT A TYPO.
+       It is what holds the whole thing rendered, so it has to outlast the
+       longest thing inside: the dimming is quick, the card underneath takes
+       --mid to settle, and matching this to the dimming would pull the floor
+       out at .18s and cut the card off halfway. */
+    display var(--mid) var(--ease) allow-discrete;
+}
+#preview[hidden], #lb[hidden] { opacity: 0; }
+
+/* On the way out these are still on screen for a third of a second, and a
+   backdrop that is invisible but still catching clicks is the worst kind of
+   bug to find later: a press lands on nothing and the app looks dead. */
+#preview[hidden], #lb[hidden], #keys[hidden], #bin-bar[hidden] {
+  pointer-events: none;
+}
+@starting-style {
+  #preview:not([hidden]), #lb:not([hidden]) { opacity: 0; }
+}
+
+/* The card rides the backdrop's state rather than its own, because it is
+   never the thing `hidden` is set on. Slower than the dimming behind it: the
+   backdrop is a light going out and the card is an object being put down. */
+.preview-card {
+  animation: none;
+  transition:
+    opacity var(--mid) var(--ease),
+    scale var(--mid) var(--ease);
+}
+#preview[hidden] .preview-card { opacity: 0; scale: .985; }
+@starting-style {
+  #preview:not([hidden]) .preview-card { opacity: 0; scale: .985; }
+}
+
+/* the shortcuts sheet, which now keeps the promise its comment makes */
+#keys {
+  animation: none;
+  transition:
+    opacity .26s var(--ease),
+    translate .26s var(--ease),
+    display .26s var(--ease) allow-discrete;
+}
+#keys[hidden] { opacity: 0; translate: 0 14px; }
+@starting-style {
+  #keys:not([hidden]) { opacity: 0; translate: 0 14px; }
+}
+
+/* The bin's bar leaves through the edge it is fixed to. It is a full width
+   bar with a shadow above it, so fading it in place would dissolve a wall
+   rather than move one, and the edge is where it came from. */
+#bin-bar {
+  transition:
+    translate var(--mid) var(--ease),
+    display var(--mid) var(--ease) allow-discrete;
+}
+#bin-bar[hidden] { translate: 0 100%; }
+@starting-style {
+  #bin-bar:not([hidden]) { translate: 0 100%; }
+}
+
+/* What cmd z just did. It is a small thing in a corner and it says something
+   that was already true, so it rises a little and fades, both ways. */
+#undo-say {
+  transition:
+    opacity var(--fast) var(--ease),
+    translate var(--fast) var(--ease),
+    display var(--fast) var(--ease) allow-discrete;
+}
+#undo-say[hidden] { opacity: 0; translate: 0 6px; }
+@starting-style {
+  #undo-say:not([hidden]) { opacity: 0; translate: 0 6px; }
+}
+
+/* "nothing matches that", which is an answer and not a panel, so it only
+   fades. Moving it would suggest it came from somewhere. */
+#none {
+  transition:
+    opacity var(--fast) var(--ease),
+    display var(--fast) var(--ease) allow-discrete;
+}
+#none[hidden] { opacity: 0; }
+@starting-style { #none:not([hidden]) { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The blanket rule in style.css already flattens every duration, which
+     takes the discrete display step with it. All that is left to say is that
+     nothing should end up parked off screen or transparent. */
+  #preview[hidden], #lb[hidden], #keys[hidden],
+  #bin-bar[hidden], #undo-say[hidden], #none[hidden] { display: none; }
+}
+
+/* --- the tray panel arriving ---------------------------------------- */
+/* THE BOX ITSELF DOES NOT SLIDE, AND THAT IS DELIBERATE.
+ *
+ * Opening the panel is a layout change: the shelf, the filters and both bars
+ * all take a right hand padding so the wall genuinely gets narrower. Sliding
+ * the panel in over a quarter second while the wall it is making room in
+ * snapped instantly would be two things disagreeing about where the edge of
+ * the window is, which is worse than either of them being abrupt. Animating
+ * the padding as well would put a wall of two thousand tiles through layout
+ * on every frame, which is the one thing the note at the top of this file
+ * says not to do.
+ *
+ * So the edge arrives with the layout and the pile inside settles. It reads
+ * as the panel filling rather than as the panel appearing, and it costs
+ * nothing: the tiles are already rendered, and only opacity and translate
+ * move.
+ *
+ * `@starting-style` does the whole thing with no javascript. The children of
+ * an element going from `display: none` become rendered at that moment, and
+ * that is exactly when a starting style applies to them.
+ *
+ * A frame that arrived in the tray a moment ago is left out. It is already
+ * doing the pop it does when something lands, and two openings on one tile
+ * is a stutter rather than a flourish.
+ */
+#tray:not([hidden]) .tray-item:not([data-fresh]) {
+  transition:
+    opacity .34s var(--ease),
+    translate .34s var(--ease);
+}
+@starting-style {
+  #tray:not([hidden]) .tray-item:not([data-fresh]) { opacity: 0; translate: 0 10px; }
+}
+
+/* A short stagger across the first row and a half, then everything after
+   lands together. The point is a pile settling rather than a queue, so it
+   stops well before the eye starts counting. */
+#tray:not([hidden]) .tray-item:nth-child(2) { transition-delay: 18ms; }
+#tray:not([hidden]) .tray-item:nth-child(3) { transition-delay: 36ms; }
+#tray:not([hidden]) .tray-item:nth-child(4) { transition-delay: 54ms; }
+#tray:not([hidden]) .tray-item:nth-child(5) { transition-delay: 68ms; }
+#tray:not([hidden]) .tray-item:nth-child(6) { transition-delay: 80ms; }
+#tray:not([hidden]) .tray-item:nth-child(n+7) { transition-delay: 90ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  #tray:not([hidden]) .tray-item { transition: none !important; transition-delay: 0s !important; }
+}
