@@ -6,6 +6,13 @@
 # that should have been four lines is four thousand.
 * text=auto eol=lf
 
+# The exception, and it is not a preference. cmd.exe parses a batch file by
+# seeking through it, and a `goto` in a file with unix line endings can jump
+# to the wrong place or fall off the end, which shows up as the window
+# closing with no message. Batch files are crlf or they are a bug report.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 # Binary, so git never looks inside them for lines to convert.
 *.jpg binary
 *.png binary

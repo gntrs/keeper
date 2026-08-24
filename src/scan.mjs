@@ -135,11 +135,26 @@ const inside = (root, full) => path.relative(root, full).split(path.sep).join("/
 
 const QUIET_NAMES = new Set([".ds_store", ".localized", "thumbs.db", "desktop.ini", "icon\r"]);
 
-/** skipped wherever they appear, at any depth */
+/**
+ * Skipped wherever they appear, at any depth, and matched without case.
+ *
+ * THE TWO WINDOWS ENTRIES ARE NOT TIDINESS. `$RECYCLE.BIN` sits at the root
+ * of every windows volume and holds the files somebody has already deleted,
+ * so scanning a drive root without skipping it puts every discarded frame
+ * back on the shelf as a new photograph, with a new id, after the person
+ * went to the trouble of throwing it away. `System Volume Information` is
+ * unreadable to a normal account and would only produce a wall of permission
+ * errors on the way past.
+ *
+ * Without case, because these are compared against names off a filesystem
+ * that does not care about it: the recycler is usually shouted and is not
+ * always, and a folder called `Node_Modules` is the same folder.
+ */
 const SKIP_DIRS = new Set([
   ".git", "node_modules", ".keeper", ".keepers", ".Trashes", ".Spotlight-V100",
   ".fseventsd", "__MACOSX", ".DS_Store",
-]);
+  "$recycle.bin", "system volume information", "$windows.~ws", "$windows.~bt",
+].map((n) => n.toLowerCase()));
 
 /**
  * Walks a folder and returns every still under it, sorted by path so the
@@ -180,7 +195,7 @@ export async function scan(root, { onProgress } = {}) {
       if (e.name.startsWith("._")) continue; // apple resource fork sidecars
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
-        if (SKIP_DIRS.has(e.name)) continue;
+        if (SKIP_DIRS.has(e.name.toLowerCase())) continue;
         found += await walk(full);
       } else if (e.isFile()) {
         const base = e.name.toLowerCase();
