@@ -1,0 +1,40 @@
+keeper
+Copyright 2026 Gintaras Zilinskas
+
+Licensed under the Apache License, Version 2.0. The full text is in LICENSE.
+
+
+WHAT A PACKAGED KEEPER CONTAINS BESIDES KEEPER
+
+The dmg and the exe carry other people's work inside them, so this file says
+whose and under what. Running keeper from a git clone carries the same
+libraries, installed by npm rather than bundled.
+
+  Node.js                     MIT
+  https://nodejs.org
+  Bundled unmodified, from the official builds at nodejs.org, and the
+  build script verifies the published sha256 before using one.
+
+  sharp                       Apache-2.0
+  https://github.com/lovell/sharp
+
+  libvips                     LGPL-3.0-or-later
+  https://github.com/libvips/libvips
+  Bundled unmodified as a shared library inside @img/sharp-libvips-*. It
+  can be replaced with another build of the same library: the file sits in
+  Contents/Resources/app/node_modules on macOS and in the app folder on
+  windows, uncompressed, and nothing here prevents swapping it. Source for
+  the exact version is at the address above.
+
+  Geist and Geist Mono        SIL Open Font License 1.1
+  https://github.com/vercel/geist-font
+  Full text in web/font/OFL.txt.
+
+  Phosphor Icons              MIT
+  https://github.com/phosphor-icons/core
+  Full text in web/phosphor-LICENSE.txt.
+
+  ffmpeg                      LGPL-2.1-or-later, when it is bundled
+  https://ffmpeg.org
+  Only present in a build made with --with-film. It is invoked as a
+  separate program and keeper links to none of it.
