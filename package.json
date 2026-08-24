@@ -3,15 +3,33 @@
   "version": "0.2.0",
   "description": "point it at a drive. get back the frames worth keeping, cropped into the holes they have to fill.",
   "type": "module",
-  "bin": { "keeper": "bin/keeper.mjs" },
-  "files": ["bin", "src", "web", "keeper.config.example.json"],
-  "engines": { "node": ">=20" },
+  "bin": {
+    "keeper": "bin/keeper.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "web",
+    "keeper.config.example.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "keeper": "node bin/keeper.mjs"
+    "keeper": "node bin/keeper.mjs",
+    "icons": "node packaging/icons.mjs",
+    "dmg": "node packaging/build-mac.mjs",
+    "portable": "node packaging/build-windows.mjs"
   },
   "dependencies": {
     "sharp": "^0.34.5"
   },
-  "keywords": ["photography", "contact-sheet", "archive", "crop", "cull"],
+  "keywords": [
+    "photography",
+    "contact-sheet",
+    "archive",
+    "crop",
+    "cull"
+  ],
   "license": "MIT"
 }

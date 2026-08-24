@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    The windows icon, which is the same drawing on a different grid. Windows
+    draws no squircle and adds no margin of its own, so the shape fills the
+    canvas and the corner is the softer radius windows 11 uses rather than
+    apple's. Sharing the svg between the two would have meant one platform
+    getting an icon with a hundred points of empty air around it.
+  -->
+  <rect x="0" y="0" width="1024" height="1024" rx="128" fill="#0b0b0c"/>
+  <rect x="2" y="2" width="1020" height="1020" rx="127" fill="none"
+        stroke="#ffffff" stroke-opacity=".14" stroke-width="4"/>
+  <rect x="287" y="287" width="450" height="450" rx="67" fill="#e1062c"/>
+</svg>

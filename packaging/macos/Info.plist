@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>              <string>keeper</string>
+  <key>CFBundleDisplayName</key>       <string>keeper</string>
+  <key>CFBundleIdentifier</key>        <string>com.github.gntrs.keeper</string>
+  <key>CFBundleExecutable</key>        <string>keeper</string>
+  <key>CFBundleIconFile</key>          <string>keeper</string>
+  <key>CFBundlePackageType</key>       <string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+  <key>CFBundleVersion</key>           <string>__VERSION__</string>
+  <key>LSMinimumSystemVersion</key>    <string>11.0</string>
+  <key>NSHighResolutionCapable</key>   <true/>
+
+  <!--
+    Keeper reads folders of photographs, and on a modern mac the interesting
+    ones all sit behind a permission prompt. A prompt with no sentence in it
+    says "keeper would like to access your desktop folder" and nothing else,
+    which is the moment somebody decides whether to trust this. So the
+    sentences are written here, in the app's own words, and they say what it
+    does with the access rather than only asking for it.
+
+    A terminal never showed these, because a command inherits whatever the
+    terminal was already allowed to do. From an icon they are the first thing
+    the app ever says.
+  -->
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>keeper reads the photographs in the folder you open and writes its index beside them. it never sends anything anywhere.</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>keeper reads the photographs in the folder you open and writes its index beside them. it never sends anything anywhere.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>keeper reads the photographs in the folder you open and writes its index beside them. it never sends anything anywhere.</string>
+  <key>NSRemovableVolumesUsageDescription</key>
+  <string>an archive usually lives on an external drive. keeper reads the frames on it and writes its index beside them.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>only if you point keeper at your photos library folder yourself. it reads the files, it does not talk to the photos app.</string>
+</dict>
+</plist>

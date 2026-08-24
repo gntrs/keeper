@@ -10,7 +10,14 @@ keeper.config.json
 # dev repo once that exists, and never into the public one.
 CLAUDE.md
 
-# the empty folder keeper.cmd starts on while it waits for a drag. it is made
-# on first run and it fills with a .keeper of its own, and neither belongs in
-# the repo.
+# left over from when the windows launcher made its own empty folder to wait
+# in. it waits in the app data folder now, outside the repo, but a clone that
+# ran the old launcher still has this one.
 start/
+
+# what packaging writes. `out` holds the icons, the dmg, the zip and the
+# installer, and `cache` holds the node builds they are made from. all of it
+# is derived from what is committed, and a repo that keeps both has two
+# answers to what shipped.
+packaging/out/
+packaging/cache/

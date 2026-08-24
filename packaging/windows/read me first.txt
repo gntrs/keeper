@@ -1,0 +1,79 @@
+keeper
+
+
+WHAT THIS IS
+
+A bench for going through a shoot. It reads a folder of photographs and
+film, gives you a keyboard to sort them with, and lets you crop one frame
+into every shape you have to fill at once.
+
+It runs on your machine and it opens in your browser. Nothing is uploaded,
+there is no account, and it works with the wifi off.
+
+
+HOW TO START IT
+
+Double click  keeper.cmd
+
+Your browser opens on its own. Drag a folder of photographs onto the page.
+
+That is the whole setup. Node, and everything else keeper needs, is already
+in this folder.
+
+
+THE WARNING WINDOWS WILL SHOW YOU
+
+The first time you run this, windows will probably say it protected your PC
+and that the publisher is unknown.
+
+It says that because this has not been signed with a paid certificate, not
+because anything is wrong with it. Click "more info", then "run anyway".
+
+If you would rather not take that on trust, everything here is open source
+and the code is at github.com/gntrs/keeper. You can read it, and you can
+build this same folder yourself from it.
+
+
+UPDATES
+
+The first time you open it, a small card in the corner asks whether keeper may
+check github for a newer version. It is asking because until you answer it,
+keeper does not talk to anything at all.
+
+Say yes and it will tell you when there is a new one and update itself when
+you press the button. It downloads under a megabyte, checks it against the
+checksum the release published, and restarts. Your tags, your crops and your
+archive are not involved.
+
+Say no and it never asks again.
+
+
+WHAT IT DOES TO YOUR FILES
+
+Nothing, unless you press the one key that says it will.
+
+  It reads your photographs. It never writes to them.
+  It makes a folder called .keeper next to them, holding the small preview
+  images and your tags. Deleting that folder loses your tags and nothing
+  else.
+  Setting a frame aside hides it from the shelf. The file stays where it is.
+  There is one key that moves an original to the recycle bin. It asks first,
+  every time, and windows can put it back.
+  Exporting crops writes new files into a folder you choose. The originals
+  are not touched.
+
+
+IF SOMETHING IS WRONG
+
+Double click  doctor.cmd  and send whoever gave you this the eight lines it
+prints. It says what this machine can and cannot do and it touches nothing.
+
+
+WHERE THINGS ARE
+
+  keeper.cmd    starts it
+  doctor.cmd    checks this machine
+  app\          the program
+  node\         the runtime it needs
+  LICENSE       apache 2.0
+  NOTICE        the other people's work that is inside this folder

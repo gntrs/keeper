@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    The macOS icon. Apple's grid puts the shape in an 824 square centred on a
+    1024 canvas, so the 100 point margin is not padding anybody chose: it is
+    the room the system expects for the shadow it draws and for the icons
+    either side.
+
+    Nothing is drawn inside except the mark the app already wears in its own
+    corner. An icon that invented a lens or a folder would be describing a
+    tool keeper is not, and at 16 points in a dock every one of those reads
+    as grey anyway. A red square does not.
+  -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#0b0b0c"/>
+  <!-- the same hairline the app draws between its own panels, so the shape
+       has an edge on a dark dock instead of dissolving into it -->
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="none"
+        stroke="#ffffff" stroke-opacity=".14" stroke-width="4"/>
+  <!-- 362 is 44% of the shape, and the corner is 15% of the square, which is
+       the 3 in 20 the mark in the top bar has always used -->
+  <rect x="331" y="331" width="362" height="362" rx="54" fill="#e1062c"/>
+</svg>
