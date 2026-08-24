@@ -337,3 +337,70 @@ body[data-dragging] #grid figure.picked::after {
 @media (prefers-reduced-motion: reduce) {
   #tray:not([hidden]) .tray-item { transition: none !important; transition-delay: 0s !important; }
 }
+
+/* --- the update card ------------------------------------------------- */
+/* IT ARRIVES SEVERAL TIMES IN ONE LIFE, and that is what shapes this.
+ *
+ * It is not one panel that opens and closes. It is one box that holds four
+ * or five different sentences in a row: a question, a wait, an answer, a
+ * download, a restart. Each of those replaced the text underneath somebody
+ * who was reading it and gave them no sign anything had happened, so every
+ * change re-runs the entry rather than only the first.
+ *
+ * A card that only animated on first sight would be the one case where the
+ * motion is least needed, because nobody has read it yet.
+ */
+@keyframes up-in { from { opacity: 0; transform: translateY(10px) scale(.985); } }
+@keyframes up-out { to { opacity: 0; transform: translateY(6px) scale(.985); } }
+
+.up.in { animation: up-in .3s var(--ease) both; }
+.up.going { animation: up-out .2s var(--ease) both; pointer-events: none; }
+
+/* A NEW RELEASE GETS THE ACCENT, ONCE.
+ *
+ * The card says the same kind of thing whether it is asking permission or
+ * announcing a version, and only one of those is news. So the news one draws
+ * a hairline of the accent across the top of the card, in the same half
+ * second it arrives, and then stops. It does not pulse and it does not
+ * repeat: a thing that keeps moving after it has been read is asking for
+ * attention it has already had.
+ */
+@keyframes up-mark { from { transform: scaleX(0); } }
+.up.loud::before {
+  content: "";
+  position: absolute; left: -1px; right: -1px; top: -1px; height: 2px;
+  background: var(--hot);
+  border-radius: var(--r) var(--r) 0 0;
+  transform-origin: left;
+  animation: up-mark .5s var(--ease) both;
+}
+
+/* WAITING HAS TO MOVE, because the alternative was a full stop.
+ *
+ * The check takes about a fifth of a second and it read as slow anyway,
+ * which is not a network problem: the card swapped to the word "checking."
+ * and sat there, and a static word is indistinguishable from a hang for as
+ * long as it is on screen. A line that travels says the same thing and reads
+ * as fast, at exactly the same speed.
+ */
+@keyframes up-run {
+  0%   { transform: translateX(-100%) scaleX(.4); }
+  50%  { transform: translateX(0) scaleX(.7); }
+  100% { transform: translateX(100%) scaleX(.4); }
+}
+.up.busy::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  overflow: hidden;
+  background: linear-gradient(90deg, #0000, var(--hot), #0000);
+  border-radius: 0 0 var(--r) var(--r);
+  animation: up-run 1.1s var(--ease) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The travelling line is the one thing here that repeats, so it is the one
+     thing that has to stop. What is left says waiting with colour instead of
+     with movement. */
+  .up.busy::after { animation: none; background: #e1062c4d; }
+  .up.loud::before { animation: none; }
+}

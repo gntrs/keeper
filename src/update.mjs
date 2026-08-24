@@ -100,9 +100,13 @@ export async function depsFingerprint(file = path.join(ROOT, "package.json")) {
  * a check that hangs is worse than a check that fails, because the thing
  * waiting for it is a person who wanted to look at photographs.
  */
+/** the exact address the check asks for, so the page can show it rather than
+    describe it. a claim about a request is worth less than the request. */
+export const asks = () => NEWS;
+
 export async function check() {
   const current = await version();
-  if (isClone()) return { current, clone: true };
+  if (isClone()) return { current, clone: true, where: NEWS };
 
   let news;
   try {
@@ -110,7 +114,7 @@ export async function check() {
     if (!res.ok) throw new Error(`github answered ${res.status}`);
     news = await res.json();
   } catch (e) {
-    return { current, error: `could not reach github: ${e.message}` };
+    return { current, where: NEWS, error: `could not reach github: ${e.message}` };
   }
 
   if (!news?.version || !news?.app || !news?.sha256) {
@@ -120,6 +124,7 @@ export async function check() {
   const ready = newer(news.version, current);
   return {
     current,
+    where: NEWS,
     latest: news.version,
     ready,
     /* A release that changed its dependencies cannot be installed by

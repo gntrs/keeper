@@ -1119,7 +1119,7 @@ body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
    --------------------------------------------------------------------- */
 .up {
   position: fixed; right: var(--s5); bottom: var(--s5); z-index: 7;
-  width: min(360px, calc(100vw - var(--s5) * 2));
+  width: min(340px, calc(100vw - var(--s5) * 2));
   padding: var(--s4);
   background: var(--raise); border: 1px solid var(--line-strong);
   border-radius: var(--r);
@@ -1130,15 +1130,13 @@ body:has(#bin-bar:not([hidden])) .up { bottom: 76px; }
 body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
 
 .up-kicker { margin: 0 0 var(--s2); }
-.up-line { margin: 0; font-size: .92rem; line-height: 1.5; color: var(--ink-2); }
+.up-line { margin: 0; font-size: .95rem; line-height: 1.45; color: var(--ink); }
 .up-acts { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
 .up-acts[hidden] { display: none; }
 
 /* A chip in the filter row sits among other chips and reads as a control
    because of them. Alone in a card it reads as a sentence, so both get an
-   edge, and the one that does the thing gets the accent. It is the same
-   treatment the bin's own two buttons have, for the same reason: two
-   choices, and only one of them is the answer. */
+   edge, and the one that does the thing gets the accent. */
 .up-acts .chip { box-shadow: inset 0 0 0 1px var(--line-strong); }
 .up-acts .chip:hover { color: var(--ink); background: #ffffff0f; }
 .up-acts .up-go {
@@ -1147,6 +1145,83 @@ body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
   box-shadow: inset 0 0 0 1px #e1062c59;
 }
 .up-acts .up-go:hover { background: #e1062c2e; color: #ff8e9f; }
+
+/* --- the fold that shows the request ------------------------------------
+
+   Closed by default and one click from open, because the person who wants
+   to read what a program sends before letting it send anything is a
+   different person from the one who wants their photographs back, and the
+   card has to serve the second one in a glance without failing the first.
+   ------------------------------------------------------------------------ */
+.up-more { margin-top: var(--s3); }
+.up-more[hidden] { display: none; }
+
+.up-fold-head {
+  display: flex; align-items: center; gap: var(--s2);
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: 500 .82rem/1 var(--mono); color: var(--ink-3);
+  letter-spacing: .02em;
+  transition: color var(--fast) var(--ease);
+}
+.up-fold-head:hover { color: var(--ink-2); }
+/* a caret drawn rather than fetched, and it turns instead of being swapped */
+.up-fold-head i {
+  width: 7px; height: 7px; display: block; flex: none;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); margin-left: 2px;
+  transition: transform var(--mid) var(--ease);
+}
+.up-fold[data-open="yes"] .up-fold-head i { transform: rotate(45deg); }
+
+/* Zero to one fraction of a grid row, which is a height animation the
+   browser measures instead of one I guess at with a max-height that is
+   always either too small to open or too big to move at the right speed. */
+.up-fold-cage {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--mid) var(--ease);
+}
+.up-fold[data-open="yes"] .up-fold-cage { grid-template-rows: 1fr; }
+.up-fold-body { overflow: hidden; }
+.up-fold-body > div {
+  padding-top: var(--s3);
+  font-size: .82rem; line-height: 1.5; color: var(--ink-2);
+}
+.up-fold-body p { margin: var(--s2) 0 0; }
+
+/* the request, set as what it is: a line of wire, in the mono, wrapping
+   rather than scrolling because it is short and being able to read all of
+   it is the entire point of showing it */
+.up-req {
+  display: block;
+  font: 400 .76rem/1.5 var(--mono);
+  color: var(--ink);
+  background: #ffffff0a;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--s2) var(--s3);
+  overflow-wrap: anywhere;
+}
+/* It reads as a link because it is set like one and because it says where
+   it goes. The mono is doing the work the underline used to: a domain in the
+   mono cut, in an app where every path and every number is in that cut,
+   reads as an address rather than as emphasis. */
+.up-link {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: var(--s3);
+  font: 500 .78rem/1 var(--mono);
+  color: #ff5d75; text-decoration: none;
+  border-bottom: 1px solid #e1062c4d; padding-bottom: 3px;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.up-link:hover { color: #ff8e9f; border-bottom-color: #e1062ca6; }
+/* the arrow that means this leaves keeper, drawn rather than fetched */
+.up-link i {
+  width: 6px; height: 6px; display: block; flex: none;
+  border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor;
+  transform: rotate(45deg); margin-bottom: 1px;
+  transition: transform var(--fast) var(--ease);
+}
+.up-link:hover i { transform: rotate(45deg) translate(1px, -1px); }
 body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 
 /* the drop state. the accent, one hairline in from the edge, so the panel

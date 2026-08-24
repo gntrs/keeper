@@ -340,19 +340,34 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
        * leaving the machine. That ordering is the whole promise.
        */
       if (route === "/api/update" && req.method === "GET") {
-        const { check, isClone, version } = await import("./update.mjs");
+        const { asks, check, isClone, version } = await import("./update.mjs");
         const policy = await updatePolicy();
         if (policy !== "on") {
-          return json(res, 200, { policy, current: await version(), clone: isClone() });
+          /* The address is sent even when the answer is no, because the page
+             asking permission has to be able to show what it would ask for.
+             Nothing is requested to produce it: it is a constant. */
+          return json(res, 200, { policy, current: await version(), clone: isClone(), where: asks() });
         }
         return json(res, 200, { policy, ...(await check()) });
       }
 
-      /* the answer to the question the page asks once */
+      /**
+       * The answer to the question the page asks once, and the answer to the
+       * question that follows it.
+       *
+       * Saying yes used to cost two round trips, because the page set the
+       * preference and then asked again what the preference had turned up.
+       * The second one is the one that talks to github, so the button sat on
+       * a dead word for both. One call now: yes comes back with the check
+       * already in it.
+       */
       if (route === "/api/update/allow" && req.method === "POST") {
         const b = await body(req).catch(() => ({}));
-        await setUpdatePolicy(!!b?.yes);
-        return json(res, 200, { ok: true, policy: (await updatePolicy()) });
+        const yes = !!b?.yes;
+        await setUpdatePolicy(yes);
+        if (!yes) return json(res, 200, { ok: true, policy: "off" });
+        const { check } = await import("./update.mjs");
+        return json(res, 200, { ok: true, policy: "on", ...(await check()) });
       }
 
       /**
