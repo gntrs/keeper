@@ -5,13 +5,21 @@ import * as windows from "./windows.mjs";
  * THE ONLY PLACE KEEPER KNOWS WHICH MACHINE IT IS ON.
  *
  * Everything above this line is the same code on both platforms, because the
- * differences are not in what keeper does. They are in four things the
+ * differences are not in what keeper does. They are in five things the
  * operating system owns and will not let a program reimplement:
  *
  *   the file manager        showing somebody a file where they can pick it up
  *   the wastebasket         a delete that is still undoable afterwards
  *   the shortcut            a file that stands for a file somewhere else
  *   the search index        turning a folder name back into a path
+ *   where things are kept   the handful of folders an archive is ever in
+ *
+ * The last two are one question asked twice, and deliberately so. The index
+ * is the fast answer and it is not always allowed to give one: opened from
+ * its icon, keeper is handed a search index with the protected folders cut
+ * out of it, while reading those same folders directly works. So the list of
+ * roots is the slow answer to the question the index sometimes refuses, and
+ * a platform that has one without the other is still worth having.
  *
  * Plus a raw decoder, which is not owned by the OS in principle and is in
  * practice, because one of these two ships one and the other does not.

@@ -162,6 +162,29 @@ export async function search(term, kind) {
 }
 
 /**
+ * THE FOLDERS WORTH LOOKING IN WHEN SPOTLIGHT WILL NOT ANSWER.
+ *
+ * Measured, not assumed: an app launched from its icon gets spotlight
+ * results filtered by the same permission system that guards the folders
+ * themselves, so `mdfind` finds a folder in the home root and comes back
+ * empty for the identical folder on the desktop. `readdir` on that same
+ * desktop folder works. The index is filtered, the disk is not.
+ *
+ * So these are the places a person actually keeps an archive, and they are
+ * read directly. /Volumes is on the list twice over: an external drive is
+ * where most of these live, and it is also the thing most often missing from
+ * the index entirely.
+ */
+export function roots() {
+  const home = process.env.HOME || "";
+  return [
+    home,
+    ...["Desktop", "Documents", "Downloads", "Pictures", "Movies"].map((d) => `${home}/${d}`),
+    "/Volumes",
+  ].filter(Boolean);
+}
+
+/**
  * macOS decodes every raw this app meets through Image I/O, and sips is the
  * front door to it. Nothing to install and nothing to check for.
  */

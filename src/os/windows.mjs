@@ -344,6 +344,30 @@ export async function search(term, kind) {
   }
 }
 
+/**
+ * The same list the mac keeps, in this machine's own folders.
+ *
+ * Windows does not filter its search results the way the mac does, so this
+ * is not repairing the same wound. It is here because the other half of that
+ * problem is on both machines: a drive that was never added to the index
+ * answers nothing, and an archive on an external drive is the ordinary case
+ * rather than the exotic one.
+ */
+export function roots() {
+  const home = process.env.USERPROFILE || "";
+  const out = home
+    ? [home, ...["Desktop", "Documents", "Downloads", "Pictures", "Videos"].map((d) => path.join(home, d))]
+    : [];
+  /* Every lettered drive from c to z. A letter with nothing behind it fails
+     its readdir and costs nothing, which is cheaper than asking windows which
+     letters are mounted. a: and b: are left off because they are floppy
+     drives and a caller with one has other problems. */
+  for (let c = "C".charCodeAt(0); c <= "Z".charCodeAt(0); c++) {
+    out.push(`${String.fromCharCode(c)}:\\`);
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------ */
 /* raw                                                                 */
 /* ------------------------------------------------------------------ */
