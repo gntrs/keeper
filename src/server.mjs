@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { paths, readIndex, writeIndex, readTags, writeTags, readPlacements, writePlacements, readBinned, writeBinned } from "./store.mjs";
 import { startOpen, jobState } from "./open.mjs";
-import { locate } from "./locate.mjs";
+import { locate, warmRoots } from "./locate.mjs";
 import {
   readTrays, writeTrays, trayById, newTray, addTo, removeFrom, dropTray, membership, exportTray, MODES,
 } from "./trays.mjs";
@@ -751,6 +751,13 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
       return json(res, 500, { error: String(e.message) });
     }
   });
+
+  /* Opened from the icon, the folders keeper looks in are behind a permission
+     it has not been given yet, and asking for it costs the first request that
+     needs it. Asked for here, it costs nothing anybody is waiting on. A
+     terminal has already been granted whatever it has, so there is nothing to
+     warm and no reason to put a dialog up. */
+  if (launched === "app") warmRoots();
 
   return new Promise((resolve, reject) => {
     server.once("error", reject);

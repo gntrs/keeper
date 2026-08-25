@@ -146,6 +146,28 @@ async function sweep(name, kind) {
   return hits;
 }
 
+/**
+ * ASK FOR THE FOLDERS AT LAUNCH, NOT WITH A FOLDER UNDER THE CURSOR.
+ *
+ * The first read of a protected folder by a newly installed app does not
+ * return until somebody answers a permission dialog, and until then it does
+ * not return at all. Left to happen during a drop, that is a five second
+ * stall ending in a card that says nothing was found, on the first drop
+ * anybody ever makes, which is the one that decides what they think of this.
+ *
+ * So the roots are read once at startup and the answer is thrown away. The
+ * dialog arrives while keeper is opening, which is when a person expects an
+ * app to say what it needs and when the sentences in Info.plist are on
+ * screen to explain it. Every drop after that is already warm.
+ *
+ * Nothing waits on this and nothing checks whether it worked. Refused, the
+ * sweep simply finds nothing and the folder dialog does what it always did:
+ * that is a keeper that asks for less and costs one click, not a broken one.
+ */
+export function warmRoots() {
+  for (const dir of host?.roots?.() ?? []) readdir(dir).catch(() => {});
+}
+
 /** the index and the disk, each seeing what the other cannot, counted once */
 const both = async (term, kind) => {
   const [indexed, swept] = await Promise.all([find(term, kind), sweep(term, kind)]);
