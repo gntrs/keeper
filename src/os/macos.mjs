@@ -29,9 +29,15 @@ const run = (cmd, args, opts = {}) =>
  * the browser has nothing to do until a folder is picked, and the dialog is
  * the answer it is waiting on.
  */
-export async function chooseFolder() {
+export async function chooseFolder(startIn = "") {
   try {
-    const out = await run("osascript", ["-e", "POSIX path of (choose folder)"]);
+    /* opening the dialog inside the folder the archive already sits in, when
+       there is one. a picker that lands wherever it last was makes the person
+       who just dropped a folder on the window go and find it by hand. */
+    const script = startIn
+      ? `POSIX path of (choose folder default location POSIX file ${JSON.stringify(startIn)})`
+      : "POSIX path of (choose folder)";
+    const out = await run("osascript", ["-e", script]);
     // a POSIX path of a folder comes back with a trailing slash. it goes
     // straight into path.join afterwards, which reads cleaner without it.
     return { path: out.trim().replace(/\/+$/, "") || "/" };

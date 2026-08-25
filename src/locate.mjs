@@ -58,7 +58,7 @@ const find = (term, kind) => host?.search(term, kind) ?? [];
  * not turn a dropped folder into a disk crawl. What matters is the count of
  * directories read while somebody waits with a folder under the cursor.
  */
-const SWEEP_DIRS = 240;
+const SWEEP_DIRS = 1200;
 
 /**
  * And the stop for a directory that will not answer at all: a mapped network
@@ -112,7 +112,14 @@ async function sweep(name, kind) {
      as many readdirs as there are roots and is done in milliseconds. Only a
      name that is nowhere obvious pays for the second pass, and nothing pays
      for a third. */
-  for (let depth = 0; depth <= 1 && level.length && !hits.length; depth++) {
+  /* FOUR LEVELS, NOT TWO.
+     Two was enough for an archive kept on the desktop and blind to every
+     real one: photographs live at <drive>\Photos\2026\a wedding, which is
+     three down from a drive root, and the sweep walked past it every time
+     and sent the person to the folder dialog. It still stops at the first
+     level that answers, so the shallow case costs exactly what it did, and
+     the deeper passes only run for a name nothing nearer has matched. */
+  for (let depth = 0; depth <= 3 && level.length && !hits.length; depth++) {
     const batch = level.slice(0, SWEEP_DIRS - read);
     read += batch.length;
 
@@ -215,6 +222,17 @@ const nameOf = (f) => (typeof f === "string" ? f : f?.name);
  * archive is somewhere the roots do not reach. Asking somebody over a message
  * to tell those apart is how a week goes by, so the report tells them apart.
  */
+/**
+ * Where the folder dialog should open, when the search has failed and the
+ * dialog is all that is left. The archive that is open is the best guess by
+ * a distance: a second shoot is almost always beside the first one.
+ */
+export function nearby(root) {
+  if (!root) return "";
+  const up = path.dirname(root);
+  return up && up !== root ? up : root;
+}
+
 export async function explain(name) {
   const began = Date.now();
   const dirs = await (host?.roots?.() ?? []);

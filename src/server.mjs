@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { paths, readIndex, writeIndex, readTags, writeTags, readPlacements, writePlacements, readBinned, writeBinned } from "./store.mjs";
 import { startOpen, jobState } from "./open.mjs";
-import { locate, warmRoots } from "./locate.mjs";
+import { locate, nearby, warmRoots } from "./locate.mjs";
 import {
   readTrays, writeTrays, trayById, newTray, addTo, removeFrom, dropTray, membership, exportTray, MODES,
 } from "./trays.mjs";
@@ -461,7 +461,7 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
        */
       if (route === "/api/choose" && req.method === "POST") {
         if (!machine) return json(res, 400, { error: `the folder chooser needs ${HOSTS}` });
-        const picked = await machine.chooseFolder();
+        const picked = await machine.chooseFolder(nearby(root));
         if (picked.error) return json(res, 500, { error: picked.error });
         return json(res, 200, picked);
       }

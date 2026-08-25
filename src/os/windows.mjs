@@ -144,12 +144,19 @@ async function withList(lines, run) {
 /* the file manager                                                    */
 /* ------------------------------------------------------------------ */
 
+/* KEEPER_START, when it is set, is a folder worth opening the dialog inside.
+   A picker that lands on This PC every time makes the person who just dropped
+   a folder on the window navigate back to it by hand, which is the whole
+   complaint the drop exists to answer. */
 const CHOOSE = `
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 $d = New-Object System.Windows.Forms.FolderBrowserDialog
 $d.Description = 'choose the folder keeper should read'
 $d.ShowNewFolderButton = $false
+if ($env:KEEPER_START -and (Test-Path -LiteralPath $env:KEEPER_START)) {
+  $d.SelectedPath = $env:KEEPER_START
+}
 if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.SelectedPath }
 else { Write-Output '<cancelled>' }
 `;
@@ -159,9 +166,9 @@ else { Write-Output '<cancelled>' }
  * the browser has nothing to do until a folder is picked, and the dialog is
  * the answer it is waiting on.
  */
-export async function chooseFolder() {
+export async function chooseFolder(startIn = "") {
   try {
-    const out = (await ps(CHOOSE, {}, 0, true)).trim();
+    const out = (await ps(CHOOSE, { KEEPER_START: startIn || "" }, 0, true)).trim();
     if (!out || out === "<cancelled>") return { cancelled: true };
     return { path: out.replace(/\\+$/, "") };
   } catch (e) {
@@ -371,33 +378,63 @@ export async function search(term, kind) {
 const DRIVES = `
 foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
   if ($d.IsReady -and $d.DriveType -ne 'CDRom') {
-    Write-Output $d.RootDirectory.FullName
+    Write-Output ('drive|' + $d.RootDirectory.FullName)
   }
+}
+$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders'
+$names = @{ 'Desktop' = 'Desktop'; 'Personal' = 'Documents'; '{374DE290-123F-4565-9164-39C4925E467B}' = 'Downloads'; 'My Pictures' = 'Pictures'; 'My Video' = 'Videos' }
+$p = Get-ItemProperty -Path $k -ErrorAction SilentlyContinue
+foreach ($n in $names.Keys) {
+  $v = $p.$n
+  if ($v) { Write-Output ('folder|' + [Environment]::ExpandEnvironmentVariables($v)) }
 }`;
 
 /* asked once per run. drives do get plugged in mid session, and the cost of
    missing one is the folder dialog, which is where that person was headed
    anyway. the cost of asking on every drop is a powershell start per drop. */
 let drives = null;
+let known = null;
 
+/**
+ * WHERE THE DESKTOP ACTUALLY IS, WHICH IS OFTEN NOT UNDER THE HOME FOLDER.
+ *
+ * Joining the profile path with "Desktop" is the obvious way to find it and
+ * it is wrong on a large share of windows machines. Onedrive redirects the
+ * known folders when it is set up to back them up, which is the default it
+ * asks for on a new windows 11, and the desktop then lives at
+ * <profile>\Onedrive\Desktop while <profile>\Desktop either does not exist
+ * or holds nothing. Domain machines redirect the same folders to a share.
+ *
+ * Windows keeps the real answer in the registry, so it is asked rather than
+ * assumed, and the values there carry environment variables that have to be
+ * expanded before they are paths. The profile root itself is still added, so
+ * a machine where this read fails entirely is no worse off than before.
+ */
 export async function roots() {
   const home = process.env.USERPROFILE || "";
-  const mine = home
-    ? [home, ...["Desktop", "Documents", "Downloads", "Pictures", "Videos"].map((d) => path.join(home, d))]
-    : [];
 
   if (drives === null) {
     try {
       const out = await ps(DRIVES, {}, 10_000);
-      drives = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const rows = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      known = rows.filter((r) => r.startsWith("folder|")).map((r) => r.slice(7));
+      drives = rows.filter((r) => r.startsWith("drive|")).map((r) => r.slice(6));
     } catch {
-      // search off, powershell locked down, or something stranger. the home
-      // folders above are still worth reading and the dialog still opens.
+      // powershell locked down, or something stranger. the profile root below
+      // is still worth reading and the folder dialog still opens.
+      known = [];
       drives = [];
     }
   }
 
-  return [...mine, ...drives];
+  /* the joined guesses stay as a floor under the registry answer: on a
+     machine with no redirection they are the same paths, and a duplicate
+     costs one readdir that the sweep would have done anyway. */
+  const guessed = home
+    ? ["Desktop", "Documents", "Downloads", "Pictures", "Videos"].map((d) => path.join(home, d))
+    : [];
+
+  return [...new Set([home, ...known, ...guessed, ...drives].filter(Boolean))];
 }
 
 /* ------------------------------------------------------------------ */
