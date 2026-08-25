@@ -1,0 +1,32 @@
+/* the placing loop's own sheet: what the strip says about frames it is
+   holding back or has already spent, and what a rack says about how full it
+   is. a link beside the others in index.html rather than an @import, for
+   the same reason drop.css is: an @import blocks the sheet it sits in until
+   it resolves. */
+
+/* the counted tail of a capped strip. it is a child of the strip's grid, so
+   without the full span it would sit in one thumbnail column and wrap a
+   word to a line. */
+.strip-more {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--s3) 0;
+}
+
+/* a frame that is already sitting in a slot. this is the shelf's intray
+   frame idiom in grey: the picture pulls back and the ground shows as a
+   border. grey rather than the accent because the accent means a live
+   choice, and this one is chosen and already spent. and grey means grey:
+   the mat touches the photograph, so it is alpha white, which composites
+   equal-RGB on the neutral wall, rgb(182,182,182), 9.7:1 against the
+   ground, rather than the warm ink, because a warm border on a picture is
+   a thumb on the print. */
+#strip figure.placed { background: #ffffffb3; }
+#strip figure.placed img { padding: 3px; }
+
+/* how full a rack is, sitting after its name in the quieter ink so the
+   count reads as a note on the heading rather than a second heading. */
+.rack-fill {
+  margin-left: var(--s3);
+  color: var(--ink-3);
+}

@@ -100,7 +100,13 @@ export function forget() {
 }
 
 let timer = 0;
-function say(text) {
+/**
+ * The one line of voice this app has. Exported now, because the shelf
+ * borrows it to admit a write that never reached the disk: same corner of
+ * the screen, same fade, so the page keeps one way of speaking instead of
+ * growing a second toast that behaves almost but not quite the same.
+ */
+export function say(text) {
   const el = document.querySelector("#undo-say");
   if (!el) return;
   el.textContent = text;

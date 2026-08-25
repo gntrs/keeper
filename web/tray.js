@@ -223,7 +223,6 @@ run.home = "tray";
 async function edit(id, patch) {
   await ask("/api/trays", { id, ...patch }, "PATCH");
   await refresh();
-  renderShelf();
 }
 
 /**

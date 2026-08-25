@@ -1,6 +1,5 @@
 @echo off
 setlocal
-title keeper
 
 rem ---------------------------------------------------------------------
 rem  Double click this.
@@ -14,9 +13,20 @@ rem  page.
 rem
 rem  This window is how you stop keeper. Close it and keeper stops. There is
 rem  a quit button on the page as well and it does the same thing.
+rem
+rem  --quiet runs it with no banner, no window and no pause, writing what it
+rem  would have printed to a log instead. That is what the start menu and
+rem  desktop shortcuts use, through keeper.vbs, because an app whose window
+rem  is a browser tab has no business leaving a console in the taskbar.
+rem  Nobody types it.
 rem ---------------------------------------------------------------------
 
+set "QUIET="
+if /I "%~1"=="--quiet" set "QUIET=1"
+
 pushd "%~dp0."
+
+if defined QUIET goto quiet
 
 echo.
 echo   keeper
@@ -42,3 +52,18 @@ popd
 echo   keeper has stopped. press any key to close this window.
 pause >nul
 endlocal
+exit /b
+
+:quiet
+rem No window means no stdout anybody can read, so it goes to a file. This is
+rem the only thing keeper writes outside an archive besides the two files it
+rem already keeps here, and it is the first thing to look at when it will not
+rem start. Never passes %* on: a shortcut sends no folder, and %* would still
+rem hold --quiet after any shift, which is the oldest trap in batch.
+set "KEEPERDIR=%LOCALAPPDATA%\keeper"
+if not exist "%KEEPERDIR%" mkdir "%KEEPERDIR%"
+echo --- %DATE% %TIME% --->>"%KEEPERDIR%\keeper.log"
+"%~dp0node\node.exe" "%~dp0app\bin\keeper.mjs" app >>"%KEEPERDIR%\keeper.log" 2>&1
+popd
+endlocal
+exit /b

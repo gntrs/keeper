@@ -3,9 +3,11 @@
 
    One surface, four things to say on it: drop it here, which one did you
    mean, this is what is happening, and this is what went wrong. They share
-   a card because they are one conversation, and the card is boxless because
-   the blurred window behind it is already the box. Nothing in here draws a
-   border to make a point that size and space were making anyway.
+   a card because they are one conversation, and the card is boxless
+   because the scrim behind it is already the box. The scrim is a plain
+   deep black rather than a blur, because a blur pulls the colour of the
+   photographs into the chrome and this layer is chrome. Nothing in here
+   draws a border to make a point that size and space were making anyway.
 
    It sits above the preview at 60 and the lightbox at 50, because a drop
    lands on the whole window and has to be answered on top of whatever was
@@ -15,9 +17,7 @@
   position: fixed; inset: 0; z-index: 80;
   display: grid; place-items: center;
   padding: var(--s6);
-  background: #0b0b0cc4;
-  backdrop-filter: blur(16px) saturate(.9);
-  -webkit-backdrop-filter: blur(16px) saturate(.9);
+  background: #000000b8;
   animation: drop-fade var(--fast) var(--ease);
 }
 .drop[hidden] { display: none; }

@@ -193,7 +193,11 @@ function summarise(items, tags) {
   say("");
   for (const chunk of [sorted.slice(0, 8), sorted.slice(8)]) {
     if (!chunk.length) continue;
-    say("  " + chunk.map(([c, n]) => `${VOCAB[c][0]} ${dim(n)}`).join("   "));
+    /* a code the vocabulary does not know prints as itself rather than
+       taking the whole boot down. archives written before the server
+       validated tags can carry one, and a tally is not the place to die
+       over it. */
+    say("  " + chunk.map(([c, n]) => `${VOCAB[c]?.[0] ?? c} ${dim(n)}`).join("   "));
   }
 }
 

@@ -58,18 +58,24 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Source: "{#Stage}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-; Minimised, because the console window is only there to be closed when you
-; are done. The browser is where keeper actually is, and it takes the focus
-; a second later anyway.
-Name: "{group}\keeper"; Filename: "{app}\keeper.cmd"; IconFilename: "{app}\keeper.ico"; WorkingDir: "{app}"; Flags: runminimized
+; keeper.vbs and not keeper.cmd, and runminimized is gone with it. Minimised
+; still puts a console in the taskbar, which is a window belonging to an app
+; whose window is a browser tab, and it reads as something left running. The
+; vbs starts the same batch file with no window at all. Quitting is the
+; button on the page, which is the only quit a browser tab could ever have
+; had and is already there.
+;
+; doctor keeps its window on purpose. Its entire output is the thing you are
+; opening it to read.
+Name: "{group}\keeper"; Filename: "{app}\keeper.vbs"; IconFilename: "{app}\keeper.ico"; WorkingDir: "{app}"
 Name: "{group}\keeper doctor"; Filename: "{app}\doctor.cmd"; IconFilename: "{app}\keeper.ico"; WorkingDir: "{app}"
-Name: "{userdesktop}\keeper"; Filename: "{app}\keeper.cmd"; IconFilename: "{app}\keeper.ico"; WorkingDir: "{app}"; Flags: runminimized; Tasks: desktopicon
+Name: "{userdesktop}\keeper"; Filename: "{app}\keeper.vbs"; IconFilename: "{app}\keeper.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "put keeper on the desktop"; GroupDescription: "shortcuts"
 
 [Run]
-Filename: "{app}\keeper.cmd"; Description: "start keeper"; Flags: postinstall nowait shellexec runminimized
+Filename: "{app}\keeper.vbs"; Description: "start keeper"; Flags: postinstall nowait shellexec
 
 [UninstallDelete]
 ; The index, the thumbnails and the tags live next to the photographs and are
@@ -78,3 +84,4 @@ Filename: "{app}\keeper.cmd"; Description: "start keeper"; Flags: postinstall no
 Type: filesandordirs; Name: "{localappdata}\keeper\start"
 Type: files; Name: "{localappdata}\keeper\run.json"
 Type: files; Name: "{localappdata}\keeper\seat.json"
+Type: files; Name: "{localappdata}\keeper\keeper.log"

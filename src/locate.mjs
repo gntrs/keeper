@@ -96,7 +96,7 @@ const SWEEP_MS = 5000;
 async function sweep(name, kind) {
   if (!host?.roots || !name) return [];
 
-  let level = host.roots();
+  let level = await host.roots();
   const hits = [];
   let read = 0;
 
@@ -165,7 +165,12 @@ async function sweep(name, kind) {
  * that is a keeper that asks for less and costs one click, not a broken one.
  */
 export function warmRoots() {
-  for (const dir of host?.roots?.() ?? []) readdir(dir).catch(() => {});
+  /* roots() is async on windows, where the list of drives is a question for
+     the operating system rather than a constant. nothing waits on any of
+     this: it is fired at the server's last line and forgotten. */
+  Promise.resolve(host?.roots?.() ?? [])
+    .then((dirs) => { for (const dir of dirs) readdir(dir).catch(() => {}); })
+    .catch(() => {});
 }
 
 /** the index and the disk, each seeing what the other cannot, counted once */
@@ -200,6 +205,30 @@ async function look(dir) {
 }
 
 const nameOf = (f) => (typeof f === "string" ? f : f?.name);
+
+/**
+ * WHAT EACH HALF OF THE LOOKUP CAN SEE, FOR `keeper doctor`.
+ *
+ * A drop that comes back with nothing looks identical whichever half failed,
+ * and the two have completely different answers: an index that is switched
+ * off is a windows setting, and a disk read that finds nothing means the
+ * archive is somewhere the roots do not reach. Asking somebody over a message
+ * to tell those apart is how a week goes by, so the report tells them apart.
+ */
+export async function explain(name) {
+  const began = Date.now();
+  const dirs = await (host?.roots?.() ?? []);
+  const [indexed, swept] = await Promise.all([
+    Promise.resolve(find(name, "folder")).then((r) => r ?? [], () => []),
+    sweep(name, "folder").catch(() => []),
+  ]);
+  return {
+    roots: dirs.length,
+    indexed: indexed.length,
+    swept: swept.length,
+    ms: Date.now() - began,
+  };
+}
 
 /**
  * Turn what a browser knows about a drop back into a path on this disk.

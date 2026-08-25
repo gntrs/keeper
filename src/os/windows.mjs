@@ -353,19 +353,51 @@ export async function search(term, kind) {
  * answers nothing, and an archive on an external drive is the ordinary case
  * rather than the exotic one.
  */
-export function roots() {
+/**
+ * ASKING WINDOWS WHICH DRIVES EXIST, RATHER THAN KNOCKING ON ALL OF THEM.
+ *
+ * The first version of this walked c: to z: and let the readdir fail on the
+ * letters with nothing behind them, on the reasoning that a failure is cheap.
+ * That reasoning is wrong on exactly the machines it matters on. A card
+ * reader, an empty optical drive or a phone slot holds a letter with no media
+ * in it, and touching one of those does not fail: it raises the modal windows
+ * hard error, "there is no disk in the drive", and **blocks the thread until
+ * somebody clicks it**. Node runs fs on a four thread pool, so a handful of
+ * those stops every other read in the process, not just the drive ones.
+ *
+ * DriveInfo.IsReady is the answer to that question and it does not touch the
+ * media to answer it, which is the entire reason .NET exposes it.
+ */
+const DRIVES = `
+foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
+  if ($d.IsReady -and $d.DriveType -ne 'CDRom') {
+    Write-Output $d.RootDirectory.FullName
+  }
+}`;
+
+/* asked once per run. drives do get plugged in mid session, and the cost of
+   missing one is the folder dialog, which is where that person was headed
+   anyway. the cost of asking on every drop is a powershell start per drop. */
+let drives = null;
+
+export async function roots() {
   const home = process.env.USERPROFILE || "";
-  const out = home
+  const mine = home
     ? [home, ...["Desktop", "Documents", "Downloads", "Pictures", "Videos"].map((d) => path.join(home, d))]
     : [];
-  /* Every lettered drive from c to z. A letter with nothing behind it fails
-     its readdir and costs nothing, which is cheaper than asking windows which
-     letters are mounted. a: and b: are left off because they are floppy
-     drives and a caller with one has other problems. */
-  for (let c = "C".charCodeAt(0); c <= "Z".charCodeAt(0); c++) {
-    out.push(`${String.fromCharCode(c)}:\\`);
+
+  if (drives === null) {
+    try {
+      const out = await ps(DRIVES, {}, 10_000);
+      drives = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    } catch {
+      // search off, powershell locked down, or something stranger. the home
+      // folders above are still worth reading and the dialog still opens.
+      drives = [];
+    }
   }
-  return out;
+
+  return [...mine, ...drives];
 }
 
 /* ------------------------------------------------------------------ */

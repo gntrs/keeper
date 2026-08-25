@@ -2,6 +2,7 @@ import { S, reveal } from "/app.js";
 import { files } from "/host.js";
 import { filtered, focus } from "/shelf.js";
 import { toggle as trayToggle, inTray } from "/tray.js";
+import { feel } from "/feel.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -49,6 +50,138 @@ let walk = filtered;
  */
 export const walkHome = () => walk?.home ?? "shelf";
 
+/* ---------------------------------------------------------------------
+   The quiet card.
+
+   The card goes still when the hand does. Looking at a photograph is the
+   one moment in this app where the chrome has nothing left to say, so
+   after a second and a half without a pointer or a key the furniture
+   steps behind the idle class and the photograph has the surround to
+   itself. Any input lifts it back instantly. This file only says when
+   deep and idle are true: what they look like, the pure black ground,
+   the depth of the fade, and the plain cut under reduced motion, is
+   style.css's side of the contract. The photograph itself is never in
+   either class's reach, so its pixels cannot dim.
+   --------------------------------------------------------------------- */
+const IDLE_MS = 1500;
+let idleTimer = 0;
+
+function stir() {
+  if (!cur) return;
+  const host = $("#preview");
+  host.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (cur) host.classList.add("idle"); }, IDLE_MS);
+}
+
+/* ---------------------------------------------------------------------
+   Zoom, and it is sticky on purpose.
+
+   A burst is thirty frames of the same second, and the question being
+   asked of it is almost always about one small region: which frame has
+   the eye sharp. So the zoom lives on the viewer, not on the picture.
+   Stepping to the next frame reuses the held scale and pan, and the same
+   eye stays under the cursor for the whole run instead of every arrow
+   press dropping you back to fit to climb in again.
+
+   The held scale is absolute, where 1 is one image pixel to one screen
+   pixel, because that is the only number that means the same thing on a
+   tall frame and a wide one. Falling back to fit clears the hold, and so
+   does closing the card: stickiness is for a pass, not a session.
+
+   Clips are left alone. Their controls own the pointer, and scrubbing
+   footage through a crop is not a judgment anyone makes here.
+   --------------------------------------------------------------------- */
+
+/** the scale fit() last chose, so held zoom knows what fit means right now */
+let fitScale = 1;
+
+/** {scale, panX, panY} while zoomed past fit, null at fit. survives steps. */
+let hold = null;
+
+/**
+ * Push the held state onto the picture. The transform is relative to the
+ * fitted size the stage was measured at, so the same absolute hold renders
+ * as a different multiple on every frame and the magnification is what
+ * stays constant. The pan is clamped to the overflow so a frame can be
+ * dragged to its edge and no further: a photograph floating loose in a
+ * black stage with nothing under the cursor is a viewer that got lost.
+ */
+function apply() {
+  paintZoom();
+  const stage = $("#preview .preview-stage");
+  const media = stage.firstElementChild;
+  if (!media || media.tagName !== "IMG") return;
+  if (!hold) {
+    media.style.transform = "";
+    media.style.cursor = "zoom-in";
+    return;
+  }
+  /* never below 1: a hold below this frame's fit would shrink the picture
+     inside its own stage, so the frame shows at fit and the hold waits for
+     the next frame it is actually past. */
+  const rel = Math.max(1, hold.scale / fitScale);
+  const ox = Math.max(0, stage.clientWidth * (rel - 1) / 2);
+  const oy = Math.max(0, stage.clientHeight * (rel - 1) / 2);
+  hold.panX = Math.min(ox, Math.max(-ox, hold.panX));
+  hold.panY = Math.min(oy, Math.max(-oy, hold.panY));
+  media.style.transform = `translate(${hold.panX}px, ${hold.panY}px) scale(${rel})`;
+  media.style.cursor = "grab";
+}
+
+/**
+ * Move to an absolute scale, keeping the point under the cursor under the
+ * cursor. cx and cy are measured from the stage centre, which is also the
+ * transform origin, so the pan that preserves a point falls out of one
+ * line of algebra instead of a rectangle dance. Landing at or below fit
+ * clears the hold, which is what makes fit the resting state rather than
+ * a zoom that happens to be small.
+ */
+function zoomTo(scale, cx, cy) {
+  const next = Math.min(8, Math.max(fitScale, scale));
+  if (next <= fitScale * 1.001) {
+    hold = null;
+    apply();
+    return;
+  }
+  const r0 = hold ? Math.max(1, hold.scale / fitScale) : 1;
+  const r1 = next / fitScale;
+  const p0x = hold ? hold.panX : 0;
+  const p0y = hold ? hold.panY : 0;
+  hold = {
+    scale: next,
+    panX: cx - (cx - p0x) * (r1 / r0),
+    panY: cy - (cy - p0y) * (r1 / r0),
+  };
+  apply();
+}
+
+/**
+ * The two state toggle: fit and one to one, nothing in between to
+ * remember. A frame already at one to one inside its fit has nothing to
+ * toggle to, so the key does nothing rather than pretending.
+ */
+function snap(cx = 0, cy = 0) {
+  if (hold) hold = null;
+  else if (fitScale < 1) return zoomTo(1, cx, cy), feel("tick");
+  else return;
+  apply();
+  feel("tick");
+}
+
+/**
+ * The held state, said out loud in the card chrome. It reads "held at"
+ * rather than a bare percentage because the number alone would not say
+ * the one thing that matters about it: that it will still be there on
+ * the next frame.
+ */
+function paintZoom() {
+  const el = $("#preview .preview-zoom");
+  if (!el) return;
+  el.hidden = !hold;
+  if (hold) el.textContent = `held at ${Math.round(hold.scale * 100)}%`;
+}
+
 /**
  * This used to be a full screen lightbox and it is not one any more, on
  * purpose. Blacking out the whole window to look at one photograph is a
@@ -57,6 +190,10 @@ export const walkHome = () => walk?.home ?? "shelf";
  * makes going back feel like leaving. A card floating over a dimmed page
  * keeps all of that in the corner of your eye while still being unambiguous
  * about what has your attention, which is the whole trick Quick Look pulls.
+ *
+ * The deep class is the one concession back toward the dark room: the
+ * surround under the card drops to pure black while it is up, so coming
+ * back to the shelf's near black reads as surfacing.
  */
 export function open(item, run = filtered) {
   if (!item) return;
@@ -78,12 +215,18 @@ export function open(item, run = filtered) {
     media.onloadedmetadata = () => size(media.videoWidth, media.videoHeight);
   } else {
     media.alt = "";
+    /* the browser's own image drag would fight the pan, and there is
+       nowhere in this app an image wants dragging to from here. */
+    media.draggable = false;
     media.onload = () => size(media.naturalWidth, media.naturalHeight);
   }
   $("#preview .preview-stage").replaceChildren(media);
 
   meta(item);
-  $("#preview").hidden = false;
+  const host = $("#preview");
+  host.hidden = false;
+  host.classList.add("deep");
+  stir();
   fit();
 }
 
@@ -127,6 +270,11 @@ function fit() {
 
   stage.style.width = `${Math.round(real.w * scale)}px`;
   stage.style.height = `${Math.round(real.h * scale)}px`;
+
+  /* what fit means changed, so a held zoom has to be re-laid on top of the
+     new measurement. the hold itself does not move: that is the point. */
+  fitScale = scale;
+  apply();
 }
 addEventListener("resize", fit);
 
@@ -175,6 +323,12 @@ function meta(item) {
     keep.textContent = inTray(item.id) ? "remove from tray" : "add to tray";
   };
 
+  /* the held zoom, spoken in the chrome rather than drawn on the picture,
+     because the one rule of the stage is that nothing sits on the pixels. */
+  const zoom = document.createElement("span");
+  zoom.className = "label num preview-zoom";
+  zoom.hidden = true;
+
   /* Nothing on this card says the arrows walk a set, so the position does.
      The set is the one the shelf is filtered down to, because that is what
      left and right actually move through, and saying "of 203" while a filter
@@ -193,16 +347,64 @@ function meta(item) {
     pos.push(count);
   }
 
-  host.replaceChildren(...pos, facts, where, finder, keep);
+  host.replaceChildren(zoom, ...pos, facts, where, finder, keep);
+  paintZoom();
 }
 
 export function close() {
   if (!cur) return;
   cur = null;
-  $("#preview").hidden = true;
+  /* the idle timer dies with the card, or a card opened within the next
+     second and a half would inherit a fade it did not earn. */
+  clearTimeout(idleTimer);
+  /* the hold dies too: stickiness is for the pass being made, and a card
+     reopened tomorrow zoomed into last week's corner would be a haunting. */
+  hold = null;
+  const host = $("#preview");
+  host.classList.remove("deep", "idle");
+  host.hidden = true;
   /* emptying the stage is what stops a clip that is still playing. hiding
      the card would leave the audio running behind the shelf. */
   $("#preview .preview-stage").replaceChildren();
+}
+
+/**
+ * Re-run the meta line for the frame on screen. The shelf calls this after a
+ * keystroke tags or keeps the previewed frame, because the card is the thing
+ * being looked at and a tag that only shows up in the chips behind it is a
+ * keystroke with no visible answer on the one surface that has your eyes.
+ */
+export function sync() {
+  if (cur) meta(cur);
+}
+
+/**
+ * The frame on screen has just left the run: set aside, put back, or off the
+ * drive entirely. The card walks to the nearest survivor rather than going
+ * dark, because the hand on the keyboard is in the middle of a pass and a
+ * card that closes itself ends the pass to make you reopen it. Forward
+ * first, the direction a cull moves, then backward, and only when nothing in
+ * the run survives does the card close. The shelf repaints itself after the
+ * same mutation, so this touches nothing but the card: a repaint from in
+ * here would paint a grid the shelf is about to paint again.
+ */
+export function evict(ids) {
+  if (!cur) return;
+  const gone = new Set(ids);
+  if (!gone.has(cur.id)) return;
+  const list = walk();
+  const at = list.findIndex((i) => i.id === cur.id);
+  let next = null;
+  for (let i = at + 1; i < list.length; i++) {
+    if (!gone.has(list[i].id)) { next = list[i]; break; }
+  }
+  if (!next) {
+    for (let i = at - 1; i >= 0; i--) {
+      if (!gone.has(list[i].id)) { next = list[i]; break; }
+    }
+  }
+  if (next) open(next, walk);
+  else close();
 }
 
 /**
@@ -239,10 +441,89 @@ export function mountPreview() {
      Nothing looks it up here, so its absence from the markup cannot throw on
      mount and take the arrow keys down with it. */
 
+  /* the stage is a permanent element that pictures pass through, so the
+     zoom gestures wire to it once instead of to every picture. */
+  const stage = $("#preview .preview-stage");
+
+  stage.addEventListener("wheel", (e) => {
+    if (!cur) return;
+    const media = stage.firstElementChild;
+    if (!media || media.tagName !== "IMG") return;
+    /* the wheel belongs to the zoom while the pointer is on the picture,
+       and letting it also scroll the page would be two answers to one
+       gesture. */
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    const cx = e.clientX - (r.left + r.width / 2);
+    const cy = e.clientY - (r.top + r.height / 2);
+    const at = hold ? hold.scale : fitScale;
+    /* exponential, because zoom is a ratio: the same flick should feel the
+       same size at 120% as at 400%, and a linear step does not. */
+    zoomTo(at * Math.exp(-e.deltaY * 0.0022), cx, cy);
+  }, { passive: false });
+
+  stage.addEventListener("dblclick", (e) => {
+    if (!cur) return;
+    const media = stage.firstElementChild;
+    if (!media || media.tagName !== "IMG") return;
+    const r = stage.getBoundingClientRect();
+    snap(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+  });
+
+  /* drag pans while a zoom is held. pointer capture keeps the pan alive
+     when a fast hand outruns the stage, which on a small crop of a big
+     frame is every drag. */
+  let drag = null;
+  stage.addEventListener("pointerdown", (e) => {
+    if (!cur || !hold) return;
+    const media = stage.firstElementChild;
+    if (!media || media.tagName !== "IMG") return;
+    drag = { x: e.clientX, y: e.clientY };
+    stage.setPointerCapture(e.pointerId);
+    media.style.cursor = "grabbing";
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!drag || !hold) return;
+    hold.panX += e.clientX - drag.x;
+    hold.panY += e.clientY - drag.y;
+    drag = { x: e.clientX, y: e.clientY };
+    apply();
+  });
+  const lift = () => {
+    if (!drag) return;
+    drag = null;
+    /* apply puts the open hand back on the cursor */
+    apply();
+  };
+  stage.addEventListener("pointerup", lift);
+  stage.addEventListener("pointercancel", lift);
+
+  /* anything the hand does wakes the chrome back up. keydown listens on
+     capture so the furniture returns even when the key itself is spent by
+     a layer above the card. */
+  addEventListener("pointermove", stir, { passive: true });
+  addEventListener("pointerdown", stir, { passive: true });
+  addEventListener("wheel", stir, { passive: true });
+  addEventListener("keydown", stir, true);
+
   addEventListener("keydown", (e) => {
     if (!cur) return;
+    /* a layer above this card can spend the keystroke first, the folder
+       panel's escape does, and it marks the event when it has. answering
+       it again here would close the card the person could not even see
+       under the panel they were dismissing. */
+    if (e.defaultPrevented) return;
     if (e.key === "Escape") { close(); return e.preventDefault(); }
     if (e.target instanceof Element && e.target.matches("input, select, textarea")) return;
+    /* z toggles fit and one to one, unless the vocab has claimed the
+       letter: a tagging key beats a viewing key, because tagging is what
+       the card is for. the shelf will have spent it as a tag by the time
+       this runs, and answering it twice would zoom under a tag. */
+    if ((e.key === "z" || e.key === "Z") && !S.vocab.Z
+        && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      snap();
+      return e.preventDefault();
+    }
     if (e.key === "ArrowRight") { step(1); return e.preventDefault(); }
     if (e.key === "ArrowLeft") { step(-1); return e.preventDefault(); }
   });

@@ -1,14 +1,14 @@
 import { S, post, tally, reveal, typed } from "/app.js";
-import { open, previewOpen, current, close as shut, walkHome } from "/preview.js";
+import { open, previewOpen, current, close as shut, walkHome, sync, evict } from "/preview.js";
 import { bin as wastebasket, files, pick as chord, restore } from "/host.js";
-import { did, didFinal } from "/undo.js";
+import { did, didFinal, say } from "/undo.js";
 import { MIME, inTray, addMany as trayAddMany, toggle as trayToggle } from "/tray.js";
 
 import { fresh, hit as thump, leave, nope } from "/motion.js";
 import { feel } from "/feel.js";
 
 const $ = (s) => document.querySelector(s);
-const F = { tag: new Set(), dir: new Set(), star: false, untagged: false, q: "", binned: false };
+const F = { tag: new Set(), dir: new Set(), star: false, untagged: false, q: "", binned: false, left: false };
 let visible = [];
 let cursor = 0;
 
@@ -50,6 +50,17 @@ let anchor = null;
 let drawn = new Set();
 let struck = [];
 
+/**
+ * The id list exactly as the grid last showed it, in order. `drawn` answers
+ * "was this frame on the wall", which is motion's question; this answers
+ * "is the wall about to show the same frames in the same places", which is
+ * the render's. When it is, the tiles are patched where they stand instead
+ * of being rebuilt, and the elements keep their identity: an arrow key that
+ * threw away a thousand tiles to move one ring was most of the cost of a
+ * keystroke at 2000 frames.
+ */
+let shownIds = [];
+
 const at = (id) => visible.findIndex((i) => i.id === id);
 
 /** everything from the anchor to here, replacing whatever was picked before */
@@ -90,7 +101,28 @@ function drop() {
    hundred pixels of file names standing in front of the first frame. */
 const DIRS = 8;
 
-const countTag = (c) => S.items.filter((i) => S.tags[i.id]?.tag === c).length;
+/**
+ * Every number the chip row wears, counted in one pass.
+ *
+ * Each chip used to filter the whole archive for itself, which on a shelf of
+ * sixteen codes was sixteen walks over two thousand frames per keystroke,
+ * plus one each for star and untagged. The facts all live on the same two
+ * thousand rows, so they are read off in a single walk and the chips look
+ * the answers up. Recounted at the top of every render, because a render is
+ * exactly the moment the numbers are about to be shown.
+ */
+let count = { tag: new Map(), star: 0, untagged: 0 };
+function census() {
+  const c = { tag: new Map(), star: 0, untagged: 0 };
+  for (const i of S.items) {
+    const t = S.tags[i.id];
+    if (t?.tag) c.tag.set(t.tag, (c.tag.get(t.tag) ?? 0) + 1);
+    else c.untagged++;
+    if (t?.star) c.star++;
+  }
+  count = c;
+}
+const countTag = (c) => count.tag.get(c) ?? 0;
 const countPlace = (p) => S.items.filter((i) => i.place === p).length;
 const word = (c) => S.vocab[c];
 /* A place is either the folder a frame sits in or a name out of the config,
@@ -99,7 +131,7 @@ const word = (c) => S.vocab[c];
    left. */
 const leaf = (p) => p.split("/").pop();
 /** whether any filter is actually on, which is the only reason clear exists */
-const filtering = () => Boolean(F.tag.size || F.dir.size || F.star || F.untagged || F.q || F.binned);
+const filtering = () => Boolean(F.tag.size || F.dir.size || F.star || F.untagged || F.q || F.binned || F.left);
 
 /**
  * One chip, wearing the value it stands for. The counts move while you tag,
@@ -122,11 +154,27 @@ export function setDigits(codes) {
   digits = new Map(codes.slice(0, 9).map((c, i) => [c, i + 1]));
 }
 
+/* The four tag hues, dealt round robin in vocabulary order. Derived and
+   never stored: the vocabulary is the one order every machine reading this
+   archive agrees on, so the same code wears the same hue on every visit
+   without a schema change or a server round trip. There is no red among
+   them on purpose. Red is keeper's mark for chosen, and a tag wearing it
+   would give the one colour with a fixed meaning a second one. */
+const HUES = ["--tag-gold", "--tag-sky", "--tag-violet", "--tag-teal"];
+function hueFor(code) {
+  const i = Object.keys(S.vocab).indexOf(code);
+  return HUES[(i < 0 ? 0 : i) % HUES.length];
+}
+
 function chip(v, label, count, key) {
   const b = document.createElement("button");
   b.className = "chip";
   b.type = "button";
   b.dataset.v = v;
+  /* a chip is a toggle and says so. the .on class is paint, and paint is the
+     one thing a screen reader cannot see, so the state rides in the
+     attribute as well and every place that moves the class moves it too. */
+  b.setAttribute("aria-pressed", String(F[key].has(v)));
 
   /**
    * What you press, ahead of the word. This row is the legend for the
@@ -146,6 +194,19 @@ function chip(v, label, count, key) {
     const n = digitFor(v);
     k.textContent = `${n || v.toLowerCase()} `;
     b.append(k);
+    /* The tag's hue, as a dot beside the word and never as a wash behind a
+       photograph. The deal is the one fact this file owns, and it rides on
+       the chip as --tag for the stylesheet to read: the dot's paint, its
+       size and its place all live over there, beside the .tag rules that
+       keep a switched on tag chip on the chrome ladder rather than in red.
+       An inline background here would win those rules by specificity and
+       the stylesheet could never dim or brighten what it does not own. */
+    b.classList.add("tag");
+    b.style.setProperty("--tag", `var(${hueFor(v)})`);
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.setAttribute("aria-hidden", "true");
+    b.append(dot);
   }
   b.append(label(v));
 
@@ -164,6 +225,7 @@ function chip(v, label, count, key) {
   b.onclick = () => {
     F[key].has(v) ? F[key].delete(v) : F[key].add(v);
     b.classList.toggle("on");
+    b.setAttribute("aria-pressed", String(b.classList.contains("on")));
     quiet(b);
     feel("tick");
     renderShelf();
@@ -237,6 +299,21 @@ function more(host, rest) {
 }
 
 export function mountShelf() {
+  census();
+  /**
+   * The grid is a listbox to the accessibility tree, because that is what it
+   * is to the hand: one focusable surface with a cursor walking options
+   * inside it. Focus stays on the grid itself and aria-activedescendant says
+   * which tile the keyboard is standing on, so moving the cursor never moves
+   * real focus and never scrolls the page out from under a screen reader.
+   */
+  const grid = $("#grid");
+  if (grid) {
+    grid.tabIndex = 0;
+    grid.setAttribute("role", "listbox");
+    grid.setAttribute("aria-multiselectable", "true");
+    grid.setAttribute("aria-label", "frames");
+  }
   const present = Object.keys(S.vocab).filter((c) => countTag(c) > 0);
   setDigits(present.length ? present : Object.keys(S.vocab));
   /* Nothing is tagged on a fresh archive, so the row falls back to the whole
@@ -249,12 +326,14 @@ export function mountShelf() {
   chips($("#f-dir"), places.slice(0, DIRS), leaf, countPlace, "dir");
   if (places.length > DIRS) more($("#f-dir"), places.slice(DIRS));
 
-  $("#f-star").onclick = (e) => { F.star = !F.star; e.currentTarget.classList.toggle("on"); feel("tick"); renderShelf(); };
-  $("#f-untagged").onclick = (e) => { F.untagged = !F.untagged; e.currentTarget.classList.toggle("on"); feel("tick"); renderShelf(); };
+  $("#f-star").onclick = (e) => { F.star = !F.star; e.currentTarget.classList.toggle("on"); e.currentTarget.setAttribute("aria-pressed", String(F.star)); feel("tick"); renderShelf(); };
+  $("#f-untagged").onclick = (e) => { F.untagged = !F.untagged; e.currentTarget.classList.toggle("on"); e.currentTarget.setAttribute("aria-pressed", String(F.untagged)); feel("tick"); renderShelf(); };
   $("#f-q").oninput = (e) => { F.q = e.target.value.trim().toLowerCase(); renderShelf(); };
   mountClear();
 
   mountSize();
+  mountTally();
+  mountAdvance();
   mountSweep();
   /* Clicking the empty part of the grid lets the selection go, the way it
      does in finder. It is on the grid rather than on the document so that a
@@ -272,7 +351,12 @@ export function mountShelf() {
   $("#f-nuke").onclick = () => nukePress();
   $("#f-binned").onclick = (e) => {
     F.binned = !F.binned;
+    /* the bin and the undecided pile are different answers to the same
+       question, and a bin view opened with left still on would show only
+       the frames that are both, which is nearly always nothing. */
+    F.left = false;
     e.currentTarget.classList.toggle("on", F.binned);
+    e.currentTarget.setAttribute("aria-pressed", String(F.binned));
     /* leaving the bin with a pile still selected would carry a selection of
        set aside frames onto a wall that is not showing any of them */
     sel.clear();
@@ -302,10 +386,12 @@ function mountClear() {
     F.star = false;
     F.untagged = false;
     F.binned = false;
+    F.left = false;
     F.q = "";
     $("#f-q").value = "";
     for (const c of document.querySelectorAll("#filters .chip.on")) {
       c.classList.remove("on");
+      c.setAttribute("aria-pressed", "false");
       quiet(c);
     }
     binCancel();
@@ -333,10 +419,13 @@ function mountSize() {
 
   slider.oninput = () => applySize(true);
   applySize(false);
-  /* the column count is a fact about the window, not about the slider, so
-     it has to be recounted when the window changes even though nothing was
-     touched in here. */
-  addEventListener("resize", () => sayColumns());
+  /* The column count is a fact about the grid, not about the slider, and
+     not about the window either: opening the tray narrows the grid without
+     the window moving an inch, and the resize listener that used to sit
+     here slept straight through it. The observer watches the element whose
+     width the number is actually about. */
+  const grid = $("#grid");
+  if (grid) new ResizeObserver(() => sayColumns()).observe(grid);
 }
 
 /**
@@ -477,6 +566,9 @@ function mountSweep() {
        sixty times a second and would take the marquee, which is a child of
        the grid, out with them. */
     for (const k of rects) k.el.classList.toggle("picked", sel.has(k.id));
+    /* the box wears the count, because a sweep is aimed by its result and
+       the bar's copy of this number is out at the edge of vision. */
+    box.dataset.n = sel.size || "";
   }
 
   function place(to) {
@@ -639,9 +731,13 @@ export function renderShelf() {
        Off, a binned frame is simply not on the wall; on, it is the only kind
        of frame on the wall, and every other filter still applies inside it. */
     if (S.binned.has(i.id) !== F.binned) return false;
+    /* left is the tally chip's filter: the frames nobody has decided about
+       yet. Not binned is already true on this line unless the bin view is
+       on, so undecided reduces to not kept. */
     return (!F.tag.size || F.tag.has(t.tag)) &&
       (!F.dir.size || F.dir.has(i.place)) &&
       (!F.star || t.star) &&
+      (!F.left || !t.star) &&
       (!F.untagged || !t.tag) &&
       (!F.q || i.path.toLowerCase().includes(F.q));
   });
@@ -657,14 +753,16 @@ export function renderShelf() {
     if (anchor && !live.has(anchor)) anchor = null;
   }
 
+  census();
   const binChip = $("#f-binned");
   if (binChip) {
     binChip.querySelector("i").textContent = S.binned.size;
     binChip.hidden = !S.binned.size && !F.binned;
   }
-  $("#f-star").querySelector("i").textContent = S.items.filter((i) => S.tags[i.id]?.star).length;
-  $("#f-untagged").querySelector("i").textContent = S.items.filter((i) => !S.tags[i.id]?.tag).length;
+  $("#f-star").querySelector("i").textContent = count.star;
+  $("#f-untagged").querySelector("i").textContent = count.untagged;
   syncTags();
+  syncTallyState();
   $("#f-clear").hidden = !filtering();
   /**
    * When the untagged filter is on, every frame on screen is untagged, so
@@ -682,14 +780,53 @@ export function renderShelf() {
   }
 
   const grid = $("#grid");
-  const before = drawn;
-  drawn = new Set(visible.map((i) => i.id));
-  grid.replaceChildren(...visible.map((item, n) => tile(item, n)));
-  fresh(grid, visible, before);
-  /* the frames a key just changed, thumped after the repaint rather than
-     before it, because the tile that was under the hand a moment ago is not
-     the same element any more: this whole grid was rebuilt in the line
-     above. the ids survive the rebuild and the elements do not. */
+  const ids = visible.map((i) => i.id);
+  /**
+   * Two ways to paint, chosen by one question: is the wall about to show
+   * the same frames in the same order. Most keystrokes answer yes. A tag, a
+   * keep, a pick, an arrow, none of them move a single tile, they change
+   * what the tiles standing there are wearing. For those the figures are
+   * patched in place: the class list, the selected state, and the corner
+   * button's promise, which are the only things tile() writes that a
+   * keystroke can change. fresh() is skipped because nothing arrived.
+   *
+   * Everything the patch touches has to be the exact set of facts tile()
+   * builds from, which is why both paths dress a figure through the same
+   * function below. A patch that dressed tiles from its own list would
+   * drift from the builder one state at a time.
+   */
+  const same = ids.length === shownIds.length && ids.every((id, i) => id === shownIds[i]);
+  if (same) {
+    let n = 0;
+    for (const fig of grid.children) {
+      if (!fig.dataset.id) continue;
+      const item = visible[n];
+      fig.className = dress(item, n);
+      fig.setAttribute("aria-selected", String(sel.has(item.id)));
+      const add = fig.querySelector(".add");
+      if (add) {
+        add.title = inTray(item.id) ? "remove from tray" : "add to tray";
+        add.setAttribute("aria-label", add.title);
+      }
+      n++;
+    }
+  } else {
+    const before = drawn;
+    grid.replaceChildren(...visible.map((item, n) => tile(item, n)));
+    fresh(grid, visible, before);
+  }
+  shownIds = ids;
+  drawn = new Set(ids);
+  /* where the keyboard is standing, said on the grid itself. focus never
+     leaves the grid element, so this attribute is the only way a screen
+     reader hears the cursor move. */
+  const on = visible[cursor];
+  if (on) grid.setAttribute("aria-activedescendant", "t" + on.id);
+  else grid.removeAttribute("aria-activedescendant");
+  /* the frames a key just changed, thumped after the paint rather than
+     before it, because on a rebuild the tile that was under the hand a
+     moment ago is not the same element any more. the ids survive either
+     path and the elements only survive one of them. */
   for (const id of struck) thump(grid.querySelector(`figure[data-id="${CSS.escape(id)}"]`));
   struck = [];
   /* after the grid, because what the trash would take depends on what the
@@ -817,18 +954,19 @@ function stack(ids) {
   return c;
 }
 
-function tile(item, n) {
+/* Five states can be true of the same frame at once: it has no tag, it is
+   kept, it is in the active tray, it is picked, and the keyboard is
+   standing on it. They are collected in a list and joined rather than
+   concatenated onto a string, because the version of this that builds the
+   class name by hand is the version where adding a sixth state quietly
+   drops a fifth. Picked was the fifth, and it arrived here rather than in
+   a rewrite, which is what the list was for. It is a function of its own
+   because two callers dress a tile now, the builder below and the patch in
+   renderShelf, and two copies of this list is how they would come to
+   disagree about what a frame is wearing. */
+function dress(item, n) {
   const t = S.tags[item.id] ?? {};
-  const fig = document.createElement("figure");
-
-  /* Five states can be true of the same frame at once: it has no tag, it is
-     kept, it is in the active tray, it is picked, and the keyboard is
-     standing on it. They are collected in a list and joined rather than
-     concatenated onto a string, because the version of this that builds the
-     class name by hand is the version where adding a sixth state quietly
-     drops a fifth. Picked was the fifth, and it arrived here rather than in
-     a rewrite, which is what the list was for. */
-  fig.className = [
+  return [
     !t.tag && "untagged",
     t.star && "star",
     inTray(item.id) && "intray",
@@ -836,6 +974,17 @@ function tile(item, n) {
     n === cursor && S.view === "shelf" && "cursor",
     item.kind === "film" && !item.w && "noposter",
   ].filter(Boolean).join(" ");
+}
+
+function tile(item, n) {
+  const fig = document.createElement("figure");
+  fig.className = dress(item, n);
+  /* an option inside the grid's listbox, wearing an id the grid can point
+     aria-activedescendant at. the selected state rides in the attribute for
+     the same reason the chips carry aria-pressed: .picked is paint. */
+  fig.setAttribute("role", "option");
+  fig.id = "t" + item.id;
+  fig.setAttribute("aria-selected", String(sel.has(item.id)));
 
   /* The id in the markup, which the sweep needs. It hit tests rectangles
      against tiles and has to name what it hit without counting children,
@@ -887,6 +1036,10 @@ function tile(item, n) {
   const held = inTray(item.id);
   add.title = held ? "remove from tray" : "add to tray";
   add.setAttribute("aria-label", add.title);
+  /* out of the tab order, because tabbing a wall of two thousand frames
+     would mean two thousand stops. the grid is one stop and the keyboard
+     already has a faster way to the same act. */
+  add.tabIndex = -1;
   add.onclick = (e) => {
     /* A modifier means the hand is building a selection, and the corner of a
        tile is not an exception to that.
@@ -1045,7 +1198,11 @@ function paintCursor() {
   const grid = $("#grid");
   if (!grid) return;
   grid.querySelector("figure.cursor")?.classList.remove("cursor");
-  grid.children[cursor]?.classList.add("cursor");
+  const on = grid.children[cursor];
+  on?.classList.add("cursor");
+  /* the ring and the attribute are the same fact in two languages, and this
+     is the other place the ring moves without a render. */
+  if (on?.id) grid.setAttribute("aria-activedescendant", on.id);
   sayBin();
 }
 
@@ -1056,7 +1213,19 @@ function paintCursor() {
  * person correcting a machine's pass never has to learn a second alphabet.
  */
 async function onKey(e) {
-  if (e.ctrlKey) return;
+  /* control was refused outright once, which on a pc keyboard refused the
+     command key itself: chord() reads control there and command here. a
+     control press that is not the chord still leaves, so control tab and
+     friends stay the browser's. */
+  if (e.ctrlKey && !chord(e)) return;
+  /* The folder panel owns the keyboard while it is up, the way the bench
+     already concedes it: a letter pressed under a scanning card must not
+     tag a frame nobody can see, and backspace there must not arm the bin.
+     defaultPrevented as well, because the panel's own escape runs first
+     and hides it before this handler sees the event, and without the mark
+     the same keystroke would go on to throw away the pick underneath. */
+  if (e.defaultPrevented) return;
+  if (document.querySelector(".drop:not([hidden])")) return;
   /* One rule, and it is the mac one: a bare letter tags, cmd plus a key
      commands. It is not a tidiness. r was bound bare to reveal in finder and
      sat in front of the tag table, so resting, one of the sixteen, could not
@@ -1092,13 +1261,23 @@ async function onKey(e) {
 
   const shown = previewOpen() ? current() : null;
   if (shown) {
-    const landed = () => { renderShelf(); tally(); return e.preventDefault(); };
+    /* the card is the surface being looked at, so it repaints its own meta
+       line as well: a tag that only changed a chip behind the blur would be
+       a keystroke with no visible answer. */
+    const landed = () => { renderShelf(); tally(); sync(); return e.preventDefault(); };
     /* Space opened this card and space shuts it, because that is what space
        does to a quick look on this machine and it is the strongest reflex
        there is. Keep moved off it and onto k, which is free, mnemonic and
        still one handed halfway down a pile. */
     if (e.key === " ") { shut(); return e.preventDefault(); }
     if (e.key === "k" || e.key === "K") { await flip(shown); return landed(); }
+    /* the digits work here the way they work on the wall, because a hand
+       that tags through the card is the same hand on the same row of keys
+       and the legend above the grid has not changed. */
+    if (/^[1-9]$/.test(e.key)) {
+      const hit = [...digits].find(([, d]) => d === Number(e.key));
+      if (hit) { await mark(shown, hit[0]); return landed(); }
+    }
     const code = e.key.toUpperCase();
     if (S.vocab[code]) { await mark(shown, code); return landed(); }
     return;
@@ -1168,8 +1347,18 @@ async function onKey(e) {
 
   if (e.key === "k" || e.key === "K") {
     if (picked()) { await keepAll([...sel]); return e.preventDefault(); }
-    await flip(item);
-    step();
+    /* the run only advances when the write landed. stepping over a keep the
+       disk refused would carry the hand away from the one frame that still
+       needs the decision made again. */
+    if (await flip(item)) {
+      /* A keep that landed is a decision made, so with auto advance on the
+         cursor walks to the next frame that still needs one, after the
+         flash has had time to be read. Letting a frame go is the decision
+         being taken back rather than made, so it keeps the plain step, and
+         so does the whole key with the toggle off. */
+      if (advance && S.tags[item.id]?.star) flashKeep(item.id);
+      else step();
+    }
     return e.preventDefault();
   }
 
@@ -1180,8 +1369,7 @@ async function onKey(e) {
     const hit = [...digits].find(([, d]) => d === Number(e.key));
     if (hit) {
       if (picked()) { await markAll([...sel], hit[0]); return e.preventDefault(); }
-      await mark(item, hit[0]);
-      step();
+      if (await mark(item, hit[0])) step();
       return e.preventDefault();
     }
   }
@@ -1193,8 +1381,7 @@ async function onKey(e) {
        frame under the cursor, and a set is a decision already made about
        every frame in it at once. */
     if (picked()) { await markAll([...sel], code); return e.preventDefault(); }
-    await mark(item, code);
-    step();
+    if (await mark(item, code)) step();
     return e.preventDefault();
   }
 }
@@ -1232,7 +1419,11 @@ function command(e) {
    * It is also off the bare r it used to sit on, where it was quietly
    * eating the `resting` tag.
    */
-  if (k === "KeyR") {
+  /* Option and only option. On a pc keyboard the chord is control, so this
+     function now hears control r as well, and control r is the browser's
+     reload there the way cmd r is here. The alt gate keeps reveal on the
+     one modifier no browser has spoken for. */
+  if (k === "KeyR" && e.altKey) {
     reveal(previewOpen() ? current() : visible[cursor]);
     return e.preventDefault();
   }
@@ -1362,15 +1553,45 @@ const tilesFor = (ids) =>
 
 async function bin(ids) {
   const going = tilesFor(ids);
+  /* Whether this bin is a decision made on the cursor frame, which is the
+     only kind that auto advances: a swept set is a decision already made
+     about many at once, the card walks itself, and inside the bin the same
+     key means the opposite thing. The next open question is found now and
+     held by id, because the render that follows renumbers everything. */
+  const auto = advance && !F.binned && !previewOpen()
+    && ids.length === 1 && ids[0] === visible[cursor]?.id;
+  const chase = auto ? visible[nextUndecided(cursor)]?.id ?? null : null;
   const ok = await post("/api/bin", { ids });
   if (!ok) { feel("no"); nope($("#f-bin")); sayBin("that did not go in the bin."); return; }
   for (const id of ids) { S.binned.add(id); sel.delete(id); }
+  /* the card first, before the wall moves: a preview left open on a frame
+     that just went in the bin would be showing a photograph the shelf no
+     longer admits to having. */
+  evict(ids);
   /* the frames are already out of the model here. this holds them on the
      wall for a fifth of a second while they shrink away, because a frame
      that disappears between two rendered frames leaves no evidence that
      anything happened except a number changing in the far corner. */
   feel("thud");
-  leave(going, () => { renderShelf(); tally(); });
+  /* the decision rides the departure: the flash goes on the tile while it
+     leaves, so the answer and the exit read as one gesture and not two. */
+  if (auto) going[0]?.classList.add("flash-bin");
+  leave(going, () => {
+    renderShelf();
+    /* land on the next open question rather than on whatever slid into the
+       empty place, which is as likely as not a frame already decided. with
+       nothing undecided ahead the clamp in renderShelf has already done
+       the honest thing, which is standing still. */
+    if (chase) {
+      const i = at(chase);
+      if (i >= 0) {
+        cursor = i;
+        paintCursor();
+        $("#grid").children[cursor]?.scrollIntoView({ block: "nearest" });
+      }
+    }
+    tally();
+  });
   did(`setting aside ${many(ids.length)}`, () => unbin(ids), () => bin(ids));
   sayBin(`${many(ids.length)} set aside. nothing was deleted.`);
   setTimeout(() => sayBin(), 6000);
@@ -1381,6 +1602,9 @@ async function unbin(ids) {
   const ok = await post("/api/bin", { ids, put: true });
   if (!ok) { feel("no"); nope($("#f-bin")); sayBin("that did not come back out."); return; }
   for (const id of ids) { S.binned.delete(id); sel.delete(id); }
+  /* leaving the bin is leaving the bin view's run too, so the card moves on
+     the same way it does when a frame goes in. */
+  evict(ids);
   feel("tap");
   leave(going, () => { renderShelf(); tally(); });
   did(`putting back ${many(ids.length)}`, () => bin(ids), () => unbin(ids));
@@ -1430,6 +1654,9 @@ async function nuke(ids) {
   S.items = S.items.filter((i) => !gone.has(i.id));
   S.byId = new Map(S.items.map((i) => [i.id, i]));
   for (const id of gone) { sel.delete(id); S.binned.delete(id); }
+  /* a card still showing a file that has left the drive would be the most
+     dishonest pixel in the app, so it walks to a survivor or shuts. */
+  evict(ids);
   feel("thud");
   leave(going, () => { renderShelf(); tally(); });
   /**
@@ -1559,23 +1786,45 @@ async function collect() {
 }
 
 /* Both writes go to the copy on this page first and to the server after,
-   and neither of them repaints: on the shelf the repaint is step()'s, one
-   frame later, and doing it here as well would paint the whole grid twice
-   for every keystroke of a run that is a keystroke every half second. */
+   and on the happy path neither repaints: on the shelf the repaint is
+   step()'s, one frame later, and doing it here as well would paint the
+   whole grid twice for every keystroke of a run that is a keystroke every
+   half second. The one repaint they do own is the retraction, when the
+   server says no and the page has been showing a tag the disk never took. */
+/** rows into the page's copy and nothing else. the callers decide whether
+    the disk hears about it, which is the whole difference between an undo
+    and an admission that a write never landed. */
+function putRows(rows) {
+  for (const [id, tag, star] of rows) {
+    S.tags[id] = { ...S.tags[id], tag: tag || undefined, star };
+  }
+}
+
 /**
  * Put a set of tag rows back exactly as they were, for the undo of anything
  * that wrote one. `[id, tag, star]` each, and an empty string is what the
  * server reads as untagged, so a frame that had no tag before gets none back
  * rather than keeping whatever it was given.
+ *
+ * The rows standing when it starts are captured first, because this write
+ * can fail like any other. When any post is refused the page goes back to
+ * what it showed before the attempt and the whole thing throws, so walk()
+ * keeps the step on its stack and says could not undo, instead of the page
+ * showing a restore the disk never took.
  */
 async function restoreTags(rows) {
-  for (const [id, tag, star] of rows) {
-    S.tags[id] = { ...S.tags[id], tag: tag || undefined, star };
-  }
+  const before = tagRows(rows.map(([id]) => id));
+  putRows(rows);
   renderShelf();
   tally();
-  await Promise.all(rows.map(([id, tag, star]) =>
+  const oks = await Promise.all(rows.map(([id, tag, star]) =>
     post("/api/tag", { id, tag: tag ?? "", star })));
+  if (oks.some((ok) => !ok)) {
+    putRows(before);
+    renderShelf();
+    tally();
+    throw new Error("restore refused");
+  }
 }
 
 /** what a set of frames is wearing right now, in the shape restoreTags reads */
@@ -1584,6 +1833,17 @@ const tagRows = (ids) =>
 
 const someFrames = (n) => `${n} ${n === 1 ? "frame" : "frames"}`;
 
+/**
+ * Both return whether the disk took the write, and the callers advance only
+ * on true. THE PAGE USED TO KEEP THE TAG EITHER WAY: the model was updated,
+ * the run stepped on, and a server that said no was a line in a console
+ * nobody had open, so a full pass over a pile could end with chips counting
+ * tags that were never on the disk. Now a refused write is retracted where
+ * it can be seen, the rows go back, the wall repaints, and the page says so
+ * in the same voice undo uses. The step is recorded only after the disk
+ * agrees, because an undo stack holding writes that never happened would
+ * offer to take back nothing.
+ */
 async function flip(item) {
   const was = tagRows([item.id]);
   const star = S.tags[item.id]?.star ? 0 : 1;
@@ -1591,9 +1851,18 @@ async function flip(item) {
   const now = tagRows([item.id]);
   struck = [item.id];
   feel("tap");
+  const ok = await post("/api/tag", { id: item.id, star });
+  if (!ok) {
+    putRows(was);
+    renderShelf();
+    tally();
+    feel("no");
+    say("that keep did not reach the disk.");
+    return false;
+  }
   did(star ? "keeping a frame" : "letting a frame go",
       () => restoreTags(was), () => restoreTags(now));
-  await post("/api/tag", { id: item.id, star });
+  return true;
 }
 
 async function mark(item, code) {
@@ -1602,9 +1871,18 @@ async function mark(item, code) {
   const now = tagRows([item.id]);
   struck = [item.id];
   feel("tick");
-  did(`tagging a frame ${S.vocab[code]?.[0] ?? code}`,
+  const ok = await post("/api/tag", { id: item.id, tag: code });
+  if (!ok) {
+    putRows(was);
+    renderShelf();
+    tally();
+    feel("no");
+    say("that tag did not reach the disk.");
+    return false;
+  }
+  did(`tagging a frame ${S.vocab[code] ?? code}`,
       () => restoreTags(was), () => restoreTags(now));
-  await post("/api/tag", { id: item.id, tag: code });
+  return true;
 }
 
 /**
@@ -1617,13 +1895,30 @@ async function mark(item, code) {
 async function markAll(ids, code) {
   const was = tagRows(ids);
   for (const id of ids) S.tags[id] = { ...S.tags[id], tag: code };
+  /* the rows as they stand now, read before anything asynchronous happens.
+     redo used to read them at redo time, through a closure over the ids,
+     which is after undo has put the old rows back: it faithfully rewrote
+     the world it was supposed to replace. the eager copy is the world this
+     keystroke made, frozen while it is still true. */
+  const now = tagRows(ids);
   struck = ids;
   feel("tick");
   renderShelf();
   tally();
-  did(`tagging ${someFrames(ids.length)} ${S.vocab[code]?.[0] ?? code}`,
-      () => restoreTags(was), () => restoreTags(tagRows(ids)));
-  await Promise.all(ids.map((id) => post("/api/tag", { id, tag: code })));
+  const oks = await Promise.all(ids.map((id) => post("/api/tag", { id, tag: code })));
+  const lost = was.filter((row, i) => !oks[i]);
+  if (lost.length) {
+    /* only the refused rows come back. the ones that landed are true on
+       the disk and retracting them would un-tag frames the server kept. */
+    putRows(lost);
+    renderShelf();
+    tally();
+    feel("no");
+    say(`${lost.length} of those did not reach the disk.`);
+    return;
+  }
+  did(`tagging ${someFrames(ids.length)} ${S.vocab[code] ?? code}`,
+      () => restoreTags(was), () => restoreTags(now));
 }
 
 /**
@@ -1636,13 +1931,25 @@ async function keepAll(ids) {
   const was = tagRows(ids);
   const star = ids.some((id) => !S.tags[id]?.star) ? 1 : 0;
   for (const id of ids) S.tags[id] = { ...S.tags[id], star };
+  /* frozen now for the same reason markAll freezes it: a redo that reads
+     the rows later reads them after undo has already unwound them. */
+  const now = tagRows(ids);
   struck = ids;
   feel("tap");
   renderShelf();
   tally();
+  const oks = await Promise.all(ids.map((id) => post("/api/tag", { id, star })));
+  const lost = was.filter((row, i) => !oks[i]);
+  if (lost.length) {
+    putRows(lost);
+    renderShelf();
+    tally();
+    feel("no");
+    say(`${lost.length} of those did not reach the disk.`);
+    return;
+  }
   did(`${star ? "keeping" : "letting go"} ${someFrames(ids.length)}`,
-      () => restoreTags(was), () => restoreTags(tagRows(ids)));
-  await Promise.all(ids.map((id) => post("/api/tag", { id, star })));
+      () => restoreTags(was), () => restoreTags(now));
 }
 
 function step() {
@@ -1653,4 +1960,208 @@ function step() {
   renderShelf();
   tally();
   $("#grid").children[cursor]?.scrollIntoView({ block: "nearest" });
+}
+
+/* ------------------------------------------------------------------ */
+/* the tally, as three chips and a strip                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The header readout, rebuilt as three live chips: kept, bin, left.
+ *
+ * app.js owns tally() and rewrites #tally wholesale every time a count
+ * moves, from half a dozen callers this file has never heard of. Rather
+ * than teaching every one of them about chips, the rewrite is watched:
+ * whenever anything else paints the readout, the chips are painted straight
+ * back over it from the same state the old line was reading. The observer
+ * is disconnected around our own write, so the loop ends the moment the
+ * chips are standing. This also means "whenever tally runs" needs no hook
+ * inside tally at all: the strip below is fed from the same repaint.
+ */
+let tallyWatch = null;
+
+function mountTally() {
+  const host = $("#tally");
+  if (!host) return;
+  tallyWatch = new MutationObserver(() => paintTally());
+  tallyWatch.observe(host, { childList: true });
+  paintTally();
+}
+
+/** the three numbers, counted the way tally() counts them: a kept frame
+    that has since been set aside counts as set aside, so the three always
+    sum to the whole archive. */
+function decisions() {
+  let kept = 0;
+  for (const i of S.items) {
+    if (!S.binned.has(i.id) && S.tags[i.id]?.star) kept++;
+  }
+  const binned = S.binned.size;
+  return { kept, binned, left: S.items.length - kept - binned };
+}
+
+/** one chip of the readout, wearing the tally's own clothes rather than
+    the filter row's: .t is the class the stylesheet dresses, mono with the
+    numbers held to their column, and the number sits in a b because that
+    is the element the #tally rules colour. Not a .chip, on purpose: a
+    switched on .chip goes red, and up here red belongs to the kept count
+    alone. */
+function tallyChip(cls, wordText, n, on, act) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = `t ${cls}${on ? " on" : ""}`;
+  b.setAttribute("aria-pressed", String(on));
+  b.append(wordText);
+  const num = document.createElement("b");
+  num.textContent = n;
+  b.append(num);
+  b.onclick = act;
+  return b;
+}
+
+function paintTally() {
+  const host = $("#tally");
+  if (!host) return;
+  const { kept, binned, left } = decisions();
+  /* our own write must not wake the watcher, or the chips repaint forever */
+  tallyWatch?.disconnect();
+  host.replaceChildren(
+    tallyChip("t-kept", "kept ", kept, F.star, tallyKept),
+    tallyChip("t-bin", "bin ", binned, F.binned, tallyBin),
+    tallyChip("t-left", "left ", left, F.left, tallyLeft),
+  );
+  tallyWatch?.observe(host, { childList: true });
+  feedStrip(kept, binned, left);
+}
+
+/* Each chip drives the filter machinery that already exists rather than a
+   private copy of it. kept is the #f-star chip's own filter and bin is
+   #f-binned's, so both clicks go through those buttons and the paint, the
+   aria state, the selection hygiene and the render all happen in the one
+   place they always have. left is the only state with no chip of its own,
+   so it lives in F beside the others and renderShelf reads it the same
+   way. The three are exclusive by meaning, a frame cannot be kept and
+   undecided at once, so switching one on walks the others off first. */
+function tallyKept() {
+  if (F.binned) $("#f-binned").click();
+  F.left = false;
+  $("#f-star").click();
+}
+
+function tallyBin() {
+  if (F.star) $("#f-star").click();
+  F.left = false;
+  $("#f-binned").click();
+}
+
+function tallyLeft() {
+  if (F.binned) $("#f-binned").click();
+  if (F.star) $("#f-star").click();
+  F.left = !F.left;
+  feel("tick");
+  renderShelf();
+}
+
+/** The chips wear the filter state on every render, because the filters
+    move from places that never touch the tally: the kept filter has a chip
+    of its own two rows down, and clear undoes everything at once. */
+function syncTallyState() {
+  const wear = (cls, on) => {
+    const b = document.querySelector(`#tally .${cls}`);
+    if (!b) return;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  };
+  wear("t-kept", F.star);
+  wear("t-bin", F.binned);
+  wear("t-left", F.left);
+}
+
+/**
+ * The progress strip under the header: three widths, one truth. The markup
+ * is three flex children in decision order, kept then binned then left,
+ * and the stylesheet owns everything else about them, the colours and the
+ * transition included. Written as percentages of the whole archive so the
+ * strip is the tally drawn as a length, and a missing strip is simply
+ * skipped: the readout is correct without it.
+ */
+function feedStrip(kept, binned, left) {
+  const strip = $("#progress");
+  if (!strip || strip.children.length < 3) return;
+  const total = kept + binned + left;
+  const pct = (n) => (total ? `${(n / total) * 100}%` : "0%");
+  strip.children[0].style.width = pct(kept);
+  strip.children[1].style.width = pct(binned);
+  strip.children[2].style.width = pct(left);
+}
+
+/* ------------------------------------------------------------------ */
+/* deciding and moving on                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Whether a decision walks the cursor to the next frame that still needs
+ * one. On by default, because that is the shape of a cull: keep or bin,
+ * land on the next open question, again. Off, both keys go back to exactly
+ * what they did before, the plain step one frame to the right. Persisted
+ * the way the tile size is, because it is a way of working rather than a
+ * mood for one session.
+ */
+const ADV_KEY = "keeper.advance";
+let advance = localStorage.getItem(ADV_KEY) !== "0";
+
+/** how long the decision shows on the tile before the cursor moves. long
+    enough to be read as an answer, short enough not to slow a run that is
+    a keystroke every half second. */
+const FLASH = 150;
+
+function mountAdvance() {
+  const t = $("#advance-toggle");
+  if (!t) return;
+  const paint = () => {
+    t.classList.toggle("on", advance);
+    t.setAttribute("aria-pressed", String(advance));
+  };
+  t.onclick = () => {
+    advance = !advance;
+    localStorage.setItem(ADV_KEY, advance ? "1" : "0");
+    feel("tick");
+    paint();
+  };
+  paint();
+}
+
+/** the next frame past this one that nobody has decided about yet. forward
+    only, never wrapping, for the same reason step() stops at the end: the
+    bottom of the pile is a thing you should be able to feel. */
+function nextUndecided(from) {
+  for (let i = from + 1; i < visible.length; i++) {
+    const t = S.tags[visible[i].id] ?? {};
+    if (!t.star && !S.binned.has(visible[i].id)) return i;
+  }
+  return -1;
+}
+
+/**
+ * A keep that landed, shown on the tile and then walked away from. The
+ * render comes first so the star and the flash arrive on the same paint,
+ * and the advance is a beat later so the decision is readable before the
+ * ring moves. The flash class goes on after the render on purpose: the
+ * patch path in renderShelf rewrites className whole, and a class added
+ * before it would not survive to be seen. With nothing undecided ahead it
+ * falls back to the plain step, so the run still finds the bottom.
+ */
+function flashKeep(id) {
+  renderShelf();
+  tally();
+  const fig = $(`#grid figure[data-id="${CSS.escape(id)}"]`);
+  fig?.classList.add("flash-keep");
+  setTimeout(() => {
+    fig?.classList.remove("flash-keep");
+    const from = at(id);
+    const next = nextUndecided(from >= 0 ? from : cursor);
+    cursor = next >= 0 ? next : Math.min(cursor + 1, visible.length - 1);
+    renderShelf();
+    $("#grid").children[cursor]?.scrollIntoView({ block: "nearest" });
+  }, FLASH);
 }

@@ -1,31 +1,85 @@
 @import "/font/geist.css";
 
 /* ---------------------------------------------------------------------
-   keeper, dark and calm.
+   keeper, warm chrome on an honest stage.
 
-   One accent, and it is a hex value rather than a mark: #e1062c. Everything
-   else is greyscale on purpose, because this is a tool for looking at
-   photographs and a coloured interface around a photograph is a thumb on
-   the print.
+   Two zones and one rule between them. Any surface a photograph touches is
+   strictly equal-RGB neutral, because a tinted surround is a thumb on the
+   print: the wall, the plate under every thumbnail, the black behind the
+   quick look. Everything else, the header, the tray, the chips, the cards,
+   sits a whisper warm, two to five channel points, so the tool reads as
+   the room and the photographs read as the work.
+   Acceptance test: eyedrop the wall, the plate under any thumbnail and
+   the black behind the quick look, R equals G equals B. No photograph
+   ever sits against a warm pixel: there is always a neutral plate or the
+   wall's own gutter between it and the chrome.
 
    Faces degrade to system-ui and never to Times. No webfont is fetched:
    keeper runs against a drive on a plane, and a tool that loses its
    typography without wifi is a tool that lied about its dependencies.
    --------------------------------------------------------------------- */
 :root {
-  --hot: #e1062c;
+  /* the contrast rubric, in five lines.
+     the ground is #0b0b0b and every ratio in this file is measured on it
+     unless a rule says otherwise. text passes at 4.5:1 or it does not ship.
+     components and rings pass at 3:1. red #e1062c is 4.00:1, a legal ring
+     and never a legal word. every new hex states its measured ratio. */
 
-  --bg: #0b0b0c;
-  --raise: #131315;
+  /* the neutral zone */
+  --bg: #0b0b0b;     /* the shelf wall */
+  --stage: #101010;  /* the plate directly under and behind a photograph */
+  --deep: #000000;   /* the quick look's surround. coming back up to the
+                        wall's #0b0b0b is what makes closing read as
+                        surfacing. */
+
+  /* The chrome ladder. Elevation is a lightness ramp, not a shadow: one
+     step up for bars and panels, rgb(21,19,16), a second for cards,
+     popovers and hover-raise, rgb(29,25,21). Both a few points warm, and
+     neither ever shares an edge with a photograph: there is always at
+     least a --stage plate between. */
+  --chrome: #151310;
+  --chrome-2: #1d1915;
+
   --line: #ffffff14;
   --line-strong: #ffffff24;
-  --ink: #ededee;
-  --ink-2: #a3a3a6;
-  --ink-3: #6e6e72;
 
-  /* the plate a picked tile sits on. a step above --raise, so a slab of them
-     reads across a wall without being a second thing to look at. */
-  --pick: #2c2c31;
+  /* One warm white at three strengths, instead of three opaque greys.
+     --ink is 17.15:1 on the ground, 16.16:1 on --chrome, 15.22:1 on
+     --chrome-2. --ink-2 composites to about #a9a59f, 8.03:1 on the ground.
+     --ink-3 composites to about #8e8b86, 5.80:1 on the ground and past
+     4.5:1 on every chrome step, so nothing that wears it needs a lift. */
+  --ink: #f2efe9;
+  --ink-2: rgba(236, 231, 223, .70);
+  --ink-3: rgba(236, 231, 223, .58);
+
+  /* Red, split into its two jobs. --hot is the brand fill, 4.00:1 on the
+     ground: it passes the 3:1 component threshold and fails the 4.5:1 text
+     one, so it draws rings, fills, the one primary button, and never sets
+     type. --hot-ink is red as text, 6.63:1 on the ground and 6.25:1 on
+     --chrome. A white label on a --hot fill is 4.93:1 and legal. */
+  --hot: #e1062c;
+  --hot-ink: #ff5d75;
+
+  /* amber takes deal-with-this, 9.02:1 on the ground, so red can mean
+     chosen and nothing else. green only ever confirms, 9.33:1, and is
+     never a keep badge. */
+  --warn: #e0a458;
+  --ok: #4fc978;
+
+  /* the plate a picked tile sits on. it earned its lift once already, so a
+     sweep across forty frames reads as a slab, and it is warmed now to sit
+     with the chrome rather than being the coolest surface in the app.
+     3.12:1 on the ground, clear of the component threshold. non-text. */
+  --pick: #655f56;
+
+  /* Four tag hues for the shelf chips, desaturated, deployed as an 8px dot
+     or a 2px tick inside a chip and never as a wash behind a thumbnail.
+     8.54:1, 7.96:1, 6.79:1 and 8.38:1 on --chrome. There is deliberately
+     no red tag: red is reserved for the brand meaning. */
+  --tag-gold: #d4aa54;
+  --tag-sky: #6cb0e8;
+  --tag-violet: #a98fe0;
+  --tag-teal: #58bfb0;
 
   /* Geist for everything with a word in it, Geist Mono for everything with a
      number or a path in it. One family, two cuts, self hosted from web/font,
@@ -82,14 +136,15 @@ body {
   display: flex; flex-direction: column; overflow: hidden;
 }
 
-/* The signature: mono, wide, muted, small. Every label on the page is this
-   and nothing else is.
+/* The signature: wide, muted, small, in the sans, because a label is a word
+   and words wear the sans here. Every label on the page is this and nothing
+   else is.
 
    It is lowercase rather than the usual uppercase because this app is written
    in lowercase from the command line up, and a stylesheet that shouts WHERE
    at you over a section whose own copy says where is a stylesheet arguing
-   with the product. The tracking and the mono do the work the capitals were
-   doing. If the capitals are ever wanted back it is the same one word
+   with the product. The tracking and the weight do the work the capitals
+   were doing. If the capitals are ever wanted back it is the same one word
    in every rule here that carries text-transform. */
 .label {
   font: 500 .78rem/1 var(--sans);
@@ -123,6 +178,9 @@ header.bar {
   display: flex; align-items: center; gap: var(--s5);
   padding: var(--s3) var(--s5);
   flex: none;
+  /* the first step of the chrome ladder. the bar is furniture, not wall,
+     and painting it says so: everything below the strip is the work. */
+  background: var(--chrome);
 }
 /* The mark and the word, set tight. The gap is a hair under half the square
    so the two read as one object, and the word keeps the size of the type
@@ -161,10 +219,31 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
 #quit:hover { color: var(--ink); }
 #quit.armed { background: var(--hot); color: #fff; }
 #quit:disabled { color: var(--ink-3); cursor: default; }
-/* the running count. numbers you glance at rather than read, so they are
-   mono and they hold their column while they change. */
-#tally { font-size: .85rem; font-variant-numeric: tabular-nums; }
-#tally .dim { color: var(--ink-3); }
+/* The running count, as three live buttons: kept, bin, left. shelf.js
+   builds them as .t rather than .chip, on purpose: clicking one drives
+   the matching filter, but a switched on .chip wears the red wash, and
+   up here red belongs to the kept count alone. So the body wears the
+   chip's clothes, the on state is the nav's neutral lift, the same
+   ground the advance toggle stands on, and the number in its b is the
+   loud half: mono with the digits held still, the kept count in the
+   text red because those are the frames red already means, the other
+   two in the second ink. The counts ride at full strength, out of
+   fit.css's count-opacity lift entirely, because the number is the
+   point of this control rather than an aside to it. */
+#tally { display: flex; align-items: center; gap: var(--s1); min-width: 0; }
+#tally .t {
+  border: 0; background: none; cursor: pointer;
+  padding: var(--s2) var(--s3); border-radius: var(--r);
+  font: 500 .95rem/1.3 var(--sans); color: var(--ink-2);
+  white-space: nowrap;
+}
+#tally .t:hover { background: #ffffff12; color: var(--ink); }
+#tally .t.on { background: #ffffff12; color: var(--ink); }
+#tally .t b {
+  font-family: var(--mono); font-weight: 500;
+  font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+#tally .t-kept b { color: var(--hot-ink); }
 /* The folder you are in, and the way to leave it. Truncated from the left
    because the tail is the half that identifies it: every path on a shoot
    drive starts /Volumes/something and ends with the name you care about. */
@@ -185,11 +264,31 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
 }
 #root:hover { color: var(--ink); background: #ffffff12; }
 
+/* The progress strip. Three pixels under the bar that answer "how far
+   through the day am I" without a number: kept in the accent, binned in a
+   quiet white, undecided in the hairline grey. The widths come from the
+   same counts that feed #tally and they move rather than jump, so a
+   decision reads as the strip advancing. Fills and a hairline only, so
+   nothing here is held to a text ratio. */
+#progress { flex: none; height: 3px; display: flex; }
+#progress[hidden] { display: none; }
+#progress i {
+  display: block; height: 100%;
+  transition: width var(--mid) var(--ease);
+}
+#progress .p-kept { background: var(--hot); opacity: .8; }
+#progress .p-bin { background: #ffffff33; }
+#progress .p-left { background: var(--line); }
+
 .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .view[hidden] { display: none; }
 
 /* --- filters. space does the separating, not boxes ----------------- */
-#filters { padding: var(--s2) var(--s5) var(--s5); flex: none; }
+/* the filter row rides the same chrome step as the bar above it, so the
+   top of the window reads as one piece of furniture over the wall. the
+   photographs never touch it: the grid's own gutter is between. */
+#filters { padding: var(--s2) var(--s5) var(--s5); flex: none;
+           background: var(--chrome); }
 #filters .row {
   display: flex; flex-wrap: wrap; align-items: center;
   gap: var(--s2); margin-bottom: var(--s2);
@@ -197,16 +296,17 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
 #filters .row:last-child { margin-bottom: 0; }
 #filters .row > b { width: 52px; flex: none; }
 
-/* A chip is a control and a tag at once, and both of those are mono here.
-   It reads a size smaller than body copy because the mono runs wider, and
-   the count beside it is already mono, so the pair stopped being two
-   typefaces bolted together. */
+/* A chip is a control and a tag at once, and both of those are words, so
+   the chip wears the sans like the copy around it. It reads a size smaller
+   than body copy so a row of six stays a row of controls, and the count
+   beside it keeps the same cut with its digits held still, so the pair
+   never reads as two typefaces bolted together. */
 .chip {
   border: 0; background: none; color: var(--ink-2);
   border-radius: var(--r); padding: var(--s2) var(--s3); cursor: pointer;
   font: 500 .95rem/1.3 var(--sans); white-space: nowrap;
 }
-.chip:hover { color: var(--ink); background: var(--raise); }
+.chip:hover { color: var(--ink); background: var(--chrome-2); }
 
 /* A chip that is on used to be a solid slab of the accent, and four of them
    next to each other stopped being four chips. They ran together into one
@@ -222,21 +322,56 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
    delete, which are the two chips where the colour means "careful" rather
    than "chosen", and those set it themselves further down.
 
-   The text is a lighter red than the accent because #e1062c is a fill
-   colour: at fourteen pixels on near black it is muddy, and a label you
-   have to lean in to read is not a state. */
+   The text is the text red, not the accent, because #e1062c is a fill
+   colour: 4.00:1 on this ground, it fails as a word at fourteen pixels,
+   and a label you have to lean in to read is not a state. The hover
+   brightens the wash and leaves the word alone: --hot-ink already passes
+   everywhere it lands, and a second, brighter red would be a hex with no
+   job. */
 .chip.on {
   background: #e1062c1c;
-  color: #ff5d75;
+  color: var(--hot-ink);
   box-shadow: inset 0 0 0 1px #e1062c59;
 }
-.chip.on:hover { background: #e1062c2e; color: #ff7b8e; }
+.chip.on:hover { background: #e1062c2e; }
+
+/* auto advance is a preference about the keyboard, not a choice about a
+   photograph, so its lit state is the nav's neutral lift rather than the
+   red the filter chips earn: red on this bar means chosen or careful, and
+   a mode is neither. the id wins over .chip.on without ceremony. */
+#advance-toggle.on {
+  background: #ffffff12; color: var(--ink); box-shadow: none;
+}
+#advance-toggle.on:hover { background: #ffffff12; }
 .chip i {
   font-style: normal; margin-left: var(--s2);
   font-size: .8rem; opacity: .6;
   font-variant-numeric: tabular-nums;
 }
 .chip.on i { opacity: .8; }
+
+/* A tag chip carries its hue as an 8px dot, never as a wash behind a
+   thumbnail. shelf.js deals the hue round robin from the four tag
+   tokens off the vocab key's index and rides it on the chip as --tag,
+   so no colour is ever stored and this rule is the only place the dot
+   is painted: the ink floor under the var is for a dot drawn before the
+   vocabulary has arrived. The dot is round because a dot is the one
+   shape in this app allowed to be. A tag chip is known by the dot it
+   carries, and a chosen one wears the ladder rather than the red
+   treatment: red on a chip means kept or careful, and a tag is neither.
+   The text lifts to ink, the dot comes to full strength. */
+.chip .dot {
+  display: inline-block; width: 8px; height: 8px;
+  margin-right: var(--s2); border-radius: 50%;
+  background: var(--tag, var(--ink-3));
+  opacity: .75; vertical-align: 0;
+}
+.chip.on:has(.dot) {
+  background: var(--chrome-2); color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.chip.on:has(.dot):hover { background: var(--chrome-2); }
+.chip.on:has(.dot) .dot, .chip:has(.dot):hover .dot { opacity: 1; }
 
 /* The magnifier. It stands in front of the field rather than inside it,
    because inside means padding-left on an input whose width is already the
@@ -289,10 +424,22 @@ input[type=search]::placeholder { color: var(--ink-3); }
    ordinary selectable text. */
 #grid figure, #strip figure { user-select: none; -webkit-user-select: none; }
 figcaption { user-select: text; -webkit-user-select: text; cursor: text; }
-figure { margin: 0; position: relative; background: #0f0f11; cursor: pointer; }
+figure { margin: 0; position: relative; background: var(--stage); cursor: pointer; }
+
+/* the plate and the step back ease in rather than snapping, fast enough to
+   feel attached to the hand. the blanket rule in style.css flattens both
+   under reduced motion. */
+#grid figure {
+  transition: box-shadow var(--fast) var(--ease), opacity var(--fast) var(--ease);
+}
 figure img {
   display: block; width: 100%; aspect-ratio: 3/2; object-fit: cover;
   transition: opacity var(--fast) var(--ease);
+  /* One hairline just inside the picture, drawn as an outline because an
+     inset box-shadow never paints over a replaced element's own pixels. A
+     high-key frame on the neutral plate has no edge of its own, and a
+     photograph that bleeds into the wall reads as part of the wall. */
+  outline: 1px solid var(--line); outline-offset: -1px;
 }
 
 /* The tag word used to be printed on the corner of every thumbnail. It is
@@ -413,9 +560,22 @@ figure.intray:hover img { opacity: .97; }
    are mounts and they would fight if they were in the same place. They are
    not: the tray's red is inside the border box, in the 4px the picture is
    inset by, and this plate is outside it. A frame that is both is a
-   photograph on a red mat on a grey plate, concentric, neither hiding the
+   photograph on a red mat on a warm plate, concentric, neither hiding the
    other, and the accent still means the tray alone. */
 figure.picked { box-shadow: 0 0 0 5px var(--pick); }
+
+/* And a hairline just inside the picture's own edge. The plate lives in the
+   gutter, which means at the seam of two picked tiles it belongs to both and
+   at the edge of the wall it hangs in space: the plate says "this region",
+   the ring says "this frame". One pixel, light, additive with everything
+   else a tile can wear, and it never covers a pixel that matters because an
+   edge pixel is gutter to the eye already. */
+figure.picked::before {
+  content: "";
+  position: absolute; inset: 0; z-index: 2;
+  box-shadow: inset 0 0 0 1px #ffffff73;
+  pointer-events: none;
+}
 
 /* cursor: the keyboard is standing here.
 
@@ -426,12 +586,24 @@ figure.picked { box-shadow: 0 0 0 5px var(--pick); }
 
    It sits inside the picked plate rather than beside it, and that is the
    common case rather than the odd one: with a set up, the keyboard is
-   almost always standing on one of its members. A white line on a grey slab
+   almost always standing on one of its members. A white line on a warm slab
    is the shape it makes, and the two never say the same thing. */
 figure.cursor {
   outline: 2px solid var(--ink);
   outline-offset: 1px;
 }
+
+/* The decision flash. When keep or bin commits on the cursor frame the
+   tile says so for a moment before the cursor moves on: kept flashes the
+   accent ring, binned steps down to the weight of a tertiary word. Both
+   are declared after .cursor so the flash wins the outline for the beat it
+   lasts; the script takes the class off again, so nothing here times
+   anything. The ring is a component and the accent passes 3:1 for one. */
+figure.flash-keep {
+  outline: 2px solid var(--hot);
+  outline-offset: 1px;
+}
+figure.flash-bin { opacity: .35; transition: opacity var(--fast) var(--ease); }
 
 /* the marquee.
 
@@ -443,8 +615,33 @@ figure.cursor {
 .marquee {
   position: absolute; z-index: 1; pointer-events: none;
   border: 1px solid var(--line-strong);
-  background: #ffffff08;
+  /* No fill. The 3% white it used to carry read as fine print on a light
+     screen and as fog on this one: over a wall of dark photographs it was a
+     grey slab you were asked to judge pictures through. The tiles under the
+     rectangle already say what is caught, so the rectangle only has to say
+     where the hand is, and a hairline says that. */
 }
+
+/* the count rides the box. "set aside n frames" in the bar is the same
+   number, but the bar is a foot and a half from where the hand is working,
+   and a sweep is aimed by its result. bottom right, inside, where the
+   pointer usually is, set in the mono because it is a number. It floats
+   over photographs mid sweep, so it rides the same black plate every
+   over-photo label in the app rides, not a chrome step: chrome never
+   touches a picture, and over photo pixels true white is allowed. On the
+   plate over a white sky the number still reads at 9.3:1. */
+.marquee::after {
+  content: attr(data-n);
+  position: absolute; right: 5px; bottom: 5px;
+  padding: 2px 7px;
+  font: 500 10.5px/1.5 var(--mono);
+  letter-spacing: .08em;
+  color: #fff;
+  background: #000000b8;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+}
+.marquee[data-n=""]::after { display: none; }
 /* Nothing hovers while a rectangle is being dragged across it. The untagged
    scrim lifts on hover and the caption fades in, and both firing under a
    moving pointer turn a sweep into a strobe. The grid has the pointer
@@ -452,6 +649,14 @@ figure.cursor {
    and stops all of it. */
 body[data-sweeping] { user-select: none; }
 body[data-sweeping] #grid figure { pointer-events: none; }
+
+/* While the rectangle is open, everything it has not caught steps back.
+   The plate and the ring say "these", this says "not these", and between
+   the two the answer to the only question a sweep asks is readable at
+   speed, mid gesture, without looking away from the pictures. Half, not
+   near black: the frames you have not chosen yet are exactly the ones you
+   are still deciding about. */
+body[data-sweeping] #grid figure:not(.picked) { opacity: .5; }
 
 /* the add button.
 
@@ -535,7 +740,7 @@ figure.intray .add:hover { filter: brightness(1.16); }
   max-width: 54ch; color: var(--ink-3); font-size: .9rem;
 }
 .rack-foot code {
-  font: .85em var(--mono); background: var(--raise);
+  font: .85em var(--mono); background: var(--chrome);
   border-radius: 3px; padding: 1px 5px; color: var(--ink-2);
 }
 
@@ -584,14 +789,24 @@ figure.intray .add:hover { filter: brightness(1.16); }
   font: 500 .9rem/1 var(--mono);
   border-radius: var(--r);
 }
-.slot .zoom button:hover { color: var(--ink); background: var(--raise); }
+.slot .zoom button:hover { color: var(--ink); background: var(--chrome); }
 .slot .zoom button:active { transform: translateY(1px); }
 
 .slot .box {
-  position: relative; overflow: hidden; background: #0f0f11;
+  position: relative; overflow: hidden; background: var(--stage);
   border-radius: var(--r); cursor: grab;
 }
 .slot .box:active { cursor: grabbing; }
+/* the same hairline the shelf draws inside a picture, for the same reason:
+   a high-key crop on the neutral plate needs an edge that is not the
+   photograph's own whites. a pseudo element rather than a shadow on the
+   box because the img inside is absolutely positioned and would paint over
+   an inset shadow; ::before, because .trying already owns ::after. */
+.slot .box::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  box-shadow: inset 0 0 0 1px var(--line);
+  pointer-events: none;
+}
 .slot.on .box { box-shadow: 0 0 0 2px var(--ink); }
 .slot .box img { position: absolute; max-width: none; }
 /* `hidden` is an attribute, not a display value, so any rule that sets
@@ -617,11 +832,12 @@ figure.intray .add:hover { filter: brightness(1.16); }
 }
 .slot .nums { padding-top: var(--s1); font: .78rem/1.6 var(--mono); color: var(--ink-3); }
 /* a number that is fine does not need a colour. it needs to be legible and
-   then to get out of the way, so the good case is plain ink and the only
-   thing that reaches for the accent is the case you have to look at. that
-   is also how the shelf works, which is the point of having one accent. */
+   then to get out of the way, so the good case is plain ink and only the
+   case you have to deal with gets a colour, and that colour is amber. red
+   used to sit here and it was a semantic collision: red in keeper means
+   you chose this, and a crop that does not fit is not a choice. */
 .slot .nums code { font: inherit; color: var(--ink); }
-.slot .nums .warn { color: var(--hot); }
+.slot .nums .warn { color: var(--warn); }
 
 #picker { width: 400px; flex: none; display: flex; flex-direction: column;
           border-left: 1px solid var(--line); }
@@ -684,48 +900,31 @@ figure.intray .add:hover { filter: brightness(1.16); }
 #strip { grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
          padding: 0 var(--s4) var(--s7); }
 
-/* --- lightbox ------------------------------------------------------ */
-/* the older full screen viewer. it is held to the same backdrop as the
-   preview card so the two never look like two different applications. */
-#lb {
-  position: fixed; inset: 0; z-index: 50; background: #0b0b0ce0;
-  backdrop-filter: blur(16px) saturate(.9);
-  -webkit-backdrop-filter: blur(16px) saturate(.9);
-  display: grid; grid-template-rows: 1fr auto; gap: var(--s4);
-  padding: var(--s5); cursor: zoom-out;
-  animation: fade var(--mid) var(--ease);
-}
-#lb[hidden] { display: none; }
-#lb .stage { min-height: 0; display: grid; place-items: center; }
-#lb .stage img, #lb .stage video { max-width: 100%; max-height: 100%; object-fit: contain; }
-#lbmeta { cursor: default; }
-#lbreveal { margin-top: var(--s3); background: var(--raise); }
-#lbmeta { text-align: center; color: var(--ink-2); font-size: .95rem; }
-#lbmeta code {
-  font: .8rem/1 var(--mono); color: var(--ink);
-  background: var(--raise); border-radius: var(--r);
-  padding: 6px var(--s2); user-select: all; display: inline-block; margin-top: var(--s2);
-}
 @keyframes fade { from { opacity: 0 } }
 
 /* --- the shortcuts sheet ------------------------------------------- */
-/* It comes up from the bottom edge it is anchored to, and it goes back down
-   the same way, because a panel that enters along one path and leaves along
-   another reads as two different panels. Solid rather than translucent: it
-   stands over a wall of photographs, and a blurred photograph behind a
-   column of text is a background pretending to be a texture. */
+/* A card on a scrim now, not a bar welded to the bottom edge. It still
+   rises from the edge it is anchored to and goes back down the same way,
+   because a panel that enters along one path and leaves along another
+   reads as two different panels. Solid rather than translucent: it stands
+   over a wall of photographs, and a blurred photograph behind a column of
+   text is a background pretending to be a texture. The scrim is a spread
+   shadow rather than a second element, so the markup and the open and
+   close logic did not have to learn anything. */
 #keys[hidden] { display: none; }
 #keys {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
-  background: var(--raise);
-  border-top: 1px solid var(--line-strong);
+  position: fixed; left: var(--s5); right: var(--s5); bottom: var(--s5);
+  z-index: 60;
+  background: var(--chrome-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
   padding: var(--s4) var(--s5) var(--s5);
-  box-shadow: 0 -24px 60px #00000073;
+  box-shadow: 0 0 0 100vmax #000000b8;
   animation: sheet .26s var(--ease);
 }
 @keyframes sheet { from { transform: translateY(14px); opacity: 0 } }
-/* the panel is a place on the screen, so the sheet stops where it starts */
-body:has(#tray:not([hidden])) #keys { right: var(--tray-w); }
+/* the panel is a place on the screen, so the card stops short of it */
+body:has(#tray:not([hidden])) #keys { right: calc(var(--tray-w) + var(--s5)); }
 
 .keys-head { display: flex; align-items: center; margin-bottom: var(--s4); }
 #keys-shut {
@@ -760,14 +959,21 @@ body:has(#tray:not([hidden])) #keys { right: var(--tray-w); }
 /* The glyphs come out of the system font rather than Geist Mono, which has
    no ⌘ ⌥ ⇧ ⏎ ⌫ ⎋ in it, and a missing glyph falls back to whatever the
    browser can find and arrives at a different size and weight from the key
-   beside it. Naming the system stack here keeps a row of chords even. */
-kbd {
+   beside it. Naming the system stack here keeps a row of chords even.
+
+   A keycap is a mono span on the first chrome step, one hairline and the
+   house radius, so a key on the card reads as a step down from the card
+   the way a key on a keyboard sits below its deck. `.key` is the same
+   clothes for keycaps built in script, the empty state's five among them. */
+kbd, .key {
   font: 400 .74rem/1 var(--mono);
   font-family: -apple-system, BlinkMacSystemFont, var(--mono);
-  background: #ffffff0f; border: 1px solid var(--line);
-  border-radius: 3px; padding: 3px 5px; color: var(--ink-2);
+  background: var(--chrome); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 3px 5px; color: var(--ink-2);
   white-space: nowrap; text-align: center;
 }
+/* the empty state's keycaps stay in its voice: quiet, and no quieter */
+#none kbd, #none .key { color: var(--ink-3); }
 
 /* the question mark. same clothes as the tray toggle beside it, round
    because it is one character and a square around one character is a box
@@ -783,7 +989,7 @@ kbd {
 
 /* Reduced motion means no movement, not no feedback. Everything that slid,
    scaled or rose is turned off, and the two things that appear out of
-   nowhere, the preview and the lightbox, keep a short cross fade instead,
+   nowhere, which is now only the preview, keep a short cross fade instead,
    because a window that materialises with no transition at all reads as a
    glitch rather than as a window opening. */
 @media (prefers-reduced-motion: reduce) {
@@ -794,7 +1000,7 @@ kbd {
   }
   button:active, figure:active, .tray-item:active,
   .tray-item:hover { transform: none !important; }
-  #preview, #lb { animation: fade .14s linear !important; }
+  #preview { animation: fade .14s linear !important; }
   .preview-card { animation: none !important; }
   #preview, .preview-card, .tray-item img, figure img,
   figure.untagged::before, figcaption, .tray-remove, figure .add {
@@ -805,7 +1011,10 @@ kbd {
 
 /* --- dragging a frame onto a slot ---------------------------------- */
 .slot[data-over] .box { box-shadow: 0 0 0 2px var(--hot); }
-.slot[data-over] .empty { color: var(--hot); }
+/* the ring is a component and may be the accent. the sentence inside it is
+   text, and the fill red fails as a word, so the invitation wears the text
+   red: 6.41:1 on the plate it sits over. */
+.slot[data-over] .empty { color: var(--hot-ink); }
 /* while a drag is in flight every slot shows where it would land, so the
    target is findable without hunting for the one under the cursor */
 body[data-dragging] .slot .box { box-shadow: 0 0 0 1px var(--line-strong); }
@@ -856,12 +1065,12 @@ figure.noposter::before {
 .blank p { margin: 0 0 var(--s4); color: var(--ink-2); }
 .blank pre {
   margin: 0 0 var(--s4); padding: var(--s3) var(--s4);
-  background: var(--raise); border-radius: var(--r);
+  background: var(--chrome); border-radius: var(--r);
   font: .8rem/1.7 var(--mono); color: var(--ink); overflow-x: auto;
 }
 .blank .hint { color: var(--ink-2); font-size: .95rem; }
 .blank code {
-  font: .85em var(--mono); background: var(--raise);
+  font: .85em var(--mono); background: var(--chrome);
   border-radius: 3px; padding: 1px 5px;
 }
 
@@ -884,7 +1093,7 @@ figure.noposter::before {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: 30;
   width: var(--tray-w);
   display: flex; flex-direction: column;
-  background: var(--raise);
+  background: var(--chrome);
   border-left: 1px solid var(--line);
 }
 #tray[hidden] { display: none; }
@@ -939,15 +1148,17 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
 .tray-head #tray-count { margin-left: auto; color: var(--ink-3); font-size: .82rem; }
 
 /* the picker is a native select with the arrow redrawn, because the system
-   one is a blue capsule and this app has one colour. the caret is inlined
-   as a data uri: keeper has to work with the wifi off. */
+   one is a blue capsule and this app has one accent. the caret is inlined
+   as a data uri, keeper has to work with the wifi off, and its stroke is
+   #8e8b86, the flat equivalent of --ink-3 over the ground, because a data
+   uri cannot read a token. */
 #tray-pick {
   appearance: none; -webkit-appearance: none;
   border: 0; background: none; cursor: pointer;
   color: var(--ink); font-size: .9rem;
   padding: var(--s1) var(--s5) var(--s1) 0;
   border-radius: var(--r);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 5 5.5 9 1.5' fill='none' stroke='%236e6e72' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 5 5.5 9 1.5' fill='none' stroke='%238e8b86' stroke-width='1.4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--s2) center;
   max-width: 62%;
@@ -974,7 +1185,9 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
   text-transform: lowercase; letter-spacing: .14em;
 }
 #tray-clear[data-armed]::before { display: none; }
-#tray-clear:hover { color: var(--hot); }
+/* a destructive word in red is text, so it wears the text red: the fill
+   red is 4.00:1 and fails as a label. */
+#tray-clear:hover { color: var(--hot-ink); }
 #tray-clear[disabled] { color: #ffffff26; cursor: default; }
 
 /* The pile is read at whatever size the wall is read at. The shelf's size
@@ -1015,7 +1228,7 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
    sideways rather than scrolling, which is what stops a raised tile at the
    edge from inventing a horizontal scrollbar. */
 .tray-item {
-  margin: 0; position: relative; background: #0f0f11;
+  margin: 0; position: relative; background: var(--stage);
   border-radius: 2px; cursor: grab;
   transition: transform var(--mid) var(--ease), box-shadow var(--mid) var(--ease);
 }
@@ -1073,7 +1286,7 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
   display: flex; align-items: center; gap: var(--s3);
   padding: var(--s3) var(--s5);
-  background: var(--raise);
+  background: var(--chrome);
   border-top: 1px solid var(--line-strong);
   box-shadow: 0 -14px 34px #0000007a;
 }
@@ -1091,7 +1304,7 @@ body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
    the button moved to the bottom of the window. */
 #bin-bar #f-bin::before { --ph: var(--ph-undo); }
 #bin-bar #f-nuke::before { --ph: var(--ph-trash); }
-#bin-bar #f-nuke { color: var(--hot); border-color: #e1062c4d; }
+#bin-bar #f-nuke { color: var(--hot-ink); border-color: #e1062c4d; }
 #bin-bar #f-nuke:hover { background: #e1062c1f; }
 
 /* What cmd z just did. Bottom left, out of the way of the bin's bar, which
@@ -1100,7 +1313,7 @@ body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
 #undo-say {
   position: fixed; left: var(--s5); bottom: var(--s5); z-index: 7;
   margin: 0; padding: var(--s2) var(--s4);
-  background: var(--raise); border: 1px solid var(--line-strong);
+  background: var(--chrome-2); border: 1px solid var(--line-strong);
   border-radius: var(--r);
   font: 500 .85rem/1.2 var(--mono); color: var(--ink-2);
   box-shadow: 0 10px 28px #0000008a;
@@ -1121,7 +1334,7 @@ body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
   position: fixed; right: var(--s5); bottom: var(--s5); z-index: 7;
   width: min(340px, calc(100vw - var(--s5) * 2));
   padding: var(--s4);
-  background: var(--raise); border: 1px solid var(--line-strong);
+  background: var(--chrome-2); border: 1px solid var(--line-strong);
   border-radius: var(--r);
   box-shadow: 0 14px 34px #0000008a;
 }
@@ -1140,11 +1353,11 @@ body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
 .up-acts .chip { box-shadow: inset 0 0 0 1px var(--line-strong); }
 .up-acts .chip:hover { color: var(--ink); background: #ffffff0f; }
 .up-acts .up-go {
-  color: #ff5d75;
+  color: var(--hot-ink);
   background: #e1062c1c;
   box-shadow: inset 0 0 0 1px #e1062c59;
 }
-.up-acts .up-go:hover { background: #e1062c2e; color: #ff8e9f; }
+.up-acts .up-go:hover { background: #e1062c2e; }
 
 /* --- the fold that shows the request ------------------------------------
 
@@ -1209,11 +1422,11 @@ body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
   display: inline-flex; align-items: center; gap: 5px;
   margin-top: var(--s3);
   font: 500 .78rem/1 var(--mono);
-  color: #ff5d75; text-decoration: none;
+  color: var(--hot-ink); text-decoration: none;
   border-bottom: 1px solid #e1062c4d; padding-bottom: 3px;
   transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
 }
-.up-link:hover { color: #ff8e9f; border-bottom-color: #e1062ca6; }
+.up-link:hover { border-bottom-color: #e1062ca6; }
 /* the arrow that means this leaves keeper, drawn rather than fetched */
 .up-link i {
   width: 6px; height: 6px; display: block; flex: none;
@@ -1225,8 +1438,10 @@ body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
 body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 
 /* the drop state. the accent, one hairline in from the edge, so the panel
-   lights up without the layout moving by a pixel. */
-#tray[data-over] { background: #17171a; }
+   lights up without the layout moving by a pixel. the lift is the second
+   step of the chrome ladder, because a panel offering to catch something
+   is a panel raised. */
+#tray[data-over] { background: var(--chrome-2); }
 #tray[data-over]::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   box-shadow: inset 0 0 0 2px var(--hot);
@@ -1293,10 +1508,12 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 /* ---------------------------------------------------------------------
    The preview.
 
-   Quick Look, not a lightbox. The difference is that a lightbox is a room
-   you enter and Quick Look is a card that appears over the work you were
-   already doing, which is why the backdrop is blurred rather than blacked
-   out: the shelf stays visible behind it, out of focus, still yours.
+   Quick Look, and immersive now. The surround is pure black rather than a
+   blur of the shelf, because the one frame you opened deserves the one
+   surround that adds nothing to it, and because a blurred wall of
+   photographs leaks their colour into the room you are judging this one
+   in. Closing lands you back on the wall's #0b0b0b, which is a step up in
+   light, so leaving reads as surfacing.
 
    The card is sized by the picture. A portrait makes a tall narrow card, a
    landscape makes a wide short one, and because the whole thing is centred
@@ -1308,13 +1525,39 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
   position: fixed; inset: 0; z-index: 60;
   display: grid; place-items: center;
   padding: var(--s6);
-  background: #0b0b0cc4;
-  backdrop-filter: blur(16px) saturate(.9);
-  -webkit-backdrop-filter: blur(16px) saturate(.9);
+  background: var(--deep);
   animation: fade var(--fast) var(--ease);
   cursor: zoom-out;
 }
 #preview[hidden] { display: none; }
+
+/* The idle fade. After a moment without a hand on anything, preview.js
+   puts `idle` on the layer and the furniture steps back to nearly nothing,
+   so a long look at a photograph is a look at a photograph. Any input
+   takes the class off and the same transition brings it back. The photo
+   itself never dims: only the card's words and buttons are furniture. The
+   reduced motion blanket in this file flattens the fade to a cut. */
+#preview .preview-meta,
+#preview .preview-zoom {
+  transition: opacity var(--mid) var(--ease);
+}
+#preview.idle .preview-meta,
+#preview.idle .preview-zoom { opacity: .18; }
+
+/* The held zoom, said out loud. A small mono readout on the picture's top
+   corner, on the same black plate every over-photo label in the app rides,
+   because 255-white over photo pixels is the one place true white is still
+   allowed. It reports state and takes no clicks. */
+#preview .preview-zoom {
+  position: absolute; left: var(--s3); top: var(--s3); z-index: 2;
+  margin: 0; padding: 2px 7px;
+  font: 500 .68rem/1.5 var(--mono); font-variant-numeric: tabular-nums;
+  letter-spacing: .08em;
+  color: #fff; background: #000000b8;
+  border-radius: var(--r);
+  pointer-events: none;
+}
+#preview .preview-zoom[hidden] { display: none; }
 
 /* A CONTRACT WITH preview.js, WHICH MEASURES THIS CARD.
 
@@ -1333,7 +1576,7 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
   display: flex; flex-direction: column;
   min-width: 300px;
   max-width: min(92vw, 1600px); max-height: 92vh;
-  background: var(--raise);
+  background: var(--chrome-2);
   border-radius: 6px;
   box-shadow: 0 24px 64px #00000073;
   overflow: hidden;
@@ -1350,7 +1593,9 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 .preview-stage {
   flex: 0 1 auto; min-height: 0; min-width: 0;
   display: flex; overflow: hidden;
-  background: #08080a;
+  /* the stage touches the photograph, so it is the neutral deep, not a
+     chrome step: the old #08080a was two points blue and blue is a bias. */
+  background: var(--deep);
 }
 .preview-stage img, .preview-stage video {
   display: block; margin: auto;
@@ -1406,21 +1651,6 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
   background: #ffffff0d; color: var(--ink-2);
 }
 .preview-meta .chip:hover { background: #ffffff1a; color: var(--ink); }
-
-/* it says close rather than drawing a cross, because there is room for the
-   word and a word is never ambiguous. it sits on the picture rather than in
-   the strip below so it is in the same place whether the frame is a tall
-   portrait or a wide landscape. */
-.preview-close {
-  position: absolute; top: var(--s2); right: var(--s2);
-  min-width: 28px; height: 26px; padding: 0 var(--s2);
-  display: grid; place-items: center;
-  border: 0; border-radius: var(--r); cursor: pointer;
-  background: #000000a6; color: #fff;
-  font: 500 .68rem/1 var(--mono); letter-spacing: .14em;
-}
-.preview-close:empty::before { content: "x"; letter-spacing: 0; }
-.preview-close:hover { background: #ffffff26; }
 
 @keyframes rise { from { opacity: 0; transform: scale(.985); } }
 
@@ -1523,7 +1753,7 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
   -webkit-appearance: none; appearance: none;
   width: 14px; height: 14px; margin-top: -5.5px;
   border: 0; border-radius: 50%;
-  background: #fff;
+  background: var(--ink);
   box-shadow: 0 1px 3px #000000a6;
   transition: transform var(--fast) var(--ease);
 }
@@ -1566,7 +1796,7 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
    --------------------------------------------------------------------- */
 #f-bin[hidden], #f-nuke[hidden], #f-binned[hidden] { display: none; }
 #f-bin, #f-nuke { color: var(--ink-3); }
-#f-bin:hover, #f-nuke:hover { color: var(--ink); background: var(--raise); }
+#f-bin:hover, #f-nuke:hover { color: var(--ink); background: var(--chrome-2); }
 /* the accent, on the one control in the app that reaches a file. armed is
    the only state in keeper where red means "you have to deal with this"
    rather than "you chose this", and it is earned here and nowhere else. */
@@ -1575,7 +1805,7 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 /* the bin itself is a filter and wears a filter's clothes, because going to
    look at what you set aside is not a destructive act */
 #f-binned { color: var(--ink-3); }
-#f-binned:hover { color: var(--ink); background: var(--raise); }
+#f-binned:hover { color: var(--ink); background: var(--chrome-2); }
 /* solid, and deliberately unlike every other chip on the row. this is not
    a filter you added to a set, it is the other room. */
 #f-binned.on { background: var(--hot); color: #fff; box-shadow: none; }
@@ -1593,25 +1823,26 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 #bin-ask {
   position: fixed; inset: 0; z-index: 90;
   display: grid; place-items: center;
-  background: #0b0b0cc4;
-  backdrop-filter: blur(14px) saturate(.9);
-  -webkit-backdrop-filter: blur(14px) saturate(.9);
+  /* the same scrim the shortcuts card stands on. a blur here pulled the
+     colour of the photographs into the one dialog that must read cold. */
+  background: #000000b8;
   animation: rise var(--mid) var(--ease);
 }
 .bin-card {
-  background: var(--raise);
+  background: var(--chrome-2);
   border-radius: 6px;
   padding: var(--s6) var(--s7);
   text-align: center;
   box-shadow: 0 24px 64px #00000073;
   max-width: 30rem;
 }
-/* the number is the whole message, so it is the size of one */
+/* the number is the whole message, so it is the size of one. it is set in
+   the text red: the fill red never sets type, whatever the point size. */
 .bin-n {
   margin: 0;
   font: 700 2.6rem/1 var(--sans);
   letter-spacing: -.02em;
-  color: var(--hot);
+  color: var(--hot-ink);
 }
 .bin-what {
   margin: var(--s3) 0 0;

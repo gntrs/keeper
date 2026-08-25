@@ -116,7 +116,7 @@ async function main() {
   for (const f of ["LICENSE", "NOTICE"]) {
     await cp(path.join(ROOT, f), path.join(folder, f));
   }
-  for (const f of ["keeper.cmd", "doctor.cmd", "read me first.txt"]) {
+  for (const f of ["keeper.cmd", "keeper.vbs", "doctor.cmd", "read me first.txt"]) {
     await cp(path.join(HERE, "windows", f), path.join(folder, f));
   }
   await cp(path.join(OUT, "keeper.ico"), path.join(folder, "keeper.ico"));
@@ -132,7 +132,7 @@ async function main() {
      turns the whole file into one line. The batch files matter more than
      that: a cmd file with lf endings can fail on a label or a for loop in
      ways that read as the file being corrupt. */
-  for (const f of ["keeper.cmd", "doctor.cmd", "read me first.txt"]) {
+  for (const f of ["keeper.cmd", "keeper.vbs", "doctor.cmd", "read me first.txt"]) {
     const at = path.join(folder, f);
     const text = await readFile(at, "utf8");
     await writeFile(at, text.replace(/\r?\n/g, "\r\n"));

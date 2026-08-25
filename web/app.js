@@ -12,6 +12,7 @@ import { paintKeys, pick as chord } from "/host.js";
 import { mountUndo } from "/undo.js";
 import { mountQuit } from "/quit.js";
 import { mountUpdate } from "/update.js";
+import { mountHint } from "/hint.js";
 
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
@@ -126,7 +127,9 @@ $("#keys-shut").onclick = () => showKeys(false);
  * are here and the rest are there.
  */
 addEventListener("keydown", (e) => {
-  if (e.ctrlKey) return;
+  /* the pc picks with control, so a control chord passes here and bare
+     control still guards nothing on a mac. */
+  if (e.ctrlKey && !chord(e)) return;
 
   /**
    * Chrome owns cmd+r, cmd+o and cmd+1 through cmd+9 at the browser level.
@@ -170,6 +173,18 @@ addEventListener("keydown", (e) => {
        the one in the blank state answers instead. */
     if (k === "KeyO") {
       document.querySelector("[data-keeper-choose]")?.click();
+      return e.preventDefault();
+    }
+
+    /* Auto advance, on the letter it governs. shelf.js owns the toggle and
+       its state, so the chord goes through the button's own click: one
+       paint, one persisted bit, one sound, no matter who asks. It is here
+       rather than in the shelf's handler because it has to answer with a
+       photograph open, where the shelf hands the bare k to the card, and
+       the preventDefault is what keeps the same press from reaching that
+       handler at all: it checks defaultPrevented on the way in. */
+    if (k === "KeyK") {
+      $("#advance-toggle")?.click();
       return e.preventDefault();
     }
     return;
@@ -217,8 +232,6 @@ S.byId = new Map(S.items.map((i) => [i.id, i]));
    rendered as `Volumes/disk/` with the root slash quietly walked to the
    back. U+202A holds the string itself ltr inside an rtl box. */
 $("#root").dataset.path = `\u202A${S.root}\u202C`;
-if (!S.slots.length) document.querySelector('[data-view="bench"]').title =
-  "no keeper.config.json, so there are no slots yet";
 
 /**
  * An archive with nothing in it is not an error and should not read like
@@ -239,6 +252,10 @@ if (!S.items.length) {
       <pre>keeper ~/Pictures/2026</pre>
     </div>`;
   $("#keys-toggle").hidden = true;
+  /* the toggle governs a run that cannot happen with nothing to run
+     through, and mountAdvance never wires it on an empty archive, so a
+     visible button here would be a control that answers to nothing. */
+  $("#advance-toggle").hidden = true;
 }
 
 /* The blank state above throws the filter row away along with the grid, so
@@ -256,10 +273,30 @@ mountUndo();
 
 /* the key legend is written in the mac spelling, so a pc reads it back */
 paintKeys();
+
+/* The empty state's keycap line. shelf.js owns the sentence in #none and
+   writes it with textContent, the right tool for a sentence and the wrong
+   one for the markup under it: the write throws the keycap line away. The
+   line is static in index.html, so the fix is the watch the tally already
+   keeps over its own chips: when a write has removed it, put it back.
+   isConnected keeps our own append from waking the watcher into a loop,
+   and on an empty archive the blank state above may have taken #none with
+   it, in which case there is nothing to guard. */
+{
+  const none = $("#none");
+  const keyline = none?.querySelector(".none-keys");
+  if (keyline) {
+    const br = keyline.previousElementSibling;
+    new MutationObserver(() => {
+      if (!keyline.isConnected) none.append(br, keyline);
+    }).observe(none, { childList: true });
+  }
+}
 await mountTray();
 /* after the state, because whether there is a quit at all is something
    only the server knows. */
 mountQuit();
 mountUpdate();
 tally();
+mountHint();
 setView(location.hash.slice(1) || "shelf");

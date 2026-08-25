@@ -195,8 +195,8 @@ body[data-dragging] #grid figure.picked::after {
  * old instant hide, which is what happens today, so nothing regresses.
  */
 
-/* the backdrop behind the card, and the older full screen viewer */
-#preview, #lb {
+/* the backdrop behind the card */
+#preview {
   animation: none;
   transition:
     opacity var(--fast) var(--ease),
@@ -207,16 +207,16 @@ body[data-dragging] #grid figure.picked::after {
        out at .18s and cut the card off halfway. */
     display var(--mid) var(--ease) allow-discrete;
 }
-#preview[hidden], #lb[hidden] { opacity: 0; }
+#preview[hidden] { opacity: 0; }
 
 /* On the way out these are still on screen for a third of a second, and a
    backdrop that is invisible but still catching clicks is the worst kind of
    bug to find later: a press lands on nothing and the app looks dead. */
-#preview[hidden], #lb[hidden], #keys[hidden], #bin-bar[hidden] {
+#preview[hidden], #keys[hidden], #bin-bar[hidden] {
   pointer-events: none;
 }
 @starting-style {
-  #preview:not([hidden]), #lb:not([hidden]) { opacity: 0; }
+  #preview:not([hidden]) { opacity: 0; }
 }
 
 /* The card rides the backdrop's state rather than its own, because it is
@@ -286,7 +286,7 @@ body[data-dragging] #grid figure.picked::after {
   /* The blanket rule in style.css already flattens every duration, which
      takes the discrete display step with it. All that is left to say is that
      nothing should end up parked off screen or transparent. */
-  #preview[hidden], #lb[hidden], #keys[hidden],
+  #preview[hidden], #keys[hidden],
   #bin-bar[hidden], #undo-say[hidden], #none[hidden] { display: none; }
 }
 

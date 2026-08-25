@@ -1,0 +1,89 @@
+/* ---------------------------------------------------------------------
+   fit.
+
+   The last sheet in the chain, and last on purpose. Nothing in here
+   invents a component: every rule is a correction to one that already
+   exists in style.css, written at the same specificity and winning only
+   because it loads later. Two corrections live here, and they are the two
+   the originals were never measured against. A half width window on a 13
+   inch laptop, where a body that cannot scroll used to push its own
+   controls off the edge. And a contrast check, where the quietest voice in
+   the building turned out to be quieter than AA allows.
+   --------------------------------------------------------------------- */
+
+/* --- text contrast --------------------------------------------------- */
+/* An --ink-3 override lived here and is deleted, because the failure it
+   corrected no longer exists. style.css once shipped an opaque #6e6e72
+   that measured 3.9:1 on the ground, under AA, and this sheet lifted it
+   after the fact. The token is now the warm ink at .58 alpha, compositing
+   to about #8e8b86: 5.80:1 on the ground and past 4.5:1 on every chrome
+   step, so the floor is cleared at the source and a second value here
+   would only be a place for the two files to disagree. */
+
+/* The count beside a chip is ink-2 seen through an opacity, and the old
+   .6 dragged it under AA. At .78 the pair composites to about 55% of the
+   warm white, 5.2:1 on the ground, with the same audible step down from
+   its label. The lit chip keeps the same ratio, one notch up. The tally's
+   counts are out of this rule's reach entirely: its buttons are .t and
+   not .chip, and style.css gives the numbers full strength in their own
+   colour. */
+.chip i { opacity: .78; }
+.chip.on i { opacity: .9; }
+
+/* The disabled bin sat at 1.5:1, which is not quiet, it is gone. A
+   control you cannot press right now still has to be a control you can
+   find, or the empty tray looks like it lost a button. */
+#tray-clear[disabled] { color: #ffffff59; }
+
+/* --- the bar survives ------------------------------------------------ */
+/* The header is one flex row on a body that cannot scroll, so when the
+   window came down to half a laptop the row had nowhere to put quit and
+   the folder button except past the right edge, unreachable. Wrapping is
+   the honest fix: at full width every item still fits on one line and
+   nothing changes, and squeezed, the row breaks into two rows instead of
+   hiding the two controls that end a session. */
+header.bar { flex-wrap: wrap; row-gap: var(--s2); }
+
+/* a flex child refuses to shrink below its content unless told it may */
+#tally { min-width: 0; }
+
+/* The search field gives ground before the controls around it do. The
+   picker's own field is untouched: its #picker-head input width rule
+   carries an id and still wins on specificity, so this reaches only the
+   field in the filter row. */
+input[type=search] { width: clamp(120px, 18vw, 240px); }
+
+/* --- the bench fits -------------------------------------------------- */
+/* Half of a 13 inch screen is somewhere around 720 to 880 css pixels,
+   and the bench was furnished for the whole screen: a 400px picker
+   beside 376px slot columns beside a 348px tray is more window than half
+   a laptop has. Two steps down rather than a continuous squeeze, so each
+   width still reads as a deliberate layout: the picker and the slot
+   columns narrow first, then the picker and the tray take one more step,
+   and a half width window holds one full slot column beside the strip
+   with no horizontal scroll. */
+@media (max-width: 1100px) {
+  header.bar { gap: var(--s3); }
+  #root { max-width: 40vw; }
+  #picker { width: 320px; }
+  .rack-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+}
+@media (max-width: 900px) {
+  :root { --tray-w: 260px; }
+  #picker { width: 260px; }
+}
+
+/* The picker's head is the bar problem again at column scale. The label
+   and two chips have a min content width around 305px, so the narrowed
+   column cannot hold the row and the chips used to spill past the window
+   edge, dragging a horizontal scrollbar in with them. Same fix, same
+   reasoning: at 400px the row still fits on one line and nothing
+   changes, and squeezed it breaks, with the search taking a full row of
+   its own instead of shrinking to nothing. */
+#picker-head { flex-wrap: wrap; row-gap: var(--s2); }
+
+/* --- the full stop card ---------------------------------------------- */
+/* the card that stops a delete was capped at a flat 30rem, which is
+   wider than the very window it is stopping at half width. it yields to
+   the edge before the edge cuts it. */
+.bin-card { max-width: min(30rem, 92vw); }

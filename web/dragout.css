@@ -20,7 +20,7 @@
   padding: 0.55rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: var(--r);
-  background: var(--raise);
+  background: var(--chrome-2);
   color: var(--ink-2);
   font: 0.72rem/1.5 var(--mono);
   letter-spacing: 0.02em;
@@ -64,7 +64,7 @@
   font: 500 0.72rem/1 var(--mono);
   text-transform: lowercase;
   letter-spacing: 0.14em;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 5 5.5 9 1.5' fill='none' stroke='%236e6e72' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1.5 5 5.5 9 1.5' fill='none' stroke='%238e8b86' stroke-width='1.4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.3rem center;
   transition: color var(--fast) var(--ease);

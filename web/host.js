@@ -54,6 +54,7 @@ export const pick = (e) => (mac() ? e.metaKey : e.ctrlKey);
 const SAID = {
   "⌘": "Ctrl", "⌥": "Alt", "⇧": "Shift",
   "⌫": "Backspace", "⏎": "Enter", "⎋": "Esc",
+  "␣": "Space", "⇥": "Tab",
 };
 
 export function paintKeys(root = document) {

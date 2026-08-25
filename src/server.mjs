@@ -79,6 +79,24 @@ async function body(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
+/**
+ * Every write to the archive's json goes through here, one at a time.
+ *
+ * The mutating routes all read a file, change it, and write it back, with
+ * awaits in the middle, and the page sends real bursts: tagging a picked
+ * set posts one request per frame in parallel. Two of those interleave, the
+ * slower read misses the faster write, and the last one to land quietly
+ * erases the rest, while every request in the burst reports ok. So the
+ * read, the change and the write are made one turn each: the queue is this
+ * process, which is the only writer these files have.
+ */
+let turn = Promise.resolve();
+function amend(job) {
+  const run = turn.then(job, job);
+  turn = run.then(() => {}, () => {});
+  return run;
+}
+
 async function sendFile(res, file, { cache = "no-store", req } = {}) {
   let s;
   try {
@@ -488,10 +506,13 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
         const ids = Array.isArray(b.ids) ? b.ids : [];
         if (!ids.length) return json(res, 400, { error: "no frames named" });
 
-        const have = new Set(await readBinned(root));
-        for (const id of ids) b.put ? have.delete(id) : have.add(id);
-        const next = [...have];
-        await writeBinned(root, next);
+        const next = await amend(async () => {
+          const have = new Set(await readBinned(root));
+          for (const id of ids) b.put ? have.delete(id) : have.add(id);
+          const out = [...have];
+          await writeBinned(root, out);
+          return out;
+        });
         return json(res, 200, { ok: true, binned: next });
       }
 
@@ -542,27 +563,46 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
         /* The index is the app's copy of what is on the drive, so it has to
            lose them too. Tags and placements are deliberately left alone: a
            frame put back from the Trash comes back to its own tags, because
-           an id is a hash of the path and the path did not change. */
+           an id is a hash of the path and the path did not change.
+
+           Both files are re-read inside the turn: the copies above were for
+           validation, and a bin write landing between that read and this
+           one must not be erased by writing the stale copy back. */
         const gone = new Set(ids);
-        await writeIndex(root, {
-          ...index,
-          items: (index?.items ?? []).filter((i) => !gone.has(i.id)),
+        await amend(async () => {
+          const now = await readIndex(root);
+          await writeIndex(root, {
+            ...now,
+            items: (now?.items ?? []).filter((i) => !gone.has(i.id)),
+          });
+          // out of the bin as well, because the bin is a list of frames on
+          // the drive and these are not on the drive any more
+          const binned = await readBinned(root);
+          await writeBinned(root, binned.filter((id) => !gone.has(id)));
         });
-        // out of the bin as well, because the bin is a list of frames on the
-        // drive and these are not on the drive any more
-        await writeBinned(root, [...set].filter((id) => !gone.has(id)));
 
         return json(res, 200, { ok: true, trashed: hits.length });
       }
 
       if (route === "/api/tag" && req.method === "POST") {
         const b = await body(req);
-        const tags = await readTags(root);
-        const cur = tags[b.id] ?? {};
-        if ("tag" in b) cur.tag = b.tag || undefined;
-        if ("star" in b) cur.star = b.star ? 1 : 0;
-        tags[b.id] = cur;
-        await writeTags(root, tags);
+        /* Only a word from the vocabulary, or nothing. Anything else written
+           here outlives this process: the CLI prints the tally by looking
+           the code up in VOCAB, and one junk code on disk crashed every
+           later `keeper <folder>` on that archive at boot. The page can
+           never send one, so a request that does is a caller that is wrong,
+           and it is told so instead of being written down. */
+        if ("tag" in b && b.tag && !VOCAB[b.tag]) {
+          return json(res, 400, { error: `no tag called ${String(b.tag).slice(0, 24)}` });
+        }
+        await amend(async () => {
+          const tags = await readTags(root);
+          const cur = tags[b.id] ?? {};
+          if ("tag" in b) cur.tag = b.tag || undefined;
+          if ("star" in b) cur.star = b.star ? 1 : 0;
+          tags[b.id] = cur;
+          await writeTags(root, tags);
+        });
         return json(res, 200, { ok: true });
       }
 
@@ -571,16 +611,20 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
         if (!config.slots.some((s) => s.id === b.slot)) {
           return json(res, 400, { error: `no slot called ${b.slot}` });
         }
-        const p = await readPlacements(root);
-        p[b.slot] = { id: b.id, place: b.place };
-        await writePlacements(root, p);
+        await amend(async () => {
+          const p = await readPlacements(root);
+          p[b.slot] = { id: b.id, place: b.place };
+          await writePlacements(root, p);
+        });
         return json(res, 200, { ok: true });
       }
 
       if (route === "/api/place" && req.method === "DELETE") {
-        const p = await readPlacements(root);
-        delete p[url.searchParams.get("slot")];
-        await writePlacements(root, p);
+        await amend(async () => {
+          const p = await readPlacements(root);
+          delete p[url.searchParams.get("slot")];
+          await writePlacements(root, p);
+        });
         return json(res, 200, { ok: true });
       }
 
@@ -596,10 +640,13 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
 
       if (route === "/api/trays" && req.method === "POST") {
         const b = await body(req);
-        const doc = await readTrays(root);
-        const tray = newTray(doc, b.name);
-        doc.active = tray.id;
-        await writeTrays(root, doc);
+        const { doc, tray } = await amend(async () => {
+          const doc2 = await readTrays(root);
+          const tray2 = newTray(doc2, b.name);
+          doc2.active = tray2.id;
+          await writeTrays(root, doc2);
+          return { doc: doc2, tray: tray2 };
+        });
         return json(res, 200, { ok: true, tray, ...doc });
       }
 
@@ -614,9 +661,6 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
        */
       if (route === "/api/trays" && req.method === "PATCH") {
         const b = await body(req);
-        const doc = await readTrays(root);
-        const tray = trayById(doc, b.id);
-        if (!tray) return json(res, 404, { error: "no such tray" });
 
         // only an add is checked. a remove is allowed to name a frame the
         // index has since lost, otherwise a tray that outlived one of its
@@ -626,35 +670,46 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
           const known = new Set((index?.items ?? []).map((i) => i.id));
           if (b.add.some((id) => !known.has(id))) return json(res, 404, { error: "unknown frame" });
         }
-
         /* The two fields that make a tray behave like a project folder
            rather than a question asked twice. Both are validated here and
            not on the way out, because a mode this route does not recognise
            would otherwise sit in trays.json until an export tried to run it. */
-        if (typeof b.mode === "string") {
-          if (!MODES.includes(b.mode)) return json(res, 400, { error: `no export mode called ${b.mode}` });
-          tray.mode = b.mode;
+        if (typeof b.mode === "string" && !MODES.includes(b.mode)) {
+          return json(res, 400, { error: `no export mode called ${b.mode}` });
         }
-        // an empty string is how the panel says "forget where it went", so
-        // it clears the field rather than being ignored as falsy
-        if (typeof b.dest === "string") tray.dest = b.dest.trim() || undefined;
 
-        if (typeof b.name === "string" && b.name.trim()) tray.name = b.name.trim().slice(0, 60);
-        if (b.clear) tray.ids = [];
-        if (b.add?.length) addTo(tray, b.add);
-        if (b.remove?.length) removeFrom(tray, b.remove);
-        if (b.active) doc.active = tray.id;
+        const doc = await amend(async () => {
+          const doc2 = await readTrays(root);
+          const tray = trayById(doc2, b.id);
+          if (!tray) return null;
 
-        await writeTrays(root, doc);
+          if (typeof b.mode === "string") tray.mode = b.mode;
+          // an empty string is how the panel says "forget where it went", so
+          // it clears the field rather than being ignored as falsy
+          if (typeof b.dest === "string") tray.dest = b.dest.trim() || undefined;
+
+          if (typeof b.name === "string" && b.name.trim()) tray.name = b.name.trim().slice(0, 60);
+          if (b.clear) tray.ids = [];
+          if (b.add?.length) addTo(tray, b.add);
+          if (b.remove?.length) removeFrom(tray, b.remove);
+          if (b.active) doc2.active = tray.id;
+
+          await writeTrays(root, doc2);
+          return doc2;
+        });
+        if (!doc) return json(res, 404, { error: "no such tray" });
         return json(res, 200, { ok: true, ...doc });
       }
 
       if (route === "/api/trays" && req.method === "DELETE") {
-        const doc = await readTrays(root);
-        const last = doc.trays.length === 1;
-        const gone = dropTray(doc, url.searchParams.get("id"));
+        const { doc, last, gone } = await amend(async () => {
+          const doc2 = await readTrays(root);
+          const last2 = doc2.trays.length === 1;
+          const gone2 = dropTray(doc2, url.searchParams.get("id"));
+          if (gone2.ok) await writeTrays(root, doc2);
+          return { doc: doc2, last: last2, gone: gone2 };
+        });
         if (!gone.ok) return json(res, 404, { error: "no such tray" });
-        await writeTrays(root, doc);
         return json(res, 200, {
           ok: true,
           cleared: gone.cleared,

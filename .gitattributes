@@ -13,6 +13,12 @@
 *.cmd text eol=crlf
 *.bat text eol=crlf
 
+# Same reasoning, one layer up. keeper.vbs is what the start menu shortcut
+# actually runs, so it is the one file whose failure mode is "the app does
+# not start and says nothing". wscript is not documented to care about line
+# endings and this is not the file to find out on.
+*.vbs text eol=crlf
+
 # Binary, so git never looks inside them for lines to convert.
 *.jpg binary
 *.png binary

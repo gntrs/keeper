@@ -1,6 +1,7 @@
 import { S, post, tally } from "/app.js";
 import { inTray } from "/tray.js";
 import { CENTERED, clamp, coverWidth, isAtCover, resolve, toObjectPosition } from "/geometry.mjs";
+import { open } from "/preview.js";
 
 import { nope } from "/motion.js";
 import { feel } from "/feel.js";
@@ -39,8 +40,11 @@ export function mountBench() {
   /* The tray is edited from the panel and from the shelf, both of which can
      be on screen while the bench holds a filtered strip underneath. An event
      rather than an import because tray.js already reaches into the shelf,
-     and a second module reaching back would be a cycle for one call. */
-  addEventListener("keeper:tray", () => { if (P.tray) strip(); });
+     and a second module reaching back would be a cycle for one call. Gated
+     on the view as well as the filter, because the shelf edits the tray
+     while the bench is off screen, and a strip rebuilt inside a hidden page
+     measures nothing and paints for nobody. */
+  addEventListener("keeper:tray", () => { if (P.tray && S.view === "bench") strip(); });
   $("#p-q").oninput = (e) => { P.q = e.target.value.trim().toLowerCase(); strip(); };
 
   /* Land on the pile he made. The shelf is where frames get kept and the
@@ -60,7 +64,13 @@ export function mountBench() {
   addEventListener("pointerup", () => (drag = null));
   addEventListener("wheel", onWheel, { passive: false });
   addEventListener("keydown", onKey);
-  addEventListener("resize", () => paintAll());
+
+  /* The slots column, watched directly rather than through the window. A
+     window resize is only one of the ways the column changes width: the
+     tray opening, closing or being dragged wider moves the same edge with
+     the window standing still, and a crop painted for the old width keeps
+     the wrong framing until something else happens to ask for a repaint. */
+  new ResizeObserver(() => { if (S.view === "bench") paintAll(); }).observe($("#slots"));
 }
 
 export function renderBench() {
@@ -131,6 +141,14 @@ function rackEl(group, list) {
   const name = document.createElement("h2");
   name.className = "label rack-name";
   name.textContent = group;
+  /* how much of this rack is done, said on the rack rather than left to be
+     counted by eye down a column of boxes. retag() keeps the number honest
+     as placements land and leave. */
+  const fill = document.createElement("span");
+  fill.className = "rack-fill num";
+  const filled = list.filter((s) => S.placements[s.id]).length;
+  fill.textContent = `${filled} of ${list.length} filled`;
+  name.append(fill);
   const grid = document.createElement("div");
   grid.className = "rack-grid";
   grid.append(...list.map(slotEl));
@@ -241,11 +259,25 @@ function slotEl(slot) {
      a placed slot is the one you make before nudging it with the arrows, and
      a trial quietly eating a crop somebody spent a minute on would be the
      worst thing this file could do. */
-  root.onclick = () => {
+  const commit = () => {
     const item = trial && !S.placements[slot.id] && S.byId.get(trial);
     if (item) assign(item, slot.id);
     else setActive(slot.id);
   };
+  root.onclick = commit;
+
+  /* The slot is a tab stop, because everything else about placing already
+     answers to the keyboard and the hole itself was the one thing that did
+     not. Focus makes the same claim a click on the box makes, and enter runs
+     the same commit or activate the click runs, so the two inputs can never
+     disagree about what a slot does. */
+  root.tabIndex = 0;
+  root.addEventListener("focus", () => setActive(slot.id));
+  root.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    commit();
+  });
   return root;
 }
 
@@ -284,10 +316,14 @@ function setTrial(id) {
 function strip() {
   const hits = S.items.filter((i) => {
     const t = S.tags[i.id] ?? {};
-    return (!P.star || t.star)
+    /* binned frames are off the wall everywhere else in the app, and the
+       strip was the one place still offering them. a frame that was thrown
+       away has no business being placed. */
+    return !S.binned.has(i.id)
+      && (!P.star || t.star)
       && (!P.tray || inTray(i.id))
       && (!P.q || i.path.toLowerCase().includes(P.q));
-  }).slice(0, 400);
+  });
 
   if (!hits.length) {
     /* Three reasons a strip comes back empty and they are not
@@ -303,11 +339,18 @@ function strip() {
     return;
   }
 
-  $("#strip").replaceChildren(...hits.map((item) => {
+  /* the run the preview walks when a strip frame is opened from here. the
+     whole filtered pile and not only the four hundred drawn, so paging
+     through the card reaches everything the filter matched. */
+  const run = () => hits;
+  run.home = "bench";
+
+  $("#strip").replaceChildren(...hits.slice(0, 400).map((item) => {
     const fig = document.createElement("figure");
     fig.className = [S.tags[item.id]?.star && "star", trial === item.id && "trying"]
       .filter(Boolean).join(" ");
     fig.dataset.id = item.id;
+    fig.title = item.path.split("/").pop();
     const img = new Image();
     img.loading = "lazy"; img.src = `/thumb/${item.id}`; img.alt = "";
     fig.append(img);
@@ -336,8 +379,53 @@ function strip() {
     });
 
     fig.onclick = () => setTrial(item.id);
+    /* the same close look a shelf frame gets. a strip thumbnail is a
+       hundred pixels wide and "is that the sharp one" cannot be answered at
+       that size. */
+    fig.ondblclick = () => open(item, run);
     return fig;
   }));
+
+  /* The cap used to be a silent slice and the strip simply ended, which
+     read as the archive ending. Four hundred stays the ceiling because the
+     grid stays quick under it, but the strip now says what it is holding
+     back and that the search box is the way through. */
+  if (hits.length > 400) {
+    const more = document.createElement("p");
+    more.className = "dim strip-more";
+    more.textContent = `showing 400 of ${hits.length}. search or filter to reach the rest.`;
+    $("#strip").append(more);
+  }
+  retag();
+}
+
+/**
+ * The strip and the racks, told the truth in place.
+ *
+ * A figure already sitting in a slot used to look exactly like one that was
+ * not, and the honest answer lived nowhere on this screen. This walks what
+ * is already drawn rather than rebuilding it, because it runs on every
+ * placement and a full strip() would throw away scroll position and lazily
+ * loaded thumbnails to change a class name.
+ */
+function retag() {
+  const inSlot = new Map();
+  for (const [slotId, p] of Object.entries(S.placements)) inSlot.set(p.id, slotId);
+
+  for (const fig of document.querySelectorAll("#strip figure")) {
+    const slotId = inSlot.get(fig.dataset.id);
+    fig.classList.toggle("placed", !!slotId);
+    const name = S.byId.get(fig.dataset.id)?.path.split("/").pop() ?? "";
+    fig.title = slotId ? `${name} · in ${slotId}` : name;
+  }
+
+  for (const sec of document.querySelectorAll("#slots .rack")) {
+    const fill = sec.querySelector(".rack-fill");
+    if (!fill) continue;
+    const slots = [...sec.querySelectorAll(".slot")];
+    const filled = slots.filter((el) => S.placements[el.dataset.slot]).length;
+    fill.textContent = `${filled} of ${slots.length} filled`;
+  }
 }
 
 /**
@@ -348,12 +436,24 @@ function strip() {
  * thing from a slot with nothing in it the next time this file reads one.
  */
 async function restoreSlot(slotId, was) {
+  const held = S.placements[slotId];
+  let ok;
   if (was) {
     S.placements[slotId] = was;
-    await post("/api/place", { slot: slotId, id: was.id, place: was.place });
+    ok = await post("/api/place", { slot: slotId, id: was.id, place: was.place });
   } else {
     delete S.placements[slotId];
-    await post(`/api/place?slot=${encodeURIComponent(slotId)}`, null, "DELETE");
+    ok = await post(`/api/place?slot=${encodeURIComponent(slotId)}`, null, "DELETE");
+  }
+  /* A restore the disk refused is a restore that did not happen, and letting
+     the local write stand would leave the page and the file disagreeing
+     about which crop exists. So the write goes back to what it was and the
+     throw hands the failure to undo, which already knows how to put the
+     step back where it came from and say why nothing moved. */
+  if (!ok) {
+    if (held) S.placements[slotId] = held;
+    else delete S.placements[slotId];
+    throw new Error(`the disk did not take the restore of ${slotId}`);
   }
   /* The crop write is on a timer, so an undo arriving inside that window
      would be followed a fifth of a second later by the very write it just
@@ -363,6 +463,7 @@ async function restoreSlot(slotId, was) {
   clearTimeout(saveTimer[slotId]);
   paint(slotId);
   tally();
+  retag();
 }
 
 /** the slot is always named. there is no path that fills whichever one is on. */
@@ -371,11 +472,30 @@ async function assign(item, slotId) {
   const now = { id: item.id, place: { ...CENTERED } };
   S.placements[slotId] = now;
   setActive(slotId);
+  const ok = await post("/api/place", { slot: slotId, id: item.id, place: CENTERED });
+
+  /* A placement the disk refused is not a placement, and a slot wearing one
+     anyway is the screen promising a file the export cannot cut. The slot
+     goes back to what it held, says so where its numbers usually go, and
+     nothing lands on the undo stack: a write that never happened is not a
+     step anyone can take back. */
+  if (!ok) {
+    if (was) S.placements[slotId] = was;
+    else delete S.placements[slotId];
+    paint(slotId);
+    tally();
+    feel("no");
+    const hit = els.get(slotId);
+    if (hit) hit.nums.textContent = "that placement did not reach the disk.";
+    retag();
+    return;
+  }
+
   did(`placing a frame in ${slotId}`,
       () => restoreSlot(slotId, was), () => restoreSlot(slotId, now));
-  await post("/api/place", { slot: slotId, id: item.id, place: CENTERED });
   paint(slotId);
   tally();
+  retag();
 }
 
 /**
@@ -457,7 +577,6 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
     return;
   }
 
-  const was = btn.textContent;
   btn.disabled = true;
   btn.classList.add("busy");
   out.textContent = "cutting...";
@@ -474,7 +593,6 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
   }
   btn.disabled = false;
   btn.classList.remove("busy");
-  btn.textContent = was;
 
   if (!d?.ok) {
     feel("no");
@@ -708,18 +826,64 @@ function onWheel(e) {
 function onKey(e) {
   /* `instanceof Element` first, because a keydown dispatched on window has
      window as its target and window has no `matches`: the handler would die
-     on the way past. Same loose wire the shelf and the app had. */
+     on the way past. Same loose wire the shelf and the app had.
+
+     The tray sits beside these slots and it holds a select, so the guard
+     reads the same three fields the shelf's does: arrows spent on walking
+     a dropdown must not also walk the strip underneath it. */
   if (S.view !== "bench") return;
-  if (e.target instanceof Element && e.target.matches("input")) return;
+  if (e.target instanceof Element && e.target.matches("input, select, textarea")) return;
+
+  /* Two windows can stand over this one, and each owns the keyboard while
+     it is up. The drop layer walks its own choices with the same arrows and
+     enter this handler uses, and the preview card pages its run with them:
+     a keystroke answered twice moves two things the person can only see one
+     of.
+
+     defaultPrevented as well as the visibility test, because the drop
+     layer's own escape runs first and hides the panel before this handler
+     ever sees the event: by the time the querySelector below asks, the
+     panel is already gone and the guard would wave the keystroke through
+     to spend a second time on the trial. A layer that answered marks the
+     event, and a marked event is finished. */
+  if (e.defaultPrevented) return;
+  if (document.querySelector(".drop:not([hidden])")) return;
+  if ($("#preview")?.hidden === false) return;
 
   if (e.key === "Escape") {
-    /* The preview card is a window standing over this one and it owns escape
-       while it is up. Without this, closing it from the bench would throw
-       away the trial underneath it in the same keystroke, and the frame you
-       opened to look at closely is exactly the frame you were trying on. */
-    if (trial && $("#preview")?.hidden !== false) setTrial(null);
+    /* the guard is stated here as well as above, because the one thing this
+       branch must never do is spend the keystroke that closes a window on
+       throwing away the trial underneath it. */
+    if (trial && !document.querySelector(".drop:not([hidden])")) setTrial(null);
     return;
   }
+
+  /* With a trial up and no crop under the arrows, left and right walk the
+     strip itself: stop trying this frame and try the one beside it. It is
+     the comparison the bench exists for, one keystroke instead of a pointer
+     trip back to the strip for every candidate. */
+  if (trial && (!active || !ctx(active)) &&
+      (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+    const figs = [...document.querySelectorAll("#strip figure")];
+    const at = figs.findIndex((f) => f.dataset.id === trial);
+    const next = figs[at + (e.key === "ArrowRight" ? 1 : -1)];
+    if (next) {
+      setTrial(next.dataset.id);
+      next.scrollIntoView({ block: "nearest" });
+    }
+    return e.preventDefault();
+  }
+
+  /* enter commits the trial into the chosen empty slot, so the whole loop,
+     try, compare, place, runs without the pointer. a slot already holding a
+     crop is never taken this way, for the same reason a click on one is
+     not. */
+  if (e.key === "Enter" && trial && active && !S.placements[active]) {
+    const item = S.byId.get(trial);
+    if (item) assign(item, active);
+    return e.preventDefault();
+  }
+
   if (!active) return;
   const c = ctx(active);
   if (!c) return;

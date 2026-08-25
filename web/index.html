@@ -19,6 +19,15 @@
 -->
 <link rel="stylesheet" href="/motion.css">
 <!--
+  fit.css comes after the sheets it corrects: its narrow window and contrast
+  overrides win by load order rather than by a specificity fight. place.css
+  and hint.css only dress elements no earlier sheet mentions, so their place
+  after it changes nothing.
+-->
+<link rel="stylesheet" href="/fit.css">
+<link rel="stylesheet" href="/place.css">
+<link rel="stylesheet" href="/hint.css">
+<!--
   The mark with the ground dropped, and the app icon keeps its ground.
 
   That is not an inconsistency, it is the same drawing at two sizes. A favicon
@@ -27,7 +36,7 @@
   icon at 128 and up, where the ground is what makes it an object rather than
   a swatch.
 -->
-<meta name="theme-color" content="#0b0b0c">
+<meta name="theme-color" content="#0b0b0b">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23e1062c'/></svg>">
 </head>
 <body>
@@ -51,6 +60,16 @@
   </nav>
   <span id="tally"></span>
   <span class="grow"></span>
+  <!--
+    Whether a decision walks you onward to the next frame nobody has decided
+    about. shelf.js owns the state, the click and the persisted bit; the
+    keycap on the label is honest because app.js answers the chord even with
+    a photograph open, where the shelf hands the bare k to the card. It sits
+    up here rather than in the filter row because it changes what the
+    keyboard does, not what the wall is showing.
+  -->
+  <button id="advance-toggle" class="chip" type="button" aria-pressed="false"
+          title="after a decision, land on the next frame nobody has decided about">auto advance <kbd>⌥K</kbd></button>
   <!-- the only way in to the shortcuts, other than the key it names -->
   <button id="keys-toggle" type="button" aria-expanded="false"
           title="shortcuts">?</button>
@@ -60,6 +79,16 @@
   <button id="root" type="button" data-keeper-choose data-icon
           title="open a different folder"></button>
 </header>
+
+<!--
+  The day, drawn as a length. Three pixels under the bar: kept, set aside,
+  and the frames still waiting, as widths of the one archive. shelf.js feeds
+  the widths from the same counts that paint the tally, so the strip and the
+  chips can never disagree, and on an archive with nothing in it the widths
+  are never written and the strip stays an empty line saying nothing.
+  aria-hidden because the tally already says these numbers out loud.
+-->
+<div id="progress" aria-hidden="true"><i class="p-kept"></i><i class="p-bin"></i><i class="p-left"></i></div>
 
 <section id="shelf" class="view">
   <div id="filters">
@@ -106,7 +135,17 @@
     </div>
   </div>
   <div id="grid"></div>
-  <p id="none" hidden>nothing matches that.</p>
+  <!--
+    The loop, taught on the one screen with nothing to practise it on.
+    Five keycaps under the sentence: the daily rhythm in one line, so the
+    keys are familiar before the frames are. The sentence above belongs to
+    shelf.js, which writes it as text and throws this line away in the
+    process; app.js watches and puts the line back, the same guard the
+    tally keeps over its own chips. There is no export key to print, so
+    the fifth cap is the tray, which is where an export starts.
+  -->
+  <p id="none" hidden>nothing matches that.<br>
+    <span class="none-keys"><kbd>k</kbd> keep <kbd>⌫</kbd> set aside <kbd>␣</kbd> look <kbd>⌘Z</kbd> undo <kbd>⌘⏎</kbd> tray</span></p>
   <!--
     The bin's own bar, and it is empty on purpose.
 
@@ -127,7 +166,7 @@
     not need a receipt, and one you cannot, a tag going back on a frame that
     has already scrolled away, is the whole reason this line exists.
   -->
-  <p id="undo-say" hidden></p>
+  <p id="undo-say" aria-live="polite" hidden></p>
 </section>
 
 <section id="bench" class="view" hidden>
@@ -150,7 +189,7 @@
       <span class="grow"></span>
       <button class="chip" id="p-tray">in tray</button>
       <button class="chip" id="p-star">kept only</button>
-      <span class="find"><input type="search" id="p-q" placeholder="search"></span>
+      <span class="find"><input type="search" id="p-q" placeholder="search" aria-label="search the strip"></span>
     </div>
     <div id="strip"></div>
   </div>
@@ -178,14 +217,14 @@
   <div id="tray-grip" title="drag to resize, double click to reset"></div>
   <header class="tray-head">
     <span class="label">tray</span>
-    <select id="tray-pick"></select>
+    <select id="tray-pick" aria-label="tray"></select>
     <span id="tray-count" class="num">0</span>
     <button id="tray-clear" type="button" data-icon="only"
             title="empty the tray"></button>
   </header>
   <div id="tray-grid"></div>
   <footer class="tray-foot">
-    <input id="tray-folder" placeholder="folder name">
+    <input id="tray-folder" placeholder="folder name" aria-label="folder name">
     <button id="tray-export" type="button" data-icon>export</button>
     <p id="tray-result"></p>
   </footer>
@@ -239,7 +278,8 @@
     <section>
       <h4 class="label">looking</h4>
       <div class="k"><span class="ks"><kbd>←↑↓→</kbd></span><span>move</span></div>
-      <div class="k"><span class="ks"><kbd>␣</kbd></span><span>look at this one</span></div>
+      <div class="k"><span class="ks"><kbd>-</kbd><kbd>=</kbd></span><span>smaller, bigger</span></div>
+      <div class="k"><span class="ks"><kbd>␣</kbd></span><span>look at this one, again to put it away</span></div>
       <div class="k"><span class="ks"><kbd>⌥1</kbd><kbd>⌥2</kbd></span><span>shelf, bench</span></div>
       <div class="k"><span class="ks"><kbd>⌘F</kbd></span><span>search</span></div>
       <div class="k"><span class="ks"><kbd>⌥O</kbd></span><span>another folder</span></div>
@@ -250,6 +290,9 @@
       <div class="k"><span class="ks"><kbd>1</kbd>…<kbd>9</kbd></span><span>the tags up top</span></div>
       <div class="k"><span class="ks"><kbd>a</kbd><kbd>z</kbd></span><span>or the tag's own letter</span></div>
       <div class="k"><span class="ks"><kbd>k</kbd></span><span>keep it</span></div>
+      <div class="k"><span class="ks"><kbd>⌥K</kbd></span><span>auto advance, on and off</span></div>
+      <div class="k"><span class="ks"><kbd>⌘Z</kbd></span><span>take it back</span></div>
+      <div class="k"><span class="ks"><kbd>⇧⌘Z</kbd></span><span>do it again</span></div>
       <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>set it aside, nothing is deleted</span></div>
     </section>
     <section>
@@ -266,6 +309,10 @@
       <h4 class="label">bench</h4>
       <div class="k"><span class="ks">drag</span><span>a frame onto a slot</span></div>
       <div class="k"><span class="ks">drag</span><span>inside a slot to move the crop</span></div>
+      <div class="k"><span class="ks">click</span><span>try a frame in every empty slot</span></div>
+      <div class="k"><span class="ks"><kbd>←→</kbd></span><span>try the one beside it</span></div>
+      <div class="k"><span class="ks"><kbd>⏎</kbd></span><span>into the chosen empty slot</span></div>
+      <div class="k"><span class="ks"><kbd>⇥</kbd></span><span>walk the slots</span></div>
       <div class="k"><span class="ks"><kbd>⌥</kbd>wheel</span><span>punch in, or pinch</span></div>
       <div class="k"><span class="ks"><kbd>0</kbd></span><span>the whole frame back</span></div>
       <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>empty the slot</span></div>

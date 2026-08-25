@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
-import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 import { HOSTS, host } from "./os/index.mjs";
+import { explain } from "./locate.mjs";
 
 /**
  * WHAT WORKS ON THIS MACHINE, SAID IN PLAIN LANGUAGE.
@@ -132,16 +133,52 @@ async function checkRaw() {
   return row(MEH, "raw", `${host.decodeHint} jpg, png, webp, avif and tif all work without it.`);
 }
 
-/** the search index, which only decides how nice dropping a folder in is */
+/** the search index, which is one of the two halves of finding a dropped folder */
 async function checkIndex() {
   if (!host) return row(NO, "search", `needs ${HOSTS}`);
   try {
     const hits = await host.search(path.basename(homedir()), "folder");
-    if (hits.length) return row(OK, "search", "the machine's search index answers, so dragging a folder onto the window finds it");
-    return row(MEH, "search", "the search index returned nothing. dragging a folder in will ask you to point at it once instead, which is one extra click and nothing else.");
+    if (hits.length) return row(OK, "search", "the machine's search index answers");
+    return row(MEH, "search", "the search index returned nothing. the disk is read as well, so a drop can still land, and the drop check below is the one that matters.");
   } catch {
-    return row(MEH, "search", "the search index did not answer. dragging a folder in will ask you to point at it once instead.");
+    return row(MEH, "search", "the search index did not answer. the disk is read as well, so a drop can still land, and the drop check below is the one that matters.");
   }
+}
+
+/**
+ * THE ONE CHECK THAT ANSWERS THE QUESTION PEOPLE ACTUALLY ASK.
+ *
+ * "I dropped a folder on it and nothing happened" is the report, and every
+ * other line in here can be green while that is true. So this runs the real
+ * lookup, on a folder that is definitely there, and says which half answered.
+ *
+ * The probe is a folder inside the home directory, because that is the one
+ * place both halves are supposed to reach on either machine. If a name that
+ * is definitely on the disk cannot be found, the drop was never going to
+ * work, and this line is the one to send on.
+ */
+async function checkDrop() {
+  if (!host) return row(NO, "drop", `needs ${HOSTS}`);
+
+  let probe = null;
+  try {
+    const kids = await readdir(homedir(), { withFileTypes: true });
+    probe = kids.find((e) => e.isDirectory() && !e.name.startsWith("."))?.name ?? null;
+  } catch (e) {
+    return row(NO, "drop", `your home folder could not be read at all: ${String(e.message).toLowerCase()}. nothing that reads a disk will work until that does.`);
+  }
+  if (!probe) return row(MEH, "drop", "there are no folders in your home directory to test with, which is unusual enough that this check cannot say anything useful.");
+
+  const r = await explain(probe);
+  const where = `looked in ${r.roots} ${r.roots === 1 ? "place" : "places"}, took ${r.ms}ms`;
+
+  if (r.indexed + r.swept === 0) {
+    return row(NO, "drop", `neither the search index nor the disk could place "${probe}", and it is definitely there. dropping a folder on the window will always fall through to the folder dialog. ${where}. send this line on.`);
+  }
+  if (r.swept === 0) {
+    return row(MEH, "drop", `the index found "${probe}" and reading the disk did not. a folder kept somewhere unusual may still need the folder dialog. ${where}.`);
+  }
+  return row(OK, "drop", `"${probe}" was found by the index ${r.indexed} ${r.indexed === 1 ? "time" : "times"} and on disk ${r.swept}, so dropping a folder onto the window will open it. ${where}.`);
 }
 
 const CHECKS = [
@@ -153,6 +190,7 @@ const CHECKS = [
   ["raw", checkRaw],
   ["film", checkFfmpeg],
   ["search", checkIndex],
+  ["drop", checkDrop],
 ];
 
 /**

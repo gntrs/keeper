@@ -1,10 +1,11 @@
 /* ---------------------------------------------------------------------
    the one place keeper reaches off the machine, and it asks first.
 
-   THE QUESTION IS ASKED ONCE AND THE DEFAULT IS NO REQUEST AT ALL. Until it
-   is answered the server makes no call, so a keeper that has never been
-   asked has never spoken to anything. Answer no and this panel is gone for
-   good and the check never runs again.
+   THE DEFAULT IS NO REQUEST AT ALL. Until the question is answered the
+   server makes no call, so a keeper that has never been asked has never
+   spoken to anything. Answer never and this panel is gone for good and the
+   check never runs again. Answer not now and nothing is written, so it
+   asks again next launch: dismissing a question is not answering it.
 
    IT SHOWS THE REQUEST RATHER THAN DESCRIBING IT. The address comes from the
    server, out of the same constant the fetch uses, so what is on screen
@@ -53,6 +54,10 @@ const button = (text, cls = "chip") => {
  * One short move says it.
  */
 function show({ label, said, detail = null, buttons = [], loud = false }) {
+  /* every failure path lands here, so the pulse of whatever wait came
+     before dies with the state that started it, and an error never breathes
+     like work still being done. */
+  root.classList.remove("busy");
   kicker.textContent = label;
   line.textContent = said;
 
@@ -193,7 +198,6 @@ function ready(state) {
       show({ label: "update", said: "that did not finish, and nothing changed. try again." });
       return;
     }
-    root.classList.remove("busy");
     if (out?.error) { show({ label: "update", said: out.error }); return; }
 
     feel("tap");
@@ -225,11 +229,20 @@ async function look() {
   if (state.clone) return;
 
   if (state.policy === "ask") {
+    /* three buttons and only two of them are answers. never writes the
+       policy off and the question is settled. not now writes nothing at
+       all: the card leaves the same way, the policy stays ask, and the
+       question comes back next launch. */
+    const never = button("never");
     const no = button("not now");
     const yes = button("check", "chip up-go");
-    no.addEventListener("click", async () => {
+    never.addEventListener("click", async () => {
       root.classList.add("going");
       await post("/api/update/allow", { yes: false });
+      setTimeout(() => { root.hidden = true; root.classList.remove("going"); }, 200);
+    });
+    no.addEventListener("click", () => {
+      root.classList.add("going");
       setTimeout(() => { root.hidden = true; root.classList.remove("going"); }, 200);
     });
     yes.addEventListener("click", async () => {
@@ -249,7 +262,7 @@ async function look() {
       label: "updates",
       said: "can keeper check github for a newer update?",
       detail: fold("what it sends", whatItSends(state.where ?? "")),
-      buttons: [no, yes],
+      buttons: [never, no, yes],
     });
     return;
   }
@@ -263,5 +276,18 @@ export function mountUpdate() {
      terminal, a checkout, and their own opinion about when to update. */
   if (!S.app) return;
   document.body.append(root);
+  /* escape is not now without the mouse: it hides the card and writes
+     nothing, so the question is back next launch. not while busy, because
+     hiding a card mid apply would hide the only report of a restart in
+     flight. */
+  window.addEventListener("keydown", (e) => {
+    /* defaultPrevented, because the preview card and the folder panel both
+       stand over this one and both mark the escape they answer: a keystroke
+       spent closing what the person was actually looking at must not also
+       take the question with it. */
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (root.hidden || root.classList.contains("busy")) return;
+    root.hidden = true;
+  });
   look();
 }
