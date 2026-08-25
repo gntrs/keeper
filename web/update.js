@@ -271,6 +271,57 @@ async function look() {
   ready(state);
 }
 
+/**
+ * THE VERSION IN THE CORNER, AND THE WAY TO ASK FOR A NEWER ONE.
+ *
+ * The card is honest and quiet: it says nothing at all when there is nothing
+ * to say, which is right, and leaves somebody who wants to know with nowhere
+ * to press. On a mac that person shrugs. On windows they went looking for a
+ * json file in a hidden folder, which is what this exists to never happen
+ * again.
+ *
+ * Pressing it makes the one request whatever the policy says, because a
+ * person asking is not keeper deciding to look, and it writes nothing down:
+ * an answer of never survives being curious once.
+ */
+function mountVersion() {
+  const el = document.querySelector("#ver");
+  if (!el) return;
+
+  const paint = (text, busy = false) => {
+    el.textContent = text;
+    el.hidden = false;
+    el.classList.toggle("busy", busy);
+  };
+
+  fetch("/api/update")
+    .then((r) => r.json())
+    .then((s) => { if (!s.clone && s.current) paint(s.current); })
+    .catch(() => {});
+
+  el.addEventListener("click", async () => {
+    paint("looking", true);
+    let s;
+    try {
+      s = await (await fetch("/api/update?once=1")).json();
+    } catch {
+      paint("no answer");
+      setTimeout(() => fetch("/api/update").then((r) => r.json()).then((x) => paint(x.current ?? "")), 2400);
+      return;
+    }
+    if (s.ready) {
+      /* hand it to the card, which already knows how to offer an install and
+         is the only thing that should ever start one. */
+      root.hidden = false;
+      ready(s);
+      paint(s.current ?? "");
+      return;
+    }
+    paint(s.error ? "no answer" : "newest");
+    setTimeout(() => paint(s.current ?? ""), 2400);
+  });
+}
+
 export function mountUpdate() {
   /* Only the installed kind. Somebody who typed a command to get here has a
      terminal, a checkout, and their own opinion about when to update. */
@@ -290,4 +341,5 @@ export function mountUpdate() {
     root.hidden = true;
   });
   look();
+  mountVersion();
 }

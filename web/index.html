@@ -73,6 +73,12 @@
   <!-- the only way in to the shortcuts, other than the key it names -->
   <button id="keys-toggle" type="button" aria-expanded="false"
           title="shortcuts">?</button>
+  <!-- the version, and the way to ask for a newer one. update.js fills it in
+       and only for an installed keeper: a checkout updates with git. it is
+       here because "how do I update this" should be answerable by looking at
+       the window, not by finding a file on the disk. -->
+  <button id="ver" class="label" type="button" hidden
+          title="check for a newer keeper"></button>
   <button id="tray-toggle" type="button" aria-expanded="false">tray</button>
   <!-- the folder you are looking at, and the control that changes it.
        drop.js listens for [data-keeper-choose] anywhere on the page. -->

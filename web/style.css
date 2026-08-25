@@ -1862,3 +1862,27 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
   font: 600 1rem/1 var(--sans);
 }
 .bin-yes:hover { filter: brightness(1.12); }
+
+/* the version in the header, which is also the check for a newer one.
+
+   It wears the quietest voice in the bar, because on the overwhelming
+   majority of launches it is a fact nobody needs. Pressing it is the only
+   way in the app to ask github a question, so it says what it is doing in
+   the same three characters it normally spends on a number. */
+#ver {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  letter-spacing: .04em;
+  color: var(--ink-3);
+  background: none;
+  border: 0;
+  padding: 2px 6px;
+  border-radius: var(--r);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+#ver:hover { color: var(--ink); background: #ffffff12; }
+#ver:active { transform: scale(.97); }
+#ver.busy { color: var(--ink-2); }

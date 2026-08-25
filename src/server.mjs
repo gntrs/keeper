@@ -360,6 +360,14 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
       if (route === "/api/update" && req.method === "GET") {
         const { asks, check, isClone, version } = await import("./update.mjs");
         const policy = await updatePolicy();
+        /* A check somebody asked for by pressing the version, which is a
+           different thing from keeper deciding to look. It makes the one
+           request and writes nothing: a person who answered never is not
+           opted back in by wanting to know once, and the next launch is as
+           quiet as they asked for. */
+        if (url.searchParams.get("once") === "1") {
+          return json(res, 200, { policy, asked: true, ...(await check()) });
+        }
         if (policy !== "on") {
           /* The address is sent even when the answer is no, because the page
              asking permission has to be able to show what it would ask for.
