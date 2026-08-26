@@ -164,9 +164,23 @@ const size = (b) =>
  * A tool that reports only what it liked cannot be trusted for a negative,
  * and the negative is half of what anyone asks an archive.
  */
-function sayWhatItWalkedPast({ ignored, barren }) {
-  if (!ignored?.length && !barren?.length) return;
+function sayWhatItWalkedPast({ ignored, barren, shut }) {
+  if (!ignored?.length && !barren?.length && !shut?.length) return;
   say("");
+  /**
+   * The libraries, first, because this is the only skip that hides
+   * PHOTOGRAPHS rather than clutter. Everything else on this report is a
+   * project file or an empty folder. A photos library is thousands of frames
+   * somebody owns, and walking past it silently would leave them counting the
+   * wall and wondering where half their pictures went. It also says why, once,
+   * because "skipped" on its own reads as a failure and it is not one.
+   */
+  if (shut?.length) {
+    const shown = shut.slice(0, 3).map((p) => dim(p)).join(", ");
+    const more = shut.length > 3 ? dim(` and ${shut.length - 3} more`) : "";
+    say(`  ${dim(`${shut.length} ${shut.length === 1 ? "library" : "libraries"} left closed:`)} ${shown}${more}`);
+    say(`    ${dim("these are apps' own folders. export from the app to cull what is inside them.")}`);
+  }
   if (ignored?.length) {
     const n = ignored.reduce((t, i) => t + i.count, 0);
     const bytes = ignored.reduce((t, i) => t + i.bytes, 0);

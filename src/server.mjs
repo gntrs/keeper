@@ -402,9 +402,25 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
        * The reply goes first for the same reason quit's does: everything
        * after it kills the process this socket belongs to. If the swap
        * throws, nothing has changed on disk and the error is the reply.
+       *
+       * THE POLICY DOES NOT GATE THIS, AND USED TO. Two different questions
+       * were being answered by one preference: may keeper look on its own,
+       * and may it install the one you are pointing at. Somebody who answered
+       * never to the first still gets a check by pressing the version, because
+       * asking once writes nothing, and that check offers an install. Gating
+       * the install on the policy made that offer a dead end: the card said
+       * updates are turned off, and the only control that could have turned
+       * them on is the consent card, which never appears again once it has
+       * been answered. A person who wanted the newest keeper had no way to say
+       * so from inside keeper.
+       *
+       * So the second question is answered by pressing the button, which is
+       * the only way it can be reached. Nothing is written either way, so the
+       * next launch is still as quiet as never asked for. What guards this
+       * route is what always really guarded it: it is refused unless the
+       * request came from keeper's own page.
        */
       if (route === "/api/update/apply" && req.method === "POST") {
-        if ((await updatePolicy()) !== "on") return json(res, 403, { error: "updates are turned off" });
         const { apply, relaunch } = await import("./update.mjs");
         let done;
         try {

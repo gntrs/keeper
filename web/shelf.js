@@ -972,7 +972,11 @@ function dress(item, n) {
     inTray(item.id) && "intray",
     sel.has(item.id) && "picked",
     n === cursor && S.view === "shelf" && "cursor",
-    item.kind === "film" && !item.w && "noposter",
+    /* a frame the decoder could not open. it wins over noposter, because a
+       clip that could not be read is unreadable rather than merely missing a
+       poster, and two words in the same place is one word too many. */
+    item.error && "unread",
+    !item.error && item.kind === "film" && !item.w && "noposter",
   ].filter(Boolean).join(" ");
 }
 
@@ -994,6 +998,25 @@ function tile(item, n) {
   const img = new Image();
   img.loading = "lazy"; img.decoding = "async"; img.src = `/thumb/${item.id}`; img.alt = "";
   fig.append(img);
+
+  /* WHY THIS TILE IS BLANK, WHICH THE INDEX ALREADY KNEW.
+     A frame the decoder could not open has no thumbnail file, so the img
+     above 404s and the tile renders as nothing at all. The scan wrote the
+     reason down at the time and this threw it away, which is how one
+     unreadable negative and an archive that will not load at all looked
+     identical to the person in front of them. They are not the same problem
+     and they should never have looked the same.
+
+     The word goes in a span rather than in css on the tile, because every
+     other state a tile wears is additive and a pseudo element is not: see
+     the note beside .why in the stylesheet. */
+  if (item.error || (item.kind === "film" && !item.w)) {
+    const why = document.createElement("span");
+    why.className = item.error ? "why bad" : "why";
+    why.textContent = item.error ? "unreadable" : "no poster";
+    fig.append(why);
+    if (item.error) fig.title = item.error;
+  }
 
   /* The tag used to print across the corner of every thumbnail and it does
      not any more. A wall of two thousand frames should read as photographs,

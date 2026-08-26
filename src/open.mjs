@@ -30,7 +30,7 @@ export async function buildIndex(root, { rescan = false, onPhase } = {}) {
     // claiming the drive held nothing else
     emit({
       phase: "ready", done: n, total: n, frames: n,
-      ignored: existing.ignored, barren: existing.barren,
+      ignored: existing.ignored, barren: existing.barren, shut: existing.shut,
     });
     return existing;
   }
@@ -42,7 +42,7 @@ export async function buildIndex(root, { rescan = false, onPhase } = {}) {
   // What the scan walked past travels with the index rather than only with
   // the run that built it, because the question it answers, "is the thing I
   // am looking for even on this drive", gets asked long after the scan.
-  const passed = { ignored: found.ignored, barren: found.barren };
+  const passed = { ignored: found.ignored, barren: found.barren, shut: found.shut };
   const items = found.items.map((f) => ({ ...f, id: idFor(f.path) }));
 
   if (!items.length) {

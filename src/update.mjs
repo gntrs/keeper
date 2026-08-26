@@ -2,13 +2,23 @@
    keeper updating itself, which is the one thing in here that touches the
    network, and therefore the one thing in here that has to be argued for.
 
-   THE PROMISE IS THAT KEEPER TALKS TO NOTHING, AND THIS DOES NOT BREAK IT,
-   because nothing here runs until somebody says it may. There is a question
-   asked once, in the page, in plain words, and until it is answered no
-   request is made. Answer no and this file is dead code for good. Nothing is
-   ever sent: the only outbound request is a GET for a small file that says
-   what the newest version is, and it carries no identifier, no archive, no
-   count of anything, and no cookie.
+   THE PROMISE IS THAT KEEPER TALKS TO NOTHING BY ITSELF, AND THIS DOES NOT
+   BREAK IT, because nothing here runs until somebody says it may. There is a
+   question asked once, in the page, in plain words, and until it is answered
+   no request is made. Answer no and keeper never looks again on its own.
+
+   IT IS NOT DEAD CODE AFTER A NO, AND THE DIFFERENCE MATTERS. Pressing the
+   version in the corner still asks, once, and writes nothing down, because a
+   person wanting to know whether there is a newer keeper is not the same
+   person changing their mind about being checked up on. Saying no is a
+   refusal to be asked on your behalf, not a promise never to want the answer.
+   That reading used to be a trap door: a no meant the install button could
+   only ever say updates are turned off, and nothing anywhere could take it
+   back.
+
+   Nothing is ever sent either way: the only outbound request is a GET for a
+   small file that says what the newest version is, and it carries no
+   identifier, no archive, no count of anything, and no cookie.
 
    WHAT IT REPLACES IS KEEPER, NOT THE MACHINE UNDER IT. An update is
    bin, src and web, which together are under a megabyte, and it leaves node
@@ -22,9 +32,8 @@
 
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -54,6 +63,35 @@ const FROM = WHERE;
    the archive is not in this list and neither is node_modules, so no update
    can reach either even if one is built wrong. */
 const PARTS = ["bin", "src", "web", "package.json"];
+
+/* The staging folder's name, kept apart from PARTS on purpose: what an update
+   may replace and where it is unpacked are two different lists, and a name in
+   both would mean an update could overwrite its own workings mid swap. */
+const STAGING = ".keeper-update-";
+
+/**
+ * Anything a previous update left behind.
+ *
+ * The staging folder is removed on the way out and on the way out of a
+ * failure, which covers everything except the one case that matters: the
+ * machine losing power in the second the swap takes. What survives that is
+ * inert, because it is not in PARTS and nothing reads it, but it is inside a
+ * folder the person can see and it would sit there for good. Cleared at the
+ * start of the next update rather than at launch, so the cost lands on the
+ * rare thing rather than on every open.
+ */
+async function sweepStale() {
+  let here;
+  try {
+    here = await readdir(ROOT);
+  } catch {
+    return;
+  }
+  for (const name of here) {
+    if (!name.startsWith(STAGING)) continue;
+    await rm(path.join(ROOT, name), { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 export async function version() {
   try {
@@ -160,7 +198,35 @@ export async function apply() {
   const got = createHash("sha256").update(bytes).digest("hex");
   if (got !== found.sha256) throw new Error("the download does not match the checksum the release published");
 
-  const work = await mkdtemp(path.join(os.tmpdir(), "keeper-update-"));
+  /**
+   * THE STAGING FOLDER GOES INSIDE THE INSTALL, not in the system temp.
+   *
+   * Every step of the swap below is a rename, and a rename cannot cross a
+   * volume: it fails with EXDEV and takes the whole update with it. The
+   * system temp folder is on the same disk as the install on most machines
+   * and on a different one on plenty, because TEMP is a setting and people
+   * move it. A person whose temp folder lives on another drive had an updater
+   * that could never install anything, and the message they got back blamed
+   * the swap rather than the drive.
+   *
+   * Inside the install rather than merely beside it, because that makes the
+   * permission this needs exactly the permission the swap needs. The swap
+   * writes into ROOT, so a staging folder in ROOT can be created if and only
+   * if the swap could have run. Beside it would have been one directory up,
+   * which is nearly always the same answer and not always, and an updater
+   * that refuses work it could have done is as wrong as one that starts work
+   * it cannot finish.
+   *
+   * So a failure here is a failure in the right place: it says the install is
+   * not writable while the install is still whole.
+   */
+  await sweepStale();
+  let work;
+  try {
+    work = await mkdtemp(path.join(ROOT, STAGING));
+  } catch (e) {
+    throw new Error(`the install folder could not be written to, so nothing was changed: ${e.message}`);
+  }
   const next = path.join(work, "next");
   const prev = path.join(work, "prev");
   await mkdir(next, { recursive: true });

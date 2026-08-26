@@ -275,6 +275,10 @@ function fit() {
      new measurement. the hold itself does not move: that is the point. */
   fitScale = scale;
   apply();
+  /* the strip is as wide as the stage this just sized, so what fits in it is
+     only knowable now. on the first open of a frame this runs after the
+     picture has loaded and the card has stopped being its minimum width. */
+  trim($("#preview .preview-facts"));
 }
 addEventListener("resize", fit);
 
@@ -288,22 +292,66 @@ function meta(item) {
   const host = $("#preview .preview-meta");
   const code = S.tags[item.id]?.tag;
   /* The pixels come before the folder, and that order is the whole point of
-     this line. It is one row that truncates from the tail on a narrow card,
-     so whatever sits last is what gets eaten, and the folder is the half that
-     can afford it: it is spelled out again in the path underneath. The
+     this line. The folder is the half that can afford to be eaten on a narrow
+     card, because it is spelled out again in the path underneath. The
      resolution is not written anywhere else on this card and it is the number
      the decision hangs on, whether this frame can be a 2400px banner. The
-     running time rides ahead of the folder for the same reason. */
-  const line = [
-    code && S.vocab[code],
-    item.w ? `${item.w}x${item.h}` : null,
-    item.clock,
-    item.place,
-  ].filter(Boolean).join(" · ");
-
+     running time rides ahead of the folder for the same reason.
+     
+     ONE ELEMENT PER FACT, AND IT USED TO BE ONE STRING. Ellipsis truncates
+     the tail of whatever box it is on, and on one joined string that box
+     holds all four facts. So a portrait frame, whose card is as narrow as
+     cards get, ate its way back past the folder and into the number: 800x1200
+     was drawn as 800x120, which is not a shortened number, it is a different
+     one, and it looks entirely plausible. A truncation that produces a
+     believable lie is worse than no room at all.
+     
+     Split, only the folder can shrink and the number is never touched. The
+     stylesheet holds that side of it, next to .preview-facts. */
   const facts = document.createElement("p");
-  facts.className = "dim";
-  facts.textContent = line;
+  facts.className = "dim preview-facts";
+
+  /**
+   * WHAT GETS GIVEN UP FIRST WHEN THE ROW IS TOO NARROW, SAID HERE.
+   *
+   * The order these are added is the reading order, left to right. The number
+   * on `give` is the order they are surrendered in, highest first, and the two
+   * orders are deliberately not the same. Reading order is what makes a
+   * sentence. Surrender order is about what is written down anywhere else:
+   *
+   *   the folder   goes first, it is spelled out in full in the path below
+   *   the runtime  next, a rough figure the clip itself carries anyway
+   *   the tag      next, the wall shows it and the chips above count it
+   *   kept         next to last, because k is a toggle: somebody who gets no
+   *                answer presses it again and turns off the thing they just
+   *                turned on. a confirmation is worth more than a label.
+   *   the pixels   never. this card is the only place they appear, and they
+   *                are the number the decision hangs on: whether this frame
+   *                can be a 2400px banner. It is the last thing standing.
+   */
+  const bit = (text, give, cls) => {
+    if (!text) return;
+    const el = document.createElement("span");
+    if (cls) el.className = cls;
+    el.dataset.give = give;
+    el.textContent = text;
+    facts.append(el);
+  };
+
+  /* kept, first, because it is the one fact on this card that the person
+     just caused. pressing k wrote it and this card said nothing back, so the
+     only confirmation was going back to the wall to look. a state you can set
+     from a screen has to be readable on that screen. */
+  if (S.tags[item.id]?.star) {
+    const kept = document.createElement("strong");
+    kept.dataset.give = "1";
+    kept.textContent = "kept";
+    facts.append(kept);
+  }
+  bit(code && S.vocab[code], 2);
+  bit(item.w ? `${item.w}x${item.h}` : null, 0);
+  bit(item.clock, 4);
+  bit(item.place, 5, "where");
 
   const where = document.createElement("code");
   where.textContent = item.path;
@@ -348,7 +396,60 @@ function meta(item) {
   }
 
   host.replaceChildren(zoom, ...pos, facts, where, finder, keep);
+  trim(facts);
   paintZoom();
+}
+
+/**
+ * DROP THE FACTS THAT DO NOT FIT, RATHER THAN DRAW HALF OF ONE.
+ *
+ * This strip is as wide as the photograph above it, by the card's design, and
+ * a portrait frame leaves it about 170 pixels once the two buttons have taken
+ * their half. Four facts want more than that. Before this, the row was one
+ * string with an ellipsis, so the overflow ate backwards from the tail and
+ * stopped wherever it ran out of room: on a portrait frame that was inside
+ * the resolution, and 800x1200 was drawn as 800x120. A shortened word is
+ * still the word. A shortened number is a different number, it is a plausible
+ * one, and it sits exactly where somebody is deciding whether this frame can
+ * be a 2400px banner.
+ *
+ * So one whole fact is removed at a time until the row fits, and which one
+ * goes is the data-give order set where the facts are built, not the order
+ * they are drawn in. Dropping the rightmost would drop the resolution before
+ * the tag, and the tag is on the wall behind this card while the resolution
+ * is on nothing.
+ *
+ * It cannot wrap instead. The card contract in the stylesheet requires this
+ * strip to be the same height on every frame, or the card resizes as you
+ * arrow along a row and the stage measurement above reads a number that has
+ * stopped being true.
+ */
+function trim(facts) {
+  if (!facts) return;
+  /* Every fact is put back before any is taken away, because this runs again
+     on every relayout and a window being widened has to give back what being
+     narrowed took. Trimming a list that had already been trimmed would only
+     ever shrink, so a card that got bigger would stay as terse as the
+     smallest it had ever been. */
+  const all = facts._all ?? (facts._all = [...facts.children]);
+  if (facts.children.length !== all.length) facts.replaceChildren(...all);
+  /* Re-measured after each removal rather than subtracted from one reading,
+     because taking the last fact away also takes its separator with it: the
+     dot is drawn on every child but the last, so each removal frees a little
+     more than the fact itself was worth. Predicting that arithmetic costs one
+     fact too many. It is at most four measurements, once, on opening a
+     picture that is about to decode several megabytes. */
+  for (let i = 0; i < 6; i++) {
+    if (facts.scrollWidth <= facts.clientWidth) return;
+    /* the most expendable one still standing, which is rarely the last */
+    let go = null;
+    for (const el of facts.children) {
+      if (go === null || Number(el.dataset.give ?? 0) > Number(go.dataset.give ?? 0)) go = el;
+    }
+    /* never leave the strip empty: one fact drawn whole beats none */
+    if (!go || facts.children.length === 1) return;
+    go.remove();
+  }
 }
 
 export function close() {

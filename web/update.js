@@ -3,9 +3,16 @@
 
    THE DEFAULT IS NO REQUEST AT ALL. Until the question is answered the
    server makes no call, so a keeper that has never been asked has never
-   spoken to anything. Answer never and this panel is gone for good and the
-   check never runs again. Answer not now and nothing is written, so it
-   asks again next launch: dismissing a question is not answering it.
+   spoken to anything. Answer never and this panel is gone for good and
+   keeper never checks on its own again. Answer not now and nothing is
+   written, so it asks again next launch: dismissing a question is not
+   answering it.
+
+   NEVER IS ABOUT THIS PANEL, NOT ABOUT THE VERSION IN THE CORNER. Pressing
+   that asks once and writes nothing, whatever was answered here, and the
+   card it opens can install what it found. Anything else made never into a
+   door that locked from the inside: the check would run, say a newer keeper
+   was out, and then refuse to fetch it with no way left to consent.
 
    IT SHOWS THE REQUEST RATHER THAN DESCRIBING IT. The address comes from the
    server, out of the same constant the fetch uses, so what is on screen

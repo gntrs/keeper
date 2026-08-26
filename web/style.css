@@ -1041,17 +1041,41 @@ figure .film::before {
   margin-left: 1px;
 }
 figure.noposter img { opacity: .12; }
-/* this label sits on ::before rather than ::after because the starred
-   corner mark took ::after, and a clip with no readable poster is already
-   dark enough that the untagged scrim on the same layer would have added
-   nothing. the words win the layer, the scrim gives it up. */
-figure.noposter::before {
-  content: "no poster"; position: absolute; inset: 0;
+figure.unread img { opacity: 0; }
+
+/**
+ * WHY A TILE SAYS NOTHING, WRITTEN IN THE TILE.
+ *
+ * Two of these. A clip whose poster frame could not be made, and a frame the
+ * decoder could not open at all. Both render as an empty rectangle otherwise,
+ * and an empty rectangle is the single least useful thing a photo tool can
+ * put in front of somebody.
+ *
+ * A REAL ELEMENT AND NOT ::before, WHICH IT USED TO BE. Every tile state on
+ * this grid is additive by design: a frame can be untagged and in a tray and
+ * picked and under the keyboard at once, and each of those draws. There is
+ * one ::before per element, the untagged scrim wanted it and the picked ring
+ * wanted it, and a label that took it silently won on source order and stole
+ * the selection ring off any clip you happened to have selected. Nothing
+ * announced that. It is the kind of thing you find by selecting the wrong
+ * frame and never knowing you did.
+ *
+ * A span costs one node per broken frame, which there are almost never many
+ * of, and it composes with everything instead of competing with it. The film
+ * mark next to it has been a span for the same reason all along.
+ */
+figure .why {
+  position: absolute; inset: 0; z-index: 1;
   display: grid; place-items: center;
-  background: none; opacity: 1;
   font: 500 .68rem/1 var(--mono); text-transform: lowercase;
   letter-spacing: .14em; color: var(--ink-3);
+  pointer-events: none;
 }
+/* amber and not red: the frame is still on the drive and still in the count,
+   keeper simply cannot show it. that is a thing to be told, not alarmed
+   about. the reason itself rides on the tile's title, because a decoder
+   message is a sentence and this is a space for one word. */
+figure .why.bad { color: var(--warn); }
 
 /* --- empty states --------------------------------------------------- */
 .blank {
@@ -1630,8 +1654,50 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
    card is narrow, since the buttons are the half you reach for. */
 .preview-meta > p {
   flex: 1 1 0; margin: 0; min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  overflow: hidden;
 }
+/* THE FOLDER GIVES WAY, THE NUMBER NEVER DOES.
+   
+   These four facts used to be one string with one ellipsis on it, and an
+   ellipsis eats the tail of its box without caring what the tail means. On a
+   portrait frame, whose card is the narrowest this app draws, it ate back
+   through the folder and into the resolution, and 800x1200 was drawn as
+   800x120. Not a shortened number. A different number, and a believable one,
+   sitting where somebody is deciding whether this frame can be a 2400px
+   banner.
+   
+   So every fact is its own box and only the folder is allowed to shrink. It
+   is the one that can afford it: the path underneath spells it out again in
+   full. Everything else is flex: none and is either drawn whole or not at
+   all, which is the only honest pair of options a number has. */
+.preview-facts {
+  display: flex; align-items: baseline; min-width: 0;
+  /* ONE LINE, ALWAYS. The card contract above is explicit that this strip
+     comes out the same height on a wide frame as on a tall one, or the card
+     changes size as you arrow along a row and preview.js measures a number
+     that has stopped being true. Wrapping would have fixed the clipping and
+     broken that, so the facts that do not fit are removed instead, from the
+     tail, by preview.js after layout. A fact shown whole or not at all. */
+  flex-wrap: nowrap; white-space: nowrap;
+}
+.preview-facts > * { flex: none; }
+/* on the last item the separator would be a dot hanging off the end of the
+   sentence. on a wrapped line it sits at the line end and reads as a
+   continuation, which is what it is. */
+.preview-facts > *:not(:last-child)::after {
+  content: "·"; padding: 0 .4em; color: var(--ink-3);
+}
+/* the folder is still the one that gives way first if a single name is
+   somehow longer than the whole card, because the path underneath repeats it
+   in full and nothing else here has a second copy anywhere. */
+.preview-facts > .where {
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* kept is the one fact here the person just caused, so it reads as a word
+   rather than a dim aside. it borrows the same weight the strong rule below
+   gives everything else on this strip. */
+.preview-facts > strong { color: var(--ink); }
 .preview-meta .chip { order: 2; }
 .preview-meta strong { font-weight: 500; color: var(--ink); }
 /* the path is the one thing down here you copy rather than read, so it is

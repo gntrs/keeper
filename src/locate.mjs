@@ -1,6 +1,8 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { buried, walkPast } from "./skip.mjs";
+
 import { host } from "./os/index.mjs";
 import { STILL_EXT, FILM_EXT } from "./scan.mjs";
 
@@ -14,30 +16,44 @@ const SCORE_CAP = 40;
  * one, and a .keeper folder is keeper's own scratch directory. None of the
  * three is ever the archive someone meant to open.
  */
-const JUNK = new Set([".Trash", ".Trashes", "node_modules", ".keeper", ".keepers"]);
-const junky = (p) => p.split(path.sep).some((seg) => JUNK.has(seg));
 
 /**
- * A FOLDER THE OPERATING SYSTEM PRESENTS AS A SINGLE FILE, AND READING INTO
- * ONE IS NOT FREE.
+ * THE PROFILE WINDOWS COPIES NEW USERS FROM, WHICH IS NOBODY'S FOLDER.
  *
- * `Photos Library.photoslibrary` sits in the pictures folder and is a
- * directory like any other as far as readdir is concerned. It is not one to
- * the person who owns it, and on macos it is behind its own permission: the
- * first read puts a photos prompt on screen. Somebody who dropped a folder on
- * the window did not ask to be asked that, and a prompt they did not expect
- * is a prompt they say no to.
+ * C:\Users\Default holds a Pictures, a Desktop, a Documents and a Downloads,
+ * all empty, all there so the next account created on this machine starts
+ * with them. Windows Search indexes it like anything else, so dropping a
+ * folder called Pictures came back with two answers: the person's, and a
+ * template they have never seen and could not have dropped.
  *
- * So the sweep walks past every one of these rather than into it. Nothing is
- * lost: an archive keeper can open is a folder of files, and none of these is
- * that.
+ * Two answers is not a small cost. One answer opens the folder, and the drop
+ * is done in three hundred milliseconds with nothing to read. Two puts a
+ * disambiguation card up and asks somebody to choose between their own
+ * pictures and a path they will have to parse to rule out. That was every
+ * drop of every common folder name on windows, which is most drops.
+ *
+ * Matched by shape and anchored to the drive root, because Default on its own
+ * is a perfectly ordinary word for a folder to be called and Users is an
+ * ordinary word for a folder to hold. It only means this at the top of a
+ * drive: D:\Photos\Users\Default is somebody's work and is left alone. The
+ * two legacy names beside it are junctions windows still keeps for programs
+ * written before Vista, and they lead back into the same place.
  */
-const PACKAGES = new Set([
-  ".photoslibrary", ".photolibrary", ".aplibrary", ".migratedaperturelibrary",
-  ".fcpbundle", ".imovielibrary", ".theater", ".tvlibrary", ".musiclibrary",
-  ".lrdata", ".lrcat", ".sparsebundle", ".app", ".bundle", ".framework", ".pkg",
-]);
-const sealed = (name) => PACKAGES.has(path.extname(name).toLowerCase());
+const TEMPLATES = new Set(["default", "default user", "all users"]);
+const template = (p) => {
+  if (process.platform !== "win32") return false;
+  const seg = p.split(path.sep);
+  return seg.length > 2
+    && String(seg[1]).toLowerCase() === "users"
+    && TEMPLATES.has(String(seg[2]).toLowerCase());
+};
+
+/** everywhere a candidate can be ruled out without opening it */
+const nowhere = (p) => buried(p) || template(p);
+
+/* which folders keeper walks past, and why, is src/skip.mjs. it is shared
+   with the scan on purpose: the two of them holding separate lists is
+   how a photos library ended up being scanned onto somebody's wall. */
 
 /**
  * The machine's own search index, which already holds what turns a folder
@@ -139,8 +155,11 @@ async function sweep(name, kind) {
     for (const got of listed) {
       if (!got) continue;
       for (const e of got.entries) {
-        if (e.name.startsWith(".") || JUNK.has(e.name) || sealed(e.name)) continue;
+        if (walkPast(e.name)) continue;
         const full = path.join(got.dir, e.name);
+        /* neither a hit nor somewhere to descend: the template profile is a
+           whole tree of empty copies of the folders being looked for. */
+        if (template(full)) continue;
         const folder = e.isDirectory();
         if (e.name === name && (kind === "folder" ? folder : e.isFile())) hits.push(full);
         if (folder) next.push(full);
@@ -268,7 +287,7 @@ export async function locate({ name, kind, files } = {}) {
   if (!name) return [];
 
   const hits = (await both(name, "folder"))
-    .filter((p) => !junky(p))
+    .filter((p) => !nowhere(p))
     .slice(0, SCORE_CAP);
 
   const want = new Set(wanted);
@@ -300,7 +319,7 @@ async function byFiles(names) {
     const seen = new Set();
     for (const file of hits) {
       const dir = path.dirname(file);
-      if (junky(dir) || seen.has(dir)) continue; // one file, one vote per folder
+      if (nowhere(dir) || seen.has(dir)) continue; // one file, one vote per folder
       seen.add(dir);
       counts.set(dir, (counts.get(dir) ?? 0) + 1);
     }

@@ -79,9 +79,11 @@ Filename: "{app}\keeper.vbs"; Description: "start keeper"; Flags: postinstall no
 
 [UninstallDelete]
 ; The index, the thumbnails and the tags live next to the photographs and are
-; never touched by an uninstall. What is removed here is only the two files
-; keeper wrote about itself: which archive was open, and which port it was on.
+; never touched by an uninstall. What is removed here is only what keeper
+; wrote about itself: the empty folder a first launch opens, which archive was
+; open and on which port, the launcher's log, and the last doctor report.
 Type: filesandordirs; Name: "{localappdata}\keeper\start"
 Type: files; Name: "{localappdata}\keeper\run.json"
 Type: files; Name: "{localappdata}\keeper\seat.json"
 Type: files; Name: "{localappdata}\keeper\keeper.log"
+Type: files; Name: "{localappdata}\keeper\doctor.txt"

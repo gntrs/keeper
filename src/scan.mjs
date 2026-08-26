@@ -1,6 +1,8 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
+import { sealed, walkPast } from "./skip.mjs";
+
 /**
  * Camera raw, by the mount a person actually owns. Every one of these is a
  * still and gets treated as one everywhere it is counted, sorted, tagged or
@@ -135,26 +137,10 @@ const inside = (root, full) => path.relative(root, full).split(path.sep).join("/
 
 const QUIET_NAMES = new Set([".ds_store", ".localized", "thumbs.db", "desktop.ini", "icon\r"]);
 
-/**
- * Skipped wherever they appear, at any depth, and matched without case.
- *
- * THE TWO WINDOWS ENTRIES ARE NOT TIDINESS. `$RECYCLE.BIN` sits at the root
- * of every windows volume and holds the files somebody has already deleted,
- * so scanning a drive root without skipping it puts every discarded frame
- * back on the shelf as a new photograph, with a new id, after the person
- * went to the trouble of throwing it away. `System Volume Information` is
- * unreadable to a normal account and would only produce a wall of permission
- * errors on the way past.
- *
- * Without case, because these are compared against names off a filesystem
- * that does not care about it: the recycler is usually shouted and is not
- * always, and a folder called `Node_Modules` is the same folder.
- */
-const SKIP_DIRS = new Set([
-  ".git", "node_modules", ".keeper", ".keepers", ".Trashes", ".Spotlight-V100",
-  ".fseventsd", "__MACOSX", ".DS_Store",
-  "$recycle.bin", "system volume information", "$windows.~ws", "$windows.~bt",
-].map((n) => n.toLowerCase()));
+/* Which folders are walked past, and why, lives in src/skip.mjs now. It
+   used to live here, and the drop search kept a second, different copy of
+   the same idea. Two lists meaning one thing is how a photos library ended
+   up being scanned into somebody's wall: this half had never been told. */
 
 /**
  * Walks a folder and returns every still under it, sorted by path so the
@@ -172,6 +158,7 @@ const SKIP_DIRS = new Set([
 export async function scan(root, { onProgress } = {}) {
   const out = [];
   const ignored = new Map(); // extension -> { count, bytes }
+  const shut = [];           // libraries and bundles walked past, said out loud
   const barren = []; // folders holding nothing readable, at any depth
   let seen = 0;
 
@@ -191,11 +178,23 @@ export async function scan(root, { onProgress } = {}) {
       return 0; // unreadable directory, e.g. a permissions-locked system folder
     }
     let found = 0;
+    /* a folder is only barren if there was nothing in it. one whose contents
+       were a photos library is not empty, it is closed, and it has already
+       been said so on the line above. reporting it twice, the second time as
+       holding nothing, contradicts the first. */
+    let closed = 0;
     for (const e of entries) {
       if (e.name.startsWith("._")) continue; // apple resource fork sidecars
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
-        if (SKIP_DIRS.has(e.name.toLowerCase())) continue;
+        if (walkPast(e.name)) {
+          /* a library walked past is worth saying out loud. it is the one
+             skip that hides photographs rather than clutter, and somebody
+             looking for the frames that are inside it deserves to be told
+             where they went rather than left to wonder. */
+          if (sealed(e.name)) { shut.push(inside(root, full)); closed++; }
+          continue;
+        }
         found += await walk(full);
       } else if (e.isFile()) {
         const base = e.name.toLowerCase();
@@ -216,7 +215,7 @@ export async function scan(root, { onProgress } = {}) {
         if (++seen % 250 === 0) onProgress?.(seen);
       }
     }
-    if (!found && dir !== root) barren.push(inside(root, dir));
+    if (!found && !closed && dir !== root) barren.push(inside(root, dir));
     return found;
   }
 
@@ -237,5 +236,6 @@ export async function scan(root, { onProgress } = {}) {
       .map(([ext, at]) => ({ ext, ...at }))
       .sort((a, b) => b.count - a.count),
     barren: topmost,
+    shut,
   };
 }
