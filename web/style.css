@@ -1685,6 +1685,10 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
    and otherwise it gets out of the way. */
 .preview-stage {
   flex: 0 1 auto; min-height: 0; min-width: 0;
+  /* the raw mark hangs in the top corner and the photograph pans underneath
+     it, which is why the transform in preview.js is put on the picture and
+     never on this box. */
+  position: relative;
   display: flex; overflow: hidden;
   /* the stage touches the photograph, so it is the neutral deep, not a
      chrome step: the old #08080a was two points blue and blue is a bias. */
@@ -1695,6 +1699,37 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
   max-width: 100%; max-height: 100%;
   width: auto; height: auto;
   object-fit: contain;
+}
+
+/* ---------------------------------------------------------------------
+   the negative's mark.
+
+   Amber, which in keeper means deal with this, and never red: red is a fill
+   and a ring in this app and this is a word. What it is telling you is not
+   that a number on the card is wrong, because the index measures the proxy
+   and the printed resolution is therefore the honest ceiling. It is that the
+   file on the drive holds more than keeper is showing, so a frame headed for
+   print goes to the original rather than to the export folder.
+
+   The ground is nearly opaque black on purpose. This is the one label in
+   keeper that sits over a photograph rather than over chrome, so its
+   contrast has to survive whatever is behind it: amber on the ground is
+   9.02:1, and over a white frame at this alpha it still holds about 6.5:1.
+   A scrim you can see through is a label that is legible on half the
+   archive.
+
+   It never takes a click. The whole stage is a zoom and pan surface and a
+   badge that swallowed a drag in one corner would be a dead spot nobody
+   could explain.
+   --------------------------------------------------------------------- */
+.raw-mark {
+  position: absolute; top: var(--s3); right: var(--s3); z-index: 2;
+  padding: 3px 7px;
+  border-radius: 3px;
+  color: var(--warn);
+  background: #000000e0;
+  border: 1px solid #e0a4583d;
+  pointer-events: none;
 }
 
 /* Two things are going on in this width.

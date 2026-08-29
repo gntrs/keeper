@@ -179,11 +179,60 @@ async function ask(route, body, method = "POST") {
 /* the drag layer                                                      */
 /* ------------------------------------------------------------------ */
 
-/* A drag only belongs to this file when it carries files. Every drag that
-   starts inside keeper, a frame going to the tray or onto a bench slot,
-   carries a private mime type instead, so this one test is what keeps the
-   two systems from ever meeting. */
-const carries = (e) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+/* The two private types every drag that starts inside keeper carries: one
+   frame, or a pick of them. */
+const OURS = ["application/x-keeper-frame", "application/x-keeper-frames"];
+const ours = (dt) => !!dt && OURS.some((m) => [...dt.types].includes(m));
+
+/**
+ * WHOSE DRAG THIS IS, AND WHY "DOES IT CARRY FILES" WAS THE WRONG QUESTION.
+ *
+ * A drag belongs to this file when somebody dragged a folder in from their
+ * file manager. It does not belong here when keeper started it, and the test
+ * for that used to be that keeper's own drags carry a private mime type and
+ * a real folder carries "Files", so looking for "Files" told the two apart.
+ *
+ * On windows it does not. Dragging a frame OUT of keeper has to hand the
+ * other application a real file, so dragout.js puts a DownloadURL on the
+ * drag, and chrome on windows answers that by synthesising a virtual file
+ * and listing "Files" in the types. The drag then matched, and the full
+ * screen "drop it here" panel slammed up over the app the instant somebody
+ * started dragging a photograph out of it. It has never been seen on a mac,
+ * where the same code has been dragged out of daily, so the two platforms
+ * disagree about what a DownloadURL drag is carrying.
+ *
+ * So the question is asked the right way round now: a drag that carries one
+ * of our own types is ours whatever else is on it. The flag underneath is
+ * the second answer, for the case where windows hands the page a types list
+ * with the custom entries stripped out. It is time bounded rather than
+ * trusted, because a drag released over another application does not
+ * reliably fire dragend, and a flag stuck on would leave keeper unable to
+ * accept a folder at all, which is worse than the bug it is guarding.
+ */
+let mine = false;
+let mineAt = 0;
+
+document.addEventListener("dragstart", (e) => {
+  if (ours(e.dataTransfer)) { mine = true; mineAt = performance.now(); }
+}, true);
+document.addEventListener("dragend", () => { mine = false; }, true);
+/* refreshed for as long as the drag is really in flight, so the expiry below
+   only ever fires on a drag that has genuinely finished somewhere else. */
+document.addEventListener("dragover", () => { if (mine) mineAt = performance.now(); }, true);
+
+const carries = (e) => {
+  const dt = e.dataTransfer;
+  if (!dt) return false;
+  const types = [...dt.types];
+  if (OURS.some((m) => types.includes(m))) return false;
+  if (mine) {
+    if (performance.now() - mineAt < 1500) return false;
+    /* nothing has moved for a second and a half, so whatever keeper started
+       is over and this is somebody else's drag. */
+    mine = false;
+  }
+  return types.includes("Files");
+};
 
 /* dragenter and dragleave fire for every element the pointer crosses on the
    way in, so a boolean would flicker the overlay off the moment the cursor

@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { paths, readIndex, writeIndex, readTags, writeTags, readPlacements, writePlacements, readBinned, writeBinned } from "./store.mjs";
+import { RAW_EXT } from "./scan.mjs";
 import { startOpen, jobState } from "./open.mjs";
 import { locate, nearby, warmRoots } from "./locate.mjs";
 import {
@@ -244,6 +245,20 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
           ...i,
           place: placeOf(i.path, config.places ?? []),
           clock: i.seconds ? clock(i.seconds) : undefined,
+          /**
+           * Whether this frame is a negative.
+           *
+           * Decided here rather than in the browser, off the same set the
+           * decoder is pointed at, because a second list of extensions kept
+           * in the page is a second answer to the question of what a raw is
+           * and the two would drift the first time a camera mount was added.
+           *
+           * It is RAW_EXT and not needsProxy, which is the same set plus bmp
+           * and jxl. Those two also go through the jpeg proxy, for their own
+           * reason, and neither of them is a negative. A badge saying raw on
+           * a bmp would be a lie about the file.
+           */
+          raw: RAW_EXT.has(path.extname(i.path).toLowerCase()) || undefined,
         }));
         return json(res, 200, {
           root,

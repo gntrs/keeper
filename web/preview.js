@@ -220,7 +220,42 @@ export function open(item, run = filtered) {
     media.draggable = false;
     media.onload = () => size(media.naturalWidth, media.naturalHeight);
   }
-  $("#preview .preview-stage").replaceChildren(media);
+  /**
+   * A NEGATIVE SAYS SO, IN THE CORNER.
+   *
+   * No browser draws an ARW, so a raw frame is shown through a jpeg proxy
+   * keeper decoded once, capped at 3072 on its long edge, and that proxy is
+   * what the shelf, this card and the export all read.
+   *
+   * WHAT THIS IS NOT SAYING IS THAT A NUMBER ON THIS CARD IS WRONG. The index
+   * measures the proxy rather than the negative, so the resolution printed
+   * below is the proxy's own and it is the honest ceiling: it is exactly what
+   * an export can reach, and the too-small warning on the bench is computed
+   * against the same pixels. Nothing here is lying and nothing needs
+   * correcting.
+   *
+   * What it says is the one thing this card otherwise cannot: the file on the
+   * drive holds more than keeper is showing you. A 33MP negative carries
+   * better than twice the detail of the 3072px proxy cut out of it, so a
+   * frame headed for print, or for anything that wants the full file, is a
+   * trip to the original rather than to keeper's export folder. Somebody who
+   * only ever sees the proxy has no way to know the negative is still there.
+   *
+   * Amber, which in keeper means deal with this, and never red: red is a fill
+   * and a ring here and this is a word. It rides over the stage, which is the
+   * one surface that touches a photograph, so its ground is the neutral black
+   * that surface already is rather than the warm chrome everything else in
+   * the app sits on.
+   */
+  const stage = $("#preview .preview-stage");
+  stage.replaceChildren(media);
+  if (item.raw) {
+    const mark = document.createElement("span");
+    mark.className = "label raw-mark";
+    mark.textContent = "raw";
+    mark.title = "a negative. keeper shows and exports the jpeg preview it decoded from it, capped at 3072 on the long edge. the file on your drive holds more.";
+    stage.append(mark);
+  }
 
   meta(item);
   const host = $("#preview");
