@@ -12,7 +12,8 @@ import { paintKeys, pick as chord } from "/host.js";
 import { mountUndo } from "/undo.js";
 import { mountQuit } from "/quit.js";
 import { mountUpdate } from "/update.js";
-import { mountHint } from "/hint.js";
+import { mountTour } from "/tour.js";
+import { mountSettings } from "/settings.js";
 
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
@@ -110,13 +111,24 @@ for (const b of document.querySelectorAll("header nav button")) {
  * afternoon, and holding a strip of a window whose whole job is showing
  * photographs as large as they go.
  */
+/* assigned the moment the pane is mounted, three lines below. it is a
+   binding rather than a direct call so showKeys can be declared above the
+   mount without either of them having to move. */
+let repaintSettings = null;
+
 export function showKeys(on) {
   $("#keys").hidden = !on;
   $("#keys-toggle").setAttribute("aria-expanded", String(!!on));
+  /* the settings pane is repainted on the way in rather than kept in step by
+     a listener, because every switch on it is a mirror of a control that
+     lives somewhere else and four rows are cheaper to redraw than to watch.
+     See settings.js. */
+  if (on) repaintSettings?.();
   feel("tick");
 }
 $("#keys-toggle").onclick = () => showKeys($("#keys").hidden);
 $("#keys-shut").onclick = () => showKeys(false);
+repaintSettings = mountSettings(showKeys);
 
 /**
  * The four keys that belong to the app rather than to a view, and the rule
@@ -251,10 +263,17 @@ if (!S.items.length) {
          through their embedded preview.</p>
       <pre>keeper ~/Pictures/2026</pre>
     </div>`;
-  $("#keys-toggle").hidden = true;
-  /* the toggle governs a run that cannot happen with nothing to run
-     through, and mountAdvance never wires it on an empty archive, so a
-     visible button here would be a control that answers to nothing. */
+  /* The question mark stays. It used to go with the rest of the furniture,
+     and that was right while the only thing behind it was a list of keys for
+     a wall that is not there. It now also holds the settings, and an empty
+     archive is exactly where a fresh install lands: hiding it would put the
+     only switch for whether keeper may talk to the internet behind opening a
+     folder first. settings.js drops the shortcuts tab instead, so what is
+     behind it here is the settings and nothing else.
+     
+     The advance toggle does go. It governs a run that cannot happen with
+     nothing to run through, and mountAdvance never wires it on an empty
+     archive, so a visible button here would answer to nothing. */
   $("#advance-toggle").hidden = true;
 }
 
@@ -298,5 +317,8 @@ await mountTray();
 mountQuit();
 mountUpdate();
 tally();
-mountHint();
+/* last, and not awaited. it waits out the update card on a first icon
+   launch, and nothing below it should wait on a question somebody may take a
+   minute to answer. */
+mountTour();
 setView(location.hash.slice(1) || "shelf");

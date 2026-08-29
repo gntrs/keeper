@@ -21,12 +21,12 @@
 <!--
   fit.css comes after the sheets it corrects: its narrow window and contrast
   overrides win by load order rather than by a specificity fight. place.css
-  and hint.css only dress elements no earlier sheet mentions, so their place
+  and tour.css only dress elements no earlier sheet mentions, so their place
   after it changes nothing.
 -->
 <link rel="stylesheet" href="/fit.css">
 <link rel="stylesheet" href="/place.css">
-<link rel="stylesheet" href="/hint.css">
+<link rel="stylesheet" href="/tour.css">
 <!--
   The mark with the ground dropped, and the app icon keeps its ground.
 
@@ -269,18 +269,29 @@
   runs and the tab reloads anyway. Same problem both sides, same answer.
 -->
 <footer id="keys" hidden>
+  <!--
+    Two panes behind one key, because they answer the same question.
+
+    The settings were three switches scattered across the app: the sound
+    lived up here beside the shortcuts, auto advance lives in the bar, and
+    whether keeper may look for a newer keeper could only ever be answered
+    once, on a card that never came back. Somebody who wanted to change their
+    mind about any of them had nowhere to go and no reason to think there
+    was anywhere. So the panel that already answers "how does this respond to
+    me" answers all of it now, on the key people already press to ask.
+
+    Tabs and not a second sheet: the shortcuts are what you came for and they
+    stay one press away, and the settings are the pane you go to on purpose.
+  -->
   <div class="keys-head">
-    <span class="label">shortcuts</span>
+    <nav class="keys-tabs">
+      <button class="label on" type="button" data-pane="keys">shortcuts</button>
+      <button class="label" type="button" data-pane="set">settings</button>
+    </nav>
     <span class="grow"></span>
-    <!--
-      not haptics. a mac gives a web page no route to the taptic engine, so
-      this is the click that stands in for one, and it is off until asked.
-    -->
-    <button class="chip" id="feel-toggle" type="button" aria-pressed="false"
-            title="a short click when a key lands. no api on a mac gives a page real haptics, so this is a sound.">sound off</button>
     <button id="keys-shut" type="button" data-icon="only" title="close"></button>
   </div>
-  <div class="keys-cols">
+  <div class="keys-cols" data-pane="keys">
     <section>
       <h4 class="label">looking</h4>
       <div class="k"><span class="ks"><kbd>←↑↓→</kbd></span><span>move</span></div>
@@ -323,6 +334,61 @@
       <div class="k"><span class="ks"><kbd>0</kbd></span><span>the whole frame back</span></div>
       <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>empty the slot</span></div>
     </section>
+  </div>
+
+  <!--
+    Four switches and a sentence about where things are kept.
+
+    Every one of them says what it does to your machine rather than naming
+    itself. "checking for a newer keeper" and not "updates", because the
+    thing being decided is whether this program talks to the internet, and
+    that is worth a whole line of the window.
+  -->
+  <div class="keys-set" data-pane="set" hidden>
+    <div class="set">
+      <div class="set-say">
+        <b>sound</b>
+        <!-- not haptics, and it cannot be. a page in a browser on a mac has
+             no route to the taptic engine, so this is the click that stands
+             in for one, and it is off until it is asked for. -->
+        <p>a short click when a key lands, so the hand gets an answer without
+           the eyes leaving the photograph.</p>
+      </div>
+      <button class="chip" id="feel-toggle" type="button" aria-pressed="false">sound off</button>
+    </div>
+
+    <!-- the same switch as the one in the bar and the same one ⌥K throws.
+         settings.js clicks that button rather than keeping a second copy of
+         the state, so the two can never disagree. -->
+    <div class="set" id="set-advance-row">
+      <div class="set-say">
+        <b>auto advance</b>
+        <p>after a decision, land on the next frame nobody has decided about.
+           the same switch as the one in the bar, and <kbd>⌥K</kbd>.</p>
+      </div>
+      <button class="chip" id="set-advance" type="button" aria-pressed="true">on</button>
+    </div>
+
+    <div class="set" id="set-updates-row" hidden>
+      <div class="set-say">
+        <b>checking for a newer keeper</b>
+        <p>one small file from github, carrying no name, no photographs and
+           nothing about you. off means no request is made at all.</p>
+      </div>
+      <button class="chip" id="set-updates" type="button" aria-pressed="false">off</button>
+    </div>
+
+    <div class="set" id="set-tour-row">
+      <div class="set-say">
+        <b>the walkthrough</b>
+        <p>the cards a first run gets, over your own archive.</p>
+      </div>
+      <button class="chip" id="set-tour" type="button">show it again</button>
+    </div>
+
+    <p class="set-foot">everything keeper writes about your photographs lives
+      in a folder called <code>.keeper</code> inside the one you opened.
+      delete it and the archive is exactly as it was.</p>
   </div>
 </footer>
 

@@ -49,6 +49,11 @@ jobs:
           path: |
             packaging/out/*.dmg
             packaging/out/*.dmg.sha256
+            # the same app as the dmg, unpacked with curl and tar instead of
+            # by the finder, which is the install that gets past a gatekeeper
+            # nobody has paid apple to satisfy. see build-mac.mjs.
+            packaging/out/keeper-macos-*.tar.gz
+            packaging/out/keeper-macos-*.tar.gz.sha256
             packaging/out/keeper-app-*.tar.gz
             packaging/out/keeper-app-*.tar.gz.sha256
             packaging/out/latest.json

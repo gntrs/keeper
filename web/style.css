@@ -935,6 +935,75 @@ body:has(#tray:not([hidden])) #keys { right: calc(var(--tray-w) + var(--s5)); }
 }
 #keys-shut:hover { color: var(--ink); }
 
+/* ---------------------------------------------------------------------
+   the two panes behind ?
+
+   The shortcuts are what the key is for and they stay first. The settings
+   are the pane you go to on purpose, so the tab is a word rather than a
+   gear: a gear is an icon everybody recognises and nobody can tell apart
+   from the next gear, and there was room for the word.
+
+   Both panes set a display, so both need the hidden rule spelled out. A
+   `hidden` attribute loses to any display a stylesheet gives an element,
+   and a pane that is display:grid stays on the screen no matter what the
+   markup says about it.
+   --------------------------------------------------------------------- */
+.keys-tabs { display: flex; gap: var(--s4); }
+.keys-tabs button {
+  border: 0; border-bottom: 2px solid transparent; background: none;
+  padding: 0 0 4px; cursor: pointer; color: var(--ink-3);
+}
+.keys-tabs button:hover { color: var(--ink-2); }
+/* the accent as a rule under the pane you are in, which is the one meaning
+   red has that is not a warning: you chose this. */
+.keys-tabs button.on { color: var(--ink); border-bottom-color: var(--hot); }
+
+.keys-cols[hidden], .keys-set[hidden] { display: none; }
+
+/* One column and not four. A switch is a sentence with a control at the end
+   of it, and a sentence wants a measure: at the width the shortcuts want,
+   four of these would be four columns of prose, which is a newspaper. */
+.keys-set { display: grid; gap: 0; max-width: 68ch; }
+
+.set {
+  display: flex; align-items: flex-start; gap: var(--s5);
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--line);
+}
+.set:first-child { border-top: 0; padding-top: 0; }
+.set[hidden] { display: none; }
+
+.set-say { flex: 1; }
+.set-say b {
+  display: block; margin-bottom: 2px;
+  font: 500 .95rem/1.35 var(--sans); color: var(--ink);
+}
+.set-say p { margin: 0; font-size: .88rem; line-height: 1.5; color: var(--ink-3); }
+.set-say kbd { margin: 0 1px; }
+
+/* the switch keeps a fixed measure so a column of them lines up, and a
+   ground so it reads as a control before it is hovered. the words in it
+   change length, on to off to not asked yet, and a control that moved every
+   time it was pressed would be the loudest thing on a quiet panel. */
+.set > .chip {
+  flex: none; min-width: 12ch; text-align: center;
+  background: var(--chrome); border: 1px solid var(--line);
+}
+.set > .chip:hover { background: var(--chrome-2); }
+
+.set-foot {
+  margin: var(--s4) 0 0; font-size: .88rem; line-height: 1.5;
+  color: var(--ink-3);
+}
+.set-foot code { font-family: var(--mono); font-size: .95em; color: var(--ink-2); }
+
+/* under the width the sheet's four shortcut columns already give up at, the
+   sentence and its switch stop being a row. */
+@media (max-width: 720px) {
+  .set { flex-direction: column; gap: var(--s2); }
+  .set > .chip { align-self: flex-start; }
+}
+
 .keys-cols {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--s5) var(--s6); max-width: 1440px;

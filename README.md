@@ -1,12 +1,17 @@
 # keeper
 
-keeper opens a folder of photographs and helps you pick the good ones and cut
-them to the shapes a website or an instagram post needs. it runs on your own
-computer. it does not need an account and it does not need the internet.
+keeper opens a folder of photographs and film and helps you pick the good ones
+and cut them to the shapes a website or an instagram post needs. it runs on
+your own computer. it does not need an account and it does not need the
+internet.
 
 a shoot comes back as 1,768 frames and a website has sixteen holes. every
 hour between those two numbers goes on scrolling a finder window at 200px a
 thumbnail, and that is the hour this takes back.
+
+it was written against a photographer's archive and it is not only for
+photographers. a pile of frames and a handful of holes to fill is the same job
+whether the pile came off a camera, a phone, a drone or a screen recorder.
 
 <img src="docs/media/shelf.jpg" alt="the shelf: a wall of thumbnails under a
 row of tag filters" width="100%">
@@ -16,22 +21,43 @@ in a readme.</sub>
 
 ## get it
 
-download the one for your computer from the
-[releases page](https://github.com/gntrs/keeper/releases). there is nothing to
-install alongside it.
+everything is on the [releases page](https://github.com/gntrs/keeper/releases)
+and there is nothing to install alongside it.
 
-| | |
-|---|---|
-| **mac** | open the `.dmg`, drag keeper to applications, open it |
-| **windows** | run the `.exe` setup, then open keeper from the start menu |
+**on windows**, run the `.exe` setup and open keeper from the start menu.
 
-**your computer will warn you the first time, and here is why.** letting a
-program pass without a warning costs money every year, on each platform, and
-that money has not been paid. so:
+**on a mac**, open terminal and paste these two lines. terminal is in
+applications, utilities, or hold cmd, press space, and type its name.
 
-- **mac** says the developer cannot be verified. open system settings, go to
-  privacy and security, scroll down, press open anyway.
+```
+curl -L -o ~/Downloads/keeper.tar.gz https://github.com/gntrs/keeper/releases/latest/download/keeper-macos-arm64.tar.gz
+tar -xzf ~/Downloads/keeper.tar.gz -C /Applications
+```
+
+keeper is then in your applications folder and opens like anything else. the
+first line fetches it and the second unpacks it, and you can throw the
+download away afterwards. that is for an apple silicon mac, which is every mac
+sold since late 2020. on an older intel mac, `arm64` becomes `x64` in the
+first line.
+
+there is a `.dmg` on that page as well and it holds exactly the same app. it
+is the familiar way to install something on a mac and it is the one your mac
+will argue with, which is why it is second here.
+
+**your computer will warn you, and here is why.** letting a program pass
+without a warning costs money every year, on each platform, and that money has
+not been paid. so:
+
 - **windows** says it protected your pc. press more info, then run anyway.
+- **the mac dmg** says the developer cannot be verified. open system settings,
+  go to privacy and security, scroll down, press open anyway. the two lines
+  above do not hit this at all, and the difference is not a trick: a mac marks
+  what a browser downloads and refuses to open it unchecked, and does not mark
+  what you fetched yourself with a command you typed.
+
+if you want to check what you downloaded before you unpack it, run
+`shasum -a 256 ~/Downloads/keeper.tar.gz` and compare the answer against the
+`.sha256` file next to the download on the releases page.
 
 you should not take that on trust from a stranger. everything keeper is made
 of is in this repository, the downloads are built by
@@ -49,9 +75,13 @@ was built.
 3. **wait once.** keeper makes a small copy of each picture so the page can
    show hundreds at a time without crawling. a few thousand photographs takes
    a few minutes. it only ever happens once per folder.
-4. **the shelf appears.** every photograph in the folder, on one screen.
+4. **the shelf appears.** every photograph in the folder, on one screen, and
+   eight cards walk you round it. they say what the keys do, they run once,
+   and skipping them is fine.
 
-next time you open keeper it opens the same folder again.
+next time you open keeper it opens the same folder again. the question mark in
+the top corner holds every key and the settings, and the walkthrough is in
+there if you want it a second time.
 
 ## picking the good ones
 
@@ -152,6 +182,27 @@ your crops in there. delete that folder and your archive is exactly as it was.
 
 **nothing is generated.** no ai model runs here and no picture of yours is
 sent anywhere to be looked at by one.
+
+## what is coming
+
+keeper is a side project. this is what it is pointed at, not a schedule, and
+it is written down so you can tell whether the thing you need is on the list
+or not on it at all.
+
+- **film treated the way the photographs are.** keeper reads mov, mp4, mkv and
+  the rest today, and shows you a poster frame off each one. the bench crops
+  stills and nothing else. cutting a clip to a shape, and trimming it, at the
+  speed the shelf already runs at.
+- **more inside the crop.** the bench gives a slot one crop and stops there.
+- **a size for youtube**, thumbnail with it.
+- **an export that goes where it is going**, instead of landing in a folder
+  you then have to open somewhere else to post it.
+- **tagging without an assistant.** the contact sheets go to one you already
+  pay for today. a model small enough to run on your own machine doing the
+  same job would take away the last thing keeper asks you to bring. it ships
+  only if that can be done locally, for free, and well enough to trust.
+
+none of that is promised for a date. it gets built when it gets built.
 
 ## if something is wrong
 

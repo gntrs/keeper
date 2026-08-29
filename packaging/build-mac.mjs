@@ -128,6 +128,45 @@ async function main() {
   say("  signing ad hoc");
   await run("codesign", ["--force", "--deep", "--sign", "-", app]);
 
+  /* --- the same app, in a tarball -------------------------------------- */
+  /**
+   * THE ONE MAC INSTALL THAT NEVER MEETS GATEKEEPER, and it is here because
+   * of an apple account nobody has paid for.
+   *
+   * A disk image downloaded by a browser is quarantined: safari and chrome
+   * write `com.apple.quarantine` onto the file, macos carries it into
+   * whatever comes out of the image, and the first open of an app that
+   * carries it and is not notarised is refused. There is a way through, it
+   * is written out in the readme, and it is four steps deep in system
+   * settings and past a sentence that says the developer cannot be verified,
+   * which for most people is where trying keeper ends.
+   *
+   * `curl` writes no quarantine attribute. Nothing else about the app
+   * changes, the same ad hoc signature, the same bytes: it is only that a
+   * file fetched by a program the person ran themselves is treated as
+   * something they chose rather than something the web handed them. So the
+   * app also ships as a plain tarball with two lines in the readme to unpack
+   * it, and those two lines are the install that works today.
+   *
+   * THE NAME CARRIES NO VERSION, and that is deliberate. Those two lines are
+   * meant to be copied out of a release note or a message and to keep
+   * working next month, which they only do if the address resolves through
+   * `releases/latest/download` to whatever is newest. The version is inside,
+   * in package.json, and keeper prints it in the corner of its own window.
+   *
+   * COPYFILE_DISABLE, because bsdtar on a mac otherwise writes a second
+   * `._name` entry beside every file to carry extended attributes that this
+   * bundle does not have and does not need. It doubles the file count and
+   * puts a folder of dot files in front of anyone who unpacks it by hand.
+   */
+  const tgz = path.join(OUT, `keeper-macos-${arch}.tar.gz`);
+  await rm(tgz, { force: true });
+  await run("tar", ["-czf", tgz, "-C", stage, "keeper.app"], {
+    env: { ...process.env, COPYFILE_DISABLE: "1" },
+  });
+  const tsum = createHash("sha256").update(await readFile(tgz)).digest("hex");
+  await writeFile(`${tgz}.sha256`, `${tsum}  ${path.basename(tgz)}\n`);
+
   /* --- the disk image -------------------------------------------------- */
   /* The window has a picture behind it and its icons in known places, and
      none of that is arranged here. A layout is a .DS_Store, the only thing
@@ -173,6 +212,8 @@ async function main() {
   const size = (await readFile(dmg)).length;
   await rm(stage, { recursive: true, force: true });
 
+  say(`\n  ${path.relative(process.cwd(), tgz)}`);
+  say(`  sha256 ${tsum}`);
   say(`\n  ${path.relative(process.cwd(), dmg)}`);
   say(`  ${(size / 1e6).toFixed(1)} mb`);
   say(`  sha256 ${sum}\n`);

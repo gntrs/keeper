@@ -107,6 +107,71 @@ export async function updatePolicy() {
 export const setUpdatePolicy = (yes) => reseat({ updates: yes ? "on" : "off" });
 
 /**
+ * WHICH WALKTHROUGH HAS BEEN ANSWERED, NOT WHETHER ONE HAS.
+ *
+ * A number and not a bit, because keeper is going to gain things and the
+ * cards will have to say so. Somebody who sat through this set has answered
+ * this set, and a later keeper with something new to show is entitled to ask
+ * them once. A bit could not tell those two apart and would either ambush
+ * everybody on every release or never speak again.
+ *
+ * BUMP THIS WHEN THE CARDS CHANGE ENOUGH TO BE WORTH SOMEBODY'S MINUTE, and
+ * for nothing else. Not for a fix, not for a rewording, not because the
+ * version number moved: a patch release that reopened a tutorial on a person
+ * who had already answered it would be exactly the thing this is here to
+ * avoid. The cards themselves are in `web/tour.js` and its header says the
+ * same thing from that end.
+ *
+ * IT LIVES HERE AND NOT IN THE BROWSER. A page's storage is keyed to its
+ * origin, and keeper's origin carries a port: `keeper app` takes the first
+ * free one from 7777 upwards, so opening keeper on a day when something else
+ * holds 7777 hands the same person a different origin with an empty store,
+ * and a walkthrough they have already sat through comes back. What somebody
+ * has been shown is a fact about them and their machine, not about which
+ * port happened to be free.
+ */
+export const TOUR = 1;
+
+export async function toured() {
+  return Number((await seat()).toured ?? 0) >= TOUR;
+}
+
+/** answered, whichever way. declining is an answer and it is remembered. */
+export const setToured = (yes) => reseat({ toured: yes ? TOUR : 0 });
+
+/**
+ * WHAT THE SEAT SAID BEFORE THIS PROCESS WROTE A WORD TO IT.
+ *
+ * Read at import, on purpose, and that is the only moment it can be read.
+ * The question it answers is whether keeper has ever run on this machine
+ * before, and keeper answers that question by leaving a mark, so anything
+ * asked after the server has opened an archive is asking about a file this
+ * launch has already changed. A first run and a hundredth look identical
+ * five seconds in.
+ *
+ * It is one small json read on a path that usually does not exist, and every
+ * command pays it. That is the price of the answer being true.
+ */
+const ARRIVED = await seat();
+
+/**
+ * Has keeper been used on this machine before this launch.
+ *
+ * Any mark counts: an archive, an answer about updates, a version, an
+ * answered walkthrough. Somebody who has all four and somebody who has one
+ * are both people who know what keeper is, and the only person this is
+ * really sorting out is the one with none of them.
+ */
+export const returning = () =>
+  ARRIVED.root !== undefined || ARRIVED.updates !== undefined ||
+  ARRIVED.seen !== undefined || ARRIVED.toured !== undefined;
+
+/** the keeper that ran here last, or null on a machine that has had none */
+export const lastSeen = () => (typeof ARRIVED.seen === "string" ? ARRIVED.seen : null);
+
+export const rememberSeen = (v) => reseat({ seen: v });
+
+/**
  * The first port from `from` upwards that this machine will actually let go
  * of. A fixed port is right for a command someone typed and wrong for an
  * icon someone clicked twice: the second click used to die on EADDRINUSE,

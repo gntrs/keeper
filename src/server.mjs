@@ -17,7 +17,7 @@ import { HOSTS, host as machine } from "./os/index.mjs";
 import { readableSource } from "./raw.mjs";
 import { clock } from "./film.mjs";
 import { loadConfig } from "./config.mjs";
-import { rememberArchive, setUpdatePolicy, updatePolicy } from "./runtime.mjs";
+import { rememberArchive, rememberSeen, returning, setToured, setUpdatePolicy, toured, updatePolicy } from "./runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "..", "web");
@@ -170,7 +170,7 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
     const route = url.pathname;
 
     try {
-      if (["/api/open", "/api/locate", "/api/choose", "/api/export", "/api/quit", "/api/update/allow", "/api/update/apply"].includes(route) && !ownOrigin(req)) {
+      if (["/api/open", "/api/locate", "/api/choose", "/api/export", "/api/quit", "/api/tour", "/api/update/allow", "/api/update/apply"].includes(route) && !ownOrigin(req)) {
         return json(res, 403, { error: "that request came from another page" });
       }
 
@@ -263,6 +263,19 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
           // only quit there is; a terminal launch already has one and a
           // button that killed it would be a surprise, not a convenience.
           app: launched === "app",
+          // whether this machine has been through the walkthrough, and what
+          // it has said about keeper looking for a newer keeper. both are
+          // preferences rather than facts about the archive, and both are
+          // read from the seat rather than from the browser, because the
+          // page's origin carries a port that can change under it.
+          toured: await toured(),
+          updates: await updatePolicy(),
+          // whether keeper had already been used on this machine before this
+          // launch. it decides how the walkthrough introduces itself: a first
+          // run gets the cards, and somebody who already knows keeper gets
+          // asked first. see runtime.mjs, where the answer is snapshotted
+          // before anything in this process can write to the seat.
+          returning: returning(),
           /**
            * What this machine calls the things keeper hands back to it.
            *
@@ -357,6 +370,22 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
        * a keeper nobody has said yes to answers this without a single packet
        * leaving the machine. That ordering is the whole promise.
        */
+      /**
+       * The walkthrough has been through, or is being asked for again.
+       *
+       * It is a route rather than a line in the browser's own storage for
+       * the reason written over `toured` in runtime.mjs: the origin carries
+       * a port and the port can move. `done` is the whole body, and false is
+       * as meaningful as true, because the settings pane offers the
+       * walkthrough again and that has to survive a reload the same way
+       * finishing it does.
+       */
+      if (route === "/api/tour" && req.method === "POST") {
+        const b = await body(req).catch(() => ({}));
+        await setToured(!!b?.done);
+        return json(res, 200, { ok: true, toured: !!b?.done });
+      }
+
       if (route === "/api/update" && req.method === "GET") {
         const { asks, check, isClone, version } = await import("./update.mjs");
         const policy = await updatePolicy();
@@ -837,6 +866,13 @@ export function serve({ root, config: opened, port = 7777, host = "127.0.0.1", l
      terminal has already been granted whatever it has, so there is nothing to
      warm and no reason to put a dialog up. */
   if (launched === "app") warmRoots();
+
+  /* The version that ran here, written after runtime.mjs has already read
+     what was there before. Nothing in keeper reads it back yet: it is the
+     record a later release needs to say what changed since the one somebody
+     actually had, and it costs one line now rather than a version's worth of
+     silence later. */
+  import("./update.mjs").then(({ version }) => version().then(rememberSeen)).catch(() => {});
 
   return new Promise((resolve, reject) => {
     server.once("error", reject);

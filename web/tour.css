@@ -1,0 +1,80 @@
+/* ---------------------------------------------------------------------
+   the walkthrough, and the ring it points with.
+
+   Two elements, both fixed, both laid over an app that stays live
+   underneath: nothing here dims the page and nothing here blocks a click,
+   because every key the cards name has to be pressable the moment it is
+   named. That is also why the ring is its own box rather than a border put
+   on the thing it points at. Half of what it points at is a chip whose own
+   border already says whether it is on, and a walkthrough must not leave a
+   control looking switched on after it has gone.
+
+   It sits at 44 and 45: over the tray at 30 and the drag layer at 40, under
+   the shortcuts sheet at 60 and the folder drop at 80. Somebody who presses
+   ? or drags a folder in halfway through has changed the subject, and the
+   thing they just did should be the thing on top.
+   --------------------------------------------------------------------- */
+
+#tour-ring {
+  position: fixed; z-index: 44;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--hot), 0 0 0 6px #e1062c2e;
+  transition: left var(--mid) var(--ease), top var(--mid) var(--ease),
+              width var(--mid) var(--ease), height var(--mid) var(--ease);
+}
+#tour-ring[hidden] { display: none; }
+
+#tour {
+  position: fixed; z-index: 45;
+  width: min(38ch, calc(100vw - 32px));
+  padding: var(--s4);
+  background: var(--chrome-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  box-shadow: 0 14px 40px #000000a8;
+  /* the card moves between steps and the move is the thing that says a step
+     happened, so the position is animated and the arrival is not: a card
+     that faded in from nothing every time would read as eight cards rather
+     than as one card walking the room. */
+  transition: left var(--mid) var(--ease), top var(--mid) var(--ease),
+              opacity var(--fast) var(--ease);
+}
+
+.tour-n { margin: 0 0 var(--s2); color: var(--ink-3); }
+
+.tour-head {
+  margin: 0 0 var(--s2);
+  font: 500 1rem/1.25 var(--sans);
+  color: var(--ink);
+}
+
+.tour-say {
+  margin: 0 0 var(--s4);
+  font-size: .92rem; line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.tour-acts { display: flex; align-items: center; gap: var(--s2); }
+.tour-acts .grow { flex: 1; }
+.tour-acts .tour-back[hidden] { display: none; }
+/* the one thing on the card that is being asked for, so it is the one thing
+   wearing the accent. it is a fill under a white label, 4.93:1, and not red
+   type, which would not pass. */
+.tour-next {
+  background: var(--hot);
+  color: #ffffff;
+}
+.tour-next:hover { background: #f01536; color: #ffffff; }
+
+/* the entry, re-run on every step by tour.js taking the class off and
+   putting it back. it is two pixels and a fade, because the card has
+   usually also travelled across the screen to get here and the travel is
+   already the announcement. */
+#tour.in { animation: tour-in var(--fast) var(--ease); }
+#tour.going { opacity: 0; }
+
+@keyframes tour-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
