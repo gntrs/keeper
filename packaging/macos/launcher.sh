@@ -26,6 +26,23 @@ if [ -f "$log" ] && [ "$(wc -c <"$log")" -gt 262144 ]; then
   tail -c 65536 "$log" >"$log.tmp" && mv "$log.tmp" "$log"
 fi
 
+# WHERE THE THINGS KEEPER SHELLS OUT TO ACTUALLY LIVE.
+#
+# A double clicked app is started by launchd, not by a shell, so it gets
+# PATH=/usr/bin:/bin:/usr/sbin:/sbin and nothing else. Measured on this
+# machine with a probe bundle, and `launchctl getenv PATH` is empty, so
+# nothing anywhere fills it in. Homebrew installs into /opt/homebrew/bin on
+# apple silicon and /usr/local/bin on intel, and neither is on that list, so
+# a person who ran `brew install ffmpeg` because keeper asked them to got
+# every clip on the shelf with no poster behind it and no reason given. From
+# a terminal it worked, which is the worst version of a bug.
+#
+# Appended rather than prepended: the system's own tools win, and this only
+# adds places to look afterwards. sips, osascript and the finder all live in
+# /usr/bin and are found either way.
+PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin"
+export PATH
+
 echo "--- $(date) ---" >>"$log"
 "$res/node" "$res/app/bin/keeper.mjs" app >>"$log" 2>&1 &
 
