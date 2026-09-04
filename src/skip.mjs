@@ -32,6 +32,14 @@ export const SKIP_DIRS = new Set([
   ".git", "node_modules", ".keeper", ".keepers",
   ".trash", ".trashes", ".spotlight-v100", ".fseventsd", "__macosx", ".ds_store",
   "$recycle.bin", "system volume information", "$windows.~ws", "$windows.~bt",
+  /* time machine, which is the worst folder on the list to walk into. its
+     backup folder is a copy of the whole disk, so a scan that opens one
+     thumbnails every photograph a second time, and once for every dated
+     backup after that. the dotted names are already walked past by the rule
+     below, but they are written down here as well so a path that came back
+     from spotlight rather than from a walk is ruled out too. */
+  "backups.backupdb", ".backups.backupdb", ".timemachine", ".mobilebackups",
+  ".documentrevisions-v100", ".temporaryitems",
   /* network drives, which is where a lot of archives actually live. a
      synology puts a thumbnail cache called @eaDir beside every folder it has
      ever shown you, and its recycle bin is a folder with a hash in the name

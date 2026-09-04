@@ -101,9 +101,19 @@ export function applyToIndex(rows, sheetIndex, { cols = 6 } = {}) {
       continue;
     }
     for (const [i, cell] of cells.entries()) {
+      /* A star is only ever carried when the agent actually wrote one.
+       *
+       * This used to send `star: 0` for every cell the agent left alone, and
+       * the server merges a row from here straight over whatever is already
+       * in tags.json, so a sheet applied after somebody had starred frames in
+       * the page wiped those stars and said `tagged 4 frames` while it did it.
+       * Measured: 0 of 2 page stars survived. The agent is reading a contact
+       * sheet, so it can say "this one is a keeper" and it cannot say "this
+       * one is not": silence from a reader who was never asked the question is
+       * not a no, and it must not overwrite the answer of the person who was. */
       tags[cell.id] = {
         tag: row.codes[i],
-        star: row.stars.includes(cell.cell) ? 1 : 0,
+        ...(row.stars.includes(cell.cell) ? { star: 1 } : {}),
       };
       applied++;
     }

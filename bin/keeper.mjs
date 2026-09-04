@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, copyFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,13 +8,14 @@ import { buildIndex } from "../src/open.mjs";
 import { buildSheets, GRID_ADVICE, cellWidth } from "../src/sheets.mjs";
 import { parseCompact, applyToIndex, VOCAB } from "../src/tags.mjs";
 import { adopt, paths, readIndex, readTags, writeTags } from "../src/store.mjs";
+import { alive, claim, holder, release, serving } from "../src/lock.mjs";
 import { loadConfig, CONFIG_NAME } from "../src/config.mjs";
 import { exportCrops } from "../src/crops.mjs";
 import { serve } from "../src/server.mjs";
 import { readTrays, trayById, exportTray, MODES } from "../src/trays.mjs";
 import { startOpen } from "../src/open.mjs";
 import {
-  appDir, blankRoot, claimRun, forgetRunSync, freePort, hushed, lastArchive, rememberArchive, running,
+  appDir, blankRoot, claimRun, forgetRunSync, freePort, hushed, lastArchive, plain, rememberArchive, running,
 } from "../src/runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -45,9 +46,52 @@ function progress(label) {
 
 /** an absolute path beats a relative one the moment the relative one climbs */
 function nice(p) {
-  const rel = path.relative(process.cwd(), p);
+  const cwd = process.cwd();
+  /* An app opened from its icon runs with the working directory at the root
+     of the disk, and a relative path from there is the absolute one with its
+     leading slash filed off: it still looks like a path and it no longer is
+     one. This is the line a stuck tester copies back to you, so it has to be
+     pasteable. */
+  if (cwd === path.parse(cwd).root) return p;
+  const rel = path.relative(cwd, p);
   return !rel ? "." : rel.startsWith("..") ? p : rel;
 }
+
+/** a path with a space in it is two arguments unless it is quoted */
+const arg = (p) => (/[\s"'\\$`]/.test(p) ? JSON.stringify(p) : p);
+
+/**
+ * HOW TO RUN KEEPER AGAIN ON THIS MACHINE, WORD FOR WORD.
+ *
+ * Nothing installs keeper onto a PATH. The mac bundle runs its own copy of
+ * node against its own copy of this file, the windows folder runs a batch
+ * file beside it, and a clone runs whatever node the person already had. So
+ * every line that told somebody to run `keeper something` was telling them
+ * to run a command that does not exist anywhere, which is worse than saying
+ * nothing: they type it, the shell says command not found, and the tool that
+ * printed it looks broken.
+ *
+ * The runner is shortened to its bare name only when a PATH entry of that
+ * name is this same file, followed through its links: a version manager puts
+ * a shim on the PATH and runs the real binary from somewhere else, and the
+ * word that works in that shell is still `node`. When nothing on the PATH
+ * leads here, which is the mac bundle carrying its own runtime, the whole
+ * path is printed, because the whole path is what runs.
+ */
+const ME = (() => {
+  const base = path.basename(process.execPath);
+  let runner = process.execPath;
+  try {
+    const real = realpathSync(process.execPath);
+    for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+      if (!dir) continue;
+      try {
+        if (realpathSync(path.join(dir, base)) === real) { runner = base; break; }
+      } catch { /* not there, which is the ordinary answer for most of PATH */ }
+    }
+  } catch { /* an execPath that cannot be resolved is printed as it stands */ }
+  return `${arg(runner)} ${arg(nice(process.argv[1] ?? "bin/keeper.mjs"))}`;
+})();
 
 /**
  * Flags that are on or off and never carry a value. Without this list the
@@ -73,19 +117,29 @@ function parseArgs(argv) {
   return { flags, rest };
 }
 
+/**
+ * One row of the help, and the reason it is built rather than written out is
+ * that the command on the left is now as long as this machine makes it.
+ * Padding to a fixed column would put half of these lines' descriptions on
+ * top of their commands on a bundle whose runner lives eight folders deep.
+ */
+const COL = ME.length + 22;
+const use = (cmd, ...lines) =>
+  lines.map((l, i) => `  ${(i ? "" : `${ME} ${cmd}`).padEnd(COL)}${l}`).join("\n");
+
 const HELP = `
 ${hot("keeper")}  find the frames worth keeping, and crop them into the holes they fill
 
-  keeper <folder>                 scan, thumbnail, and open the shelf
-  keeper app [folder]             the way the icon opens it: remembers the
-                                  last archive, picks its own port, and
-                                  reuses a copy that is already running
-  keeper sheets <folder>          contact sheets for a coding agent to read
-  keeper tag <folder> <file>      apply the tags that agent wrote
-  keeper export <folder>          write the placed crops out
-  keeper trays <folder>           what is in the trays, and how much
-  keeper init [folder]            create ${CONFIG_NAME}
-  keeper doctor                   check this machine can run all of it
+${use("<folder>", "scan, thumbnail, and open the shelf")}
+${use("app [folder]", "the way the icon opens it: remembers the",
+  "last archive, picks its own port, and",
+  "reuses a copy that is already running")}
+${use("sheets <folder>", "contact sheets for a coding agent to read")}
+${use("tag <folder> <file>", "apply the tags that agent wrote")}
+${use("export <folder>", "write the placed crops out")}
+${use("trays <folder>", "what is in the trays, and how much")}
+${use("init [folder]", `create ${CONFIG_NAME}`)}
+${use("doctor", "check this machine can run all of it")}
 
 ${dim("options")}
   --port <n>        default 7777
@@ -238,6 +292,39 @@ async function openIn(url) {
   }
 }
 
+/**
+ * THE NINE CHECKS, PRINTED.
+ *
+ * Shared by the `doctor` command and by the app path when it cannot start,
+ * because those are two different people. The first typed a command and can
+ * read the answer. The second double clicked an icon on a mac, where the
+ * bundle is the only way in and everything it prints goes to a log file:
+ * windows ships a doctor.cmd beside keeper.cmd and the bundle ships nothing
+ * at all, so a tester whose app does nothing when clicked had one stack
+ * trace to send and no command to run. Now the log already holds the checks.
+ */
+async function report() {
+  const { doctor, OK, NO, MEH } = await import("../src/doctor.mjs");
+  const rows = await doctor();
+  const wide = Math.max(...rows.map((r) => r.what.length));
+  for (const r of rows) {
+    const mark = r.state === OK ? "  ok  " : r.state === NO ? hot("  no  ") : hot(" warn ");
+    say(`${mark}${r.what.padEnd(wide)}  ${r.said}`);
+  }
+  /* A warn is not a clear row. The summary counted only the broken ones, so
+     a machine with no ffmpeg and no search index was told all nine were
+     clear while two lines above it said otherwise, and the one number
+     somebody pastes back was the one number that was wrong. */
+  const broken = rows.filter((r) => r.state === NO).length;
+  const soft = rows.filter((r) => r.state === MEH).length;
+  say("");
+  say(broken
+    ? hot(`  ${broken} of ${rows.length} would stop something working. the lines above say which.`)
+    : soft
+      ? dim(`  ${rows.length - soft} of ${rows.length} clear, and ${soft} worth a look. nothing here stops keeper running.`)
+      : dim(`  all ${rows.length} clear. point keeper at a folder and it will run.`));
+}
+
 async function main() {
   const { flags, rest } = parseArgs(process.argv.slice(2));
   const known = ["app", "sheets", "tag", "export", "trays", "init", "doctor", "help"];
@@ -253,19 +340,8 @@ async function main() {
    * this, on a machine nobody else can see, and paste the answer back.
    */
   if (cmd === "doctor") {
-    const { doctor, OK, NO } = await import("../src/doctor.mjs");
     say("");
-    const rows = await doctor();
-    const wide = Math.max(...rows.map((r) => r.what.length));
-    for (const r of rows) {
-      const mark = r.state === OK ? "  ok  " : r.state === NO ? hot("  no  ") : hot(" warn ");
-      say(`${mark}${r.what.padEnd(wide)}  ${r.said}`);
-    }
-    const broken = rows.filter((r) => r.state === NO).length;
-    say("");
-    say(broken
-      ? hot(`  ${broken} of ${rows.length} would stop something working. the lines above say which.`)
-      : dim(`  all ${rows.length} clear. point keeper at a folder and it will run.`));
+    await report();
     say("");
     return;
   }
@@ -282,11 +358,12 @@ async function main() {
    * The order matters and is not the order the shelf uses. The shelf indexes
    * and then serves, which is right when a progress bar is being watched in
    * the terminal it is printing to. Here there is nowhere to print, so it
-   * serves first and opens the browser immediately, and the scan runs behind
-   * the page that is already up and reports itself through the same progress
-   * the drop panel polls. A person who double clicked an icon should see
-   * their own app inside a second, not a bouncing dock icon and then nothing
-   * for a minute while ten thousand thumbnails are made.
+   * serves, starts the scan, and only then opens the browser. A person who
+   * double clicked an icon should see their own app inside a second, and what
+   * they should see in it is the scan: opening the tab first was measured at
+   * 0.7s of an empty wall on a folder whose progress, had anything been
+   * polling it, said thumbnailing 229 of 2000. The scan is under way and
+   * /api/progress is answering before the tab exists.
    */
   if (cmd === "app") {
     const asked = rest[0] ? path.resolve(rest[0]) : null;
@@ -300,7 +377,7 @@ async function main() {
       if (asked) {
         await fetch(`${live.url}/api/open`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-keeper-token": live.token ?? "" },
           body: JSON.stringify({ path: asked }),
         }).catch(() => {});
       }
@@ -314,12 +391,49 @@ async function main() {
        worth an error message: it is the ordinary life of an external disk,
        and the right response is the empty page that asks for a folder. */
     const remembered = asked ?? (await lastArchive());
-    const here = remembered && existsSync(remembered) ? remembered : await blankRoot();
+    let here = remembered && existsSync(remembered) ? remembered : await blankRoot();
+
+    /* The same answer for a keeper started from a terminal, which the check
+       above cannot see because a command line run writes no app run file. It
+       does leave a claim beside the photographs, and that claim names the
+       port its window is on. */
+    const held = await holder(here);
+    if (held && alive(held.pid) && held.port && await serving(held)) {
+      const there = `http://127.0.0.1:${held.port}`;
+      if (!flags["no-open"]) await openIn(there);
+      say(`  ${hot(there)}`);
+      say(dim("  that archive is already open there, so this is that keeper and not a second one."));
+      return;
+    }
 
     const port = await freePort(Number(flags.port) || 7777);
-    const config = await loadConfig(here);
-    const { url } = await serve({ root: here, config, port, launched: "app" });
-    await claimRun(port);
+    let up;
+    try {
+      up = await serve({ root: here, config: await loadConfig(here), port, launched: "app" });
+    } catch (e) {
+      /* A busy archive is not a broken machine. Another keeper is holding
+         this folder without serving it, sheets for instance, so there is no
+         port to send anybody to and the claim's own sentence is the answer. */
+      if (e.code === "EBUSY") { say(`  ${hot(e.message)}`); process.exit(1); }
+      /* Everything else opens the empty page, and this is the whole point of
+         the icon path.
+       *
+         Nobody typed anything to get here and there is no terminal to read,
+         so exiting is a dock icon that bounces, spins, and quits with nothing
+         on screen, for ever, because the remembered folder is still the
+         remembered folder on the next click too. That is the shape of a
+         program that is broken beyond a tester's reach, and the cause can be
+         as ordinary as a folder that has gone read only or a drive that is
+         not plugged in. The log still gets the sentence and the nine checks
+         for anybody who goes looking, and the person gets a window they can
+         drop another folder onto. */
+      say(`\n  ${hot("!")} ${plain(e.message)}\n`);
+      if (e.code !== "EUNREADABLE") { await report(); say(""); }
+      here = await blankRoot();
+      up = await serve({ root: here, config: await loadConfig(here), port, launched: "app" });
+    }
+    const { url, token } = up;
+    await claimRun(port, token);
     if (here !== (await blankRoot())) await rememberArchive(here);
 
     /* The run file describes a process, so it dies with the process, by
@@ -329,18 +443,19 @@ async function main() {
     process.on("exit", forgetRunSync);
     for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));
 
+    /* An archive with an index already opens instantly and is left alone. One
+       without gets scanned now, before the tab, because the alternative is a
+       shelf that sits empty until somebody works out that they were supposed
+       to drop the folder they had already chosen. startOpen sets the phase
+       before it returns, so the page's first poll is answered. */
+    if (!(await readIndex(here))) startOpen(here);
+
     /* An update restarts keeper with a tab already open and watching, and
        that tab reloads itself. Opening a second one would leave two pages
        against one server, one of them stale. */
     if (!flags["no-open"] && !(await hushed())) await openIn(url);
     say(`  ${hot(url)}`);
     say(dim(`  state in ${nice(appDir())}`));
-
-    /* An archive with an index already opens instantly and is left alone. One
-       without gets scanned now, behind the page, because the alternative is a
-       shelf that sits empty until somebody works out that they were supposed
-       to drop the folder they had already chosen. */
-    if (!(await readIndex(here))) startOpen(here);
     return;
   }
 
@@ -356,7 +471,7 @@ async function main() {
     if (existsSync(dst)) { say(hot(`  ${CONFIG_NAME} already exists, leaving it alone`)); return; }
     await copyFile(path.join(HERE, "..", "keeper.config.example.json"), dst);
     say(`  wrote ${hot(CONFIG_NAME)}`);
-    say(dim("  edit the slots, then run `keeper <your archive folder>`"));
+    say(dim(`  edit the slots, then run \`${ME} <your archive folder>\``));
     return;
   }
 
@@ -366,22 +481,41 @@ async function main() {
   say(`  ${hot("keeper")} ${dim(root)}`);
 
   if (cmd === "sheets") {
-    const index = await indexWithBar(root, { rescan: !!flags.rescan });
-    if (!index.items.length) return;
-    const cols = Number(flags.cols) || 6;
-    const rows = Number(flags.rows) || 4;
-    const P = paths(root);
-    const bar = progress("sheets");
-    const out = await buildSheets(root, index.items, P.sheets, {
-      thumbsDir: P.thumbs,
-      cols, rows,
-      onProgress: (n, total) => bar.tick(`${n}/${total}`),
-    });
-    bar.done(`${out.sheets} sheets, ${out.perSheet} frames each, ${out.cellWidth}px a frame`);
-    say("");
-    say(`  ${dim("they are in")} ${nice(P.sheets)}`);
-    say(`  ${dim("hand them to a coding agent with AGENTS.md, then:")}`);
-    say(`     keeper tag ${nice(root)} tags.txt`);
+    /* The claim before the scan. Sheets writes thumbnails and its own index
+       into .keeper, and a second keeper writing that folder from another
+       process is the thing this whole file now refuses to do. */
+    try {
+      await claim(root);
+    } catch (e) {
+      /* plain() for the same reason main().catch uses it: EBUSY carries a
+         sentence written for a person and comes through untouched, while an
+         EACCES on a folder nobody can write is an errno and has to be turned
+         into one. This used to print e.message straight out, so the one
+         command a stuck tester runs answered with `EACCES: permission denied,
+         mkdir` while `keeper app` on the same folder answered in English. */
+      say(hot(`  ${plain(e.message)}`));
+      process.exit(1);
+    }
+    try {
+      const index = await indexWithBar(root, { rescan: !!flags.rescan });
+      if (!index.items.length) return;
+      const cols = Number(flags.cols) || 6;
+      const rows = Number(flags.rows) || 4;
+      const P = paths(root);
+      const bar = progress("sheets");
+      const out = await buildSheets(root, index.items, P.sheets, {
+        thumbsDir: P.thumbs,
+        cols, rows,
+        onProgress: (n, total) => bar.tick(`${n}/${total}`),
+      });
+      bar.done(`${out.sheets} sheets, ${out.perSheet} frames each, ${out.cellWidth}px a frame`);
+      say("");
+      say(`  ${dim("they are in")} ${nice(P.sheets)}`);
+      say(`  ${dim("hand them to a coding agent with AGENTS.md, then:")}`);
+      say(`     ${ME} tag ${arg(nice(root))} tags.txt`);
+    } finally {
+      await release(root);
+    }
     return;
   }
 
@@ -397,14 +531,53 @@ async function main() {
       : parseCompact(text);
 
     const { tags: fresh, problems, applied } = applyToIndex(parsed.rows, sheetIndex);
-    const all = { ...(await readTags(root)) };
-    for (const [id, v] of Object.entries(fresh)) all[id] = { ...all[id], ...v };
-    await writeTags(root, all);
+    const rows = Object.entries(fresh).map(([id, v]) => ({ id, ...v }));
+
+    /* THIS USED TO BE A READ, A MERGE AND A WRITE FROM A SECOND PROCESS.
+       The readme hands this exact command to an agent while the page is open
+       in front of somebody, and both of them were writing the whole tags file
+       from a copy they had read a minute apart. Measured against starring in
+       the browser: eighty rows became three, no tag letters survived, and
+       both sides said they had succeeded. So when a keeper is already serving
+       this archive the tags go through it, into the one queue that orders
+       every write to this folder, and only a folder nobody is holding gets
+       written here. */
+    const held = await holder(root);
+    if (held && alive(held.pid) && held.port) {
+      const res = await fetch(`http://127.0.0.1:${held.port}/api/tag`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-keeper-token": held.token ?? "" },
+        body: JSON.stringify({ rows }),
+      }).catch(() => null);
+      if (!res?.ok) {
+        const why = res ? await res.json().then((d) => `: ${d.error}`).catch(() => "") : "";
+        say(hot(`  the keeper on port ${held.port} did not take the tags${why}`));
+        process.exit(1);
+      }
+      say(dim("  through the keeper already open on this archive"));
+    } else {
+      /* No port on a live claim means a keeper is working in here without
+         serving, sheets for instance, and there is nowhere to send the rows.
+         The lock's own sentence is the one to print. */
+      try {
+        await claim(root);
+      } catch (e) { say(hot(`  ${e.message}`)); process.exit(1); }
+      try {
+        const all = { ...(await readTags(root)) };
+        for (const { id, ...v } of rows) all[id] = { ...all[id], ...v };
+        await writeTags(root, all);
+      } finally {
+        await release(root);
+      }
+    }
 
     say(`  tagged ${hot(applied)} frames`);
     for (const p of [...parsed.problems, ...problems]) say(hot(`  ! ${p}`));
     const index = await readIndex(root);
-    summarise(index?.items ?? [], all);
+    /* read back rather than reported from memory: the summary is a claim
+       about what is on the disk, and on the server path this process never
+       held the file it is describing. */
+    summarise(index?.items ?? [], await readTags(root));
     return;
   }
 
@@ -429,11 +602,11 @@ async function main() {
     say("");
     say(`  wrote ${hot(n)} ${n === 1 ? "crop" : "crops"} to ${dim(nice(out.dir))}`);
     if (out.empty) {
-      say(dim(`  ${out.empty} of your ${out.mine} slots are still empty. run \`keeper <folder>\` and fill them.`));
+      say(dim(`  ${out.empty} of your ${out.mine} slots are still empty. run \`${ME} <folder>\` and fill them.`));
     }
     if (!n && config.missing) {
       say(dim(`  there is no ${CONFIG_NAME} in this folder, so keeper only knows`));
-      say(dim(`  the standard shapes. \`keeper init\` adds your own.`));
+      say(dim(`  the standard shapes. \`${ME} init\` adds your own.`));
     }
     return;
   }
@@ -499,20 +672,40 @@ async function main() {
       say(`  ${t.name.padEnd(20)} ${n.padEnd(12)} ${dim(t.id)}${mark}`);
     }
     say("");
-    say(dim(`  keeper trays ${nice(root)} --export <tray> --to <folder>`));
+    say(dim(`  ${ME} trays ${arg(nice(root))} --export <tray> --to <folder>`));
     say(dim(`  add --mode symlink to point at the originals instead of copying them`));
     return;
   }
 
   // default: shelf
   const config = await loadConfig(process.cwd());
-  const index = await indexWithBar(root, { rescan: !!flags.rescan });
-  // An empty archive still opens. It used to stop here with one line in the
-  // terminal, which is the least useful moment to say nothing: someone who
-  // pointed keeper at the wrong folder learns more from a page that says
-  // what it reads than from a sentence that says it found nothing. The shelf
-  // has a state for this.
-  summarise(index.items, await readTags(root));
+  /* The claim before the scan, and the same claim the app path reads: one
+     keeper per archive, whichever way it was started. serve() rewrites it
+     with the port a moment later and takes over letting it go. */
+  try {
+    await claim(root);
+  } catch (e) { say(hot(`  ${plain(e.message)}`)); process.exit(1); }
+
+  /* Everything between the claim and serve() can still refuse the archive, a
+     tags.json that will not parse being the likely one, and the claim is
+     already taken by then. Exiting through main().catch without putting it
+     down leaves a file naming a pid that is already dead. The next run sweeps
+     that, until the day the number belongs to something else and the archive
+     locks itself out for good.
+
+     An empty archive still opens. It used to stop here with one line in the
+     terminal, which is the least useful moment to say nothing: someone who
+     pointed keeper at the wrong folder learns more from a page that says what
+     it reads than from a sentence that says it found nothing. The shelf has a
+     state for this. */
+  let index;
+  try {
+    index = await indexWithBar(root, { rescan: !!flags.rescan });
+    summarise(index.items, await readTags(root));
+  } catch (e) {
+    await release(root);
+    throw e;
+  }
 
   const { url } = await serve({ root, config, port: Number(flags.port) || 7777 });
   say("");
@@ -534,4 +727,6 @@ async function main() {
   if (!flags["no-open"]) await openIn(url);
 }
 
-main().catch((e) => { console.error(`\n  ${hot("!")} ${e.message}\n`); process.exit(1); });
+/* plain() and not the raw message: an errno is a fact about a system call,
+   and the person reading this wants the sentence about their drive. */
+main().catch((e) => { console.error(`\n  ${hot("!")} ${plain(e.message)}\n`); process.exit(1); });

@@ -1,4 +1,4 @@
-import { readdir, stat } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { sealed, walkPast } from "./skip.mjs";
@@ -169,8 +169,23 @@ export async function scan(root, { onProgress } = {}) {
     ignored.set(ext, at);
   };
 
+  /* WHERE THE WALK HAS ALREADY BEEN, BY THE PATH THE DISK CALLS IT.
+     A symlinked folder used to be neither walked nor mentioned: readdir
+     reports it as a link and not a directory, so the branch below took it for
+     a file, `kindOf` said it was nothing, and it went into no report at all.
+     Somebody who keeps last year's shoots as a link to another drive got a
+     scan that quietly found none of them.
+     Following one means a link back to a parent is a loop, and a loop is a
+     scan that never ends, so every folder entered records its real path and a
+     link resolving to somewhere already entered, or to the root or an
+     ancestor of it, is stepped over. */
+  const home = await realpath(root).catch(() => path.resolve(root));
+  const seenReal = new Set();
+
   /** returns how many readable frames sit at or under this folder */
   async function walk(dir) {
+    const here = await realpath(dir).catch(() => null);
+    if (here) seenReal.add(here);
     let entries;
     try {
       entries = await readdir(dir, { withFileTypes: true });
@@ -186,7 +201,18 @@ export async function scan(root, { onProgress } = {}) {
     for (const e of entries) {
       if (e.name.startsWith("._")) continue; // apple resource fork sidecars
       const full = path.join(dir, e.name);
-      if (e.isDirectory()) {
+      /* What this entry really is, once a link has been followed. The link's
+         own path is what gets used everywhere after this, because a frame's
+         id is a hash of its path inside the archive and reading through the
+         link keeps that id the same whatever the link points at today. */
+      let kind = e;
+      if (e.isSymbolicLink()) {
+        const real = await realpath(full).catch(() => null);
+        if (!real || seenReal.has(real) || home.startsWith(real + path.sep) || real === home) continue;
+        kind = await stat(full).catch(() => null);
+        if (!kind) continue; // a link to nothing, which is the ordinary broken alias
+      }
+      if (kind.isDirectory()) {
         if (walkPast(e.name)) {
           /* a library walked past is worth saying out loud. it is the one
              skip that hides photographs rather than clutter, and somebody
@@ -196,7 +222,7 @@ export async function scan(root, { onProgress } = {}) {
           continue;
         }
         found += await walk(full);
-      } else if (e.isFile()) {
+      } else if (kind.isFile()) {
         const base = e.name.toLowerCase();
         const ext = path.extname(base);
         const kind = kindOf(ext);

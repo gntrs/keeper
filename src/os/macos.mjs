@@ -1,4 +1,7 @@
 import { execFile } from "node:child_process";
+import { constants } from "node:fs";
+import { access } from "node:fs/promises";
+import path from "node:path";
 
 /**
  * What macOS calls the four things in os/index.mjs, in its own words.
@@ -34,9 +37,22 @@ export async function chooseFolder(startIn = "") {
     /* opening the dialog inside the folder the archive already sits in, when
        there is one. a picker that lands wherever it last was makes the person
        who just dropped a folder on the window go and find it by hand. */
-    const script = startIn
-      ? `POSIX path of (choose folder default location POSIX file ${JSON.stringify(startIn)})`
-      : "POSIX path of (choose folder)";
+    /* Through System Events, and activated, because keeper has no application
+       of its own to bring forward.
+     *
+       The server is a headless background process, so a bare `choose folder`
+       puts a dialog up that never becomes frontmost: measured with
+       `lsappinfo front` while it was open, the frontmost application did not
+       change. Meanwhile the panel in the page says "the dialog is open in
+       front of this window, keeper is waiting for it", which is then simply
+       untrue, and this is the only way into an archive spotlight has not
+       indexed, which is most external drives and every fresh card copy.
+       System Events is a real application that can be activated, and the
+       dialog comes forward with it. */
+    const pick = startIn
+      ? `choose folder default location POSIX file ${JSON.stringify(startIn)}`
+      : "choose folder";
+    const script = `tell application "System Events"\nactivate\nPOSIX path of (${pick})\nend tell`;
     const out = await run("osascript", ["-e", script]);
     // a POSIX path of a folder comes back with a trailing slash. it goes
     // straight into path.join afterwards, which reads cleaner without it.
@@ -72,6 +88,15 @@ export function openDir(dir) {
  *
  * The paths go to osascript as an argv list rather than inside a built
  * string, so nothing in a filename can end the quoting and start a command.
+ *
+ * Gone from where it was is the only claim worth making, so it is the one
+ * that gets tested. The finder is not reliably loud either: an apple event
+ * can come back clean with the file still sitting on the drive, and osascript
+ * exiting 0 is not the same sentence as the photograph being in the trash.
+ * The caller reads a clean return as licence to drop those frames from the
+ * index, which is the one mistake this module must not let it make. The check
+ * lives on both platforms now because the fix for the windows disaster had
+ * been applied on one of them only.
  */
 export async function trash(paths) {
   const script = `on run argv
@@ -82,6 +107,18 @@ export async function trash(paths) {
   tell application "Finder" to delete l
 end run`;
   await run("osascript", ["-e", script, ...paths]);
+
+  const left = [];
+  for (const p of paths) {
+    try {
+      await access(p, constants.F_OK);
+      left.push(path.basename(p));
+    } catch { /* not there any more, which is the whole point */ }
+  }
+  if (!left.length) return;
+
+  const names = left.slice(0, 3).join(", ") + (left.length > 3 ? ", and more" : "");
+  throw new Error(`${left.length} of ${paths.length} did not reach ${bin} and are still on the drive: ${names}`);
 }
 
 /**

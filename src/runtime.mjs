@@ -32,6 +32,11 @@ import path from "node:path";
  * anything asks the platform to move a file to a wastebasket.
  */
 export function appDir() {
+  /* KEEPER_HOME first, before any platform branch. A second keeper on one
+     machine, and every test that spawns one, needs a seat of its own: without
+     this a test run reads the archive somebody had open and writes over the
+     answer they gave the walkthrough. */
+  if (process.env.KEEPER_HOME) return process.env.KEEPER_HOME;
   const home = os.homedir();
   if (process.platform === "darwin") return path.join(home, "Library", "Application Support", "keeper");
   if (process.platform === "win32") {
@@ -60,10 +65,11 @@ export async function blankRoot() {
 }
 
 /**
- * The seat: everything keeper remembers about you between launches, which is
- * two things. It is read and written whole rather than field by field,
- * because it is two fields and a file this small has no use for a format
- * that can be half updated.
+ * The seat: everything keeper remembers about you between launches. It is
+ * read and written whole rather than field by field, because it is a handful
+ * of small fields and a file this size has no use for a format that can be
+ * half updated. Each field has one writer, and they are listed beside the
+ * function that writes them.
  */
 async function seat() {
   try {
@@ -136,8 +142,15 @@ export async function toured() {
   return Number((await seat()).toured ?? 0) >= TOUR;
 }
 
-/** answered, whichever way. declining is an answer and it is remembered. */
-export const setToured = (yes) => reseat({ toured: yes ? TOUR : 0 });
+/**
+ * Answered, whichever way. Declining is an answer and it is remembered.
+ *
+ * The version goes down in the same write, because `seen` is the version the
+ * walkthrough was answered on and nothing else. It used to be written at
+ * boot, which made every second launch of a new install look like a machine
+ * that had already been through this.
+ */
+export const setToured = (yes, at) => reseat({ toured: yes ? TOUR : 0, seen: at });
 
 /**
  * WHAT THE SEAT SAID BEFORE THIS PROCESS WROTE A WORD TO IT.
@@ -155,21 +168,54 @@ export const setToured = (yes) => reseat({ toured: yes ? TOUR : 0 });
 const ARRIVED = await seat();
 
 /**
- * Has keeper been used on this machine before this launch.
+ * Has this machine answered the walkthrough.
  *
- * Any mark counts: an archive, an answer about updates, a version, an
- * answered walkthrough. Somebody who has all four and somebody who has one
- * are both people who know what keeper is, and the only person this is
- * really sorting out is the one with none of them.
+ * The walkthrough's own answer and nothing else. It used to count any mark in
+ * the seat, and the version keeper writes at boot is a mark, so the second
+ * launch of a fresh install was a returning user: it got the card that says
+ * what is new instead of the walkthrough it had never been offered. A machine
+ * that has never answered is a first run, whatever else it has done.
  */
-export const returning = () =>
-  ARRIVED.root !== undefined || ARRIVED.updates !== undefined ||
-  ARRIVED.seen !== undefined || ARRIVED.toured !== undefined;
+export const returning = () => ARRIVED.toured !== undefined;
 
-/** the keeper that ran here last, or null on a machine that has had none */
+/** the version the walkthrough was answered on, or null if it never was */
 export const lastSeen = () => (typeof ARRIVED.seen === "string" ? ARRIVED.seen : null);
 
-export const rememberSeen = (v) => reseat({ seen: v });
+/* The version that last ran here, which is a different fact from `seen` and
+   has to stay a different field. Keeping them apart is the whole of what
+   lets a first run stay a first run. */
+export const rememberRan = (v) => reseat({ ran: v });
+
+/**
+ * WHAT WENT WRONG, SAID TO THE PERSON RATHER THAN TO THE PROGRAMMER.
+ *
+ * An errno is a fact about a system call and it is the wrong half of the
+ * answer: `EACCES: permission denied, mkdir /somewhere/.keeper` tells
+ * somebody nothing they can act on, and it is the line that reaches them
+ * through the terminal and through the drop panel both. The three that
+ * matter are a folder that cannot be written, a disk with nothing left on
+ * it, and a drive that is not plugged in, and each of those has one sentence
+ * that says what to do next.
+ *
+ * Anything that is already a sentence comes back untouched, so a message
+ * written for a person is never rewritten by this.
+ */
+const SENTENCES = {
+  EACCES: "keeper cannot write into that folder. it keeps its index in a .keeper folder beside the photographs, so the folder has to be writable. a read only drive or a locked folder looks like this.",
+  ENOSPC: "the disk is full, so keeper cannot write its index. free some space and open the folder again.",
+  ENOENT: "that folder is not there any more. an unplugged drive looks like this.",
+};
+SENTENCES.EPERM = SENTENCES.EACCES;
+SENTENCES.EROFS = SENTENCES.EACCES;
+
+export function plain(message) {
+  const said = String(message ?? "");
+  /* node puts the code at the front of the message and follows it with a
+     colon, so that is the only place worth looking. A code named halfway
+     through a sentence is somebody quoting one, not the system raising one. */
+  const code = said.match(/^([A-Z]+)(?::|$)/)?.[1];
+  return (code && SENTENCES[code]) || said;
+}
 
 /**
  * The first port from `from` upwards that this machine will actually let go
@@ -222,16 +268,25 @@ export async function running() {
     const res = await fetch(`http://127.0.0.1:${port}/api/ping`, { signal: AbortSignal.timeout(1200) });
     const body = await res.json();
     if (body?.keeper !== true) throw new Error("not keeper");
-    return { port, pid: body.pid, root: body.root, url: `http://127.0.0.1:${port}` };
+    /* the token comes off the file and never off the ping. /api/ping is a
+       GET, which is exactly the request the server does not check, so a ping
+       that handed the token back would be handing it to anything on this
+       machine that can spell the port. */
+    return { port, pid: body.pid, root: body.root, url: `http://127.0.0.1:${port}`, token: said?.token ?? null };
   } catch {
     await forgetRun();
     return null;
   }
 }
 
-export async function claimRun(port) {
+/**
+ * Where the running keeper is, and what a second copy of the cli has to say
+ * to be allowed to write to it. The token is the one the server minted this
+ * boot, so it lives and dies with the file that describes that boot.
+ */
+export async function claimRun(port, token = null) {
   await mkdir(appDir(), { recursive: true });
-  await writeFile(RUN(), JSON.stringify({ port, pid: process.pid }, null, 2));
+  await writeFile(RUN(), JSON.stringify({ port, pid: process.pid, token }, null, 2));
 }
 
 export async function forgetRun() {
