@@ -58,10 +58,19 @@ export async function chooseFolder(startIn = "") {
     // straight into path.join afterwards, which reads cleaner without it.
     return { path: out.trim().replace(/\/+$/, "") || "/" };
   } catch (e) {
-    // cancel is exit 1 with "User canceled" on stderr, and it is the ordinary
-    // outcome of putting a dialog up rather than an error to report to
-    // somebody who just changed their mind.
-    if (/User canceled/i.test(e.message)) return { cancelled: true };
+    /* Cancel is exit 1 with a -128 on stderr, and it is the ordinary outcome
+       of putting a dialog up rather than an error to report to somebody who
+       just changed their mind.
+     *
+       Both spellings, and the code. A bare `choose folder` says "User
+       canceled" with one l; through System Events, which is how this dialog
+       is raised now so that it comes to the front, the same cancel comes back
+       as "system events got an error: user cancelled. (-128)". The one l test
+       stopped matching the moment that changed, and pressing cancel started
+       printing an applescript error at somebody who had simply changed their
+       mind. -128 is the number for it and is there whichever wording the
+       machine chooses. */
+    if (/-128|user cancell?ed/i.test(e.message)) return { cancelled: true };
     return { error: e.message.toLowerCase() };
   }
 }
