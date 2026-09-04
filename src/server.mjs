@@ -823,12 +823,24 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         const out = await amend(here, async () => {
           const gone = [];
           const left = [];
+          /* ONLY A FILE THAT IS NOT THERE COUNTS AS GONE.
+             This catch used to take every errno as proof the delete worked,
+             which is the opposite of what the check is for. A folder whose
+             permissions changed under it, a volume that dropped, a read macos
+             refused: all of them answered "trashed", the frame left the index
+             and the bin, and the photograph stayed on the drive where keeper
+             could no longer see it. Measured with a chmod 000 folder: ok true,
+             trashed 1, file still there, and the bin decision destroyed.
+             ENOENT is the only errno that means what this needs it to mean.
+             Anything else is a file keeper could not ask about, which is not
+             the same as a file that has gone, and it stays. */
           for (let i = 0; i < hits.length; i++) {
             try {
               await access(abs[i]);
               left.push(hits[i].id);
-            } catch {
-              gone.push(hits[i].id);
+            } catch (e) {
+              if (e.code === "ENOENT") gone.push(hits[i].id);
+              else left.push(hits[i].id);
             }
           }
           const drop = new Set(gone);
