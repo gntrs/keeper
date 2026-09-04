@@ -35,5 +35,25 @@
   <string>an archive usually lives on an external drive. keeper reads the frames on it and writes its index beside them.</string>
   <key>NSPhotoLibraryUsageDescription</key>
   <string>only if you point keeper at your photos library folder yourself. it reads the files, it does not talk to the photos app.</string>
+
+  <!--
+    The one that was missing, and the sentence matters more here than in any
+    of the five above it.
+
+    Three things in keeper are the finder doing them rather than keeper: the
+    folder chooser, moving a frame to the wastebasket with its put back
+    record, and writing an alias into a tray export. All three are apple
+    events, and a mac asks before letting one app drive another. Without a
+    key here the prompt is the bare "keeper wants to control finder", which
+    is the single most alarming sentence the system knows how to write and
+    the only thing the person has to go on.
+
+    Measured on this machine before it was added: the events were allowed and
+    the delete worked, so this was never the blocker it looked like from the
+    outside. What it fixes is the sentence a stranger reads on the first mac
+    that has not already answered it.
+  -->
+  <key>NSAppleEventsUsageDescription</key>
+  <string>keeper asks the finder to do three things: show you a folder chooser, move a frame you deleted to the wastebasket so you can put it back, and write aliases when a tray is exported that way. it never asks the finder for anything else.</string>
 </dict>
 </plist>
