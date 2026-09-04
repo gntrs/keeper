@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -30,8 +30,36 @@ async function archive() {
 
 /* node -e cannot hold a top level await without being told it is a module,
    and every child below imports the very files under test. */
-const child = (code, io = "ignore") =>
-  spawn(process.execPath, ["--input-type=module", "-e", code], { stdio: io });
+const child = (code, io = "ignore", ...argv) =>
+  spawn(process.execPath, ["--input-type=module", "-e", code, ...argv], { stdio: io });
+
+/* A real keeper server in a process of its own, on a port the operating
+   system picks, torn down even when the test that started it fails. Without
+   the t.after the parent holds an open pipe to a live child and the whole run
+   hangs after the last assertion instead of exiting. */
+async function server(t, root) {
+  const kid = child(
+    `
+    process.env.KEEPER_HOME = ${JSON.stringify(process.env.KEEPER_HOME)};
+    const { serve } = await import(${JSON.stringify(new URL("../src/server.mjs", import.meta.url).href)});
+    const { loadConfig } = await import(${JSON.stringify(new URL("../src/config.mjs", import.meta.url).href)});
+    const root = process.argv[1];
+    const up = await serve({ root, config: await loadConfig(root), port: 0 });
+    console.log("up " + new URL(up.url).port);
+    setInterval(() => {}, 1e9);
+  `,
+    ["ignore", "pipe", "inherit"],
+    root,
+  );
+  const exited = once(kid, "exit");
+  t.after(async () => { kid.kill("SIGKILL"); await exited; });
+
+  for await (const chunk of kid.stdout) {
+    const said = /up (\d+)/.exec(String(chunk));
+    if (said) return { kid, port: Number(said[1]) };
+  }
+  throw new Error("the child server never said which port it took");
+}
 
 /* a fingerprint of the folder, so the parent can see the instant the child
    starts putting bytes down without caring which name it puts them under */
@@ -176,4 +204,57 @@ test("release never removes another pid's claim", async () => {
   lock.releaseSync(root);
   assert.equal(existsSync(file), true);
   assert.equal(JSON.parse(await readFile(file, "utf8")).pid, 1);
+});
+
+/* A CLAIM TRAVELS WITH THE FOLDER, AND A COPIED FOLDER IS NOT THE FOLDER.
+   Duplicating a shoot in the finder copies .keeper/run.json along with the
+   photographs, so the copy arrives holding the original's pid, port and
+   token. The pid is alive and the port answers, and until this was fixed
+   keeper refused to open the copy and pointed at a window showing a
+   completely different folder. */
+test("a claim copied in from another archive does not hold this one", async (t) => {
+  const mine = await archive();
+  const theirs = await archive();
+  await mkdir(path.join(mine, ".keeper"), { recursive: true });
+  await mkdir(path.join(theirs, ".keeper"), { recursive: true });
+
+  /* A real server on a real port, answering for `theirs` and nothing else.
+     Nothing less would do: the whole question is what the port says it is
+     serving, so a stub that answered would be a test of the stub. */
+  const { kid, port } = await server(t, theirs);
+  const held = { pid: kid.pid, port, token: "t", at: new Date().toISOString() };
+  await writeFile(path.join(theirs, ".keeper", "run.json"), JSON.stringify(held));
+  // the copy, carrying the original's claim, exactly as cp -R would leave it
+  await writeFile(path.join(mine, ".keeper", "run.json"), JSON.stringify(held));
+
+  assert.equal(await lock.serving(held, theirs), true, "it really is serving its own archive");
+  assert.equal(await lock.serving(held, mine), false, "and it is not serving the copy");
+
+  // so the copy opens, and the original stays refused
+  await lock.claim(mine);
+  assert.equal((await lock.holder(mine)).pid, process.pid);
+  await assert.rejects(() => lock.claim(theirs), (e) => e.code === "EBUSY");
+});
+
+/* THE DANGEROUS DIRECTION, and the reason the comparison errs toward yes.
+   A wrong no deletes a live keeper's claim and puts two processes on one
+   tags.json, which is the silent disaster the lock exists to prevent. The
+   browser claims the resolved path and a command line claims whatever was
+   typed, so one folder arrives under two names all the time. */
+test("the same folder under two names is still the same folder", async (t) => {
+  const root = await archive();
+  const alias = `${root}-alias`;
+  await symlink(root, alias);
+  made.push(alias);
+
+  const { kid, port } = await server(t, root);
+  const held = { pid: kid.pid, port, token: "t" };
+
+  assert.equal(await lock.serving(held, alias), true, "a symlink to the folder is the folder");
+  assert.equal(await lock.serving(held, root), true);
+});
+
+test("nothing to compare on is treated as still holding it", async () => {
+  // no port to ask, so there is no answer, and the claim stands
+  assert.equal(await lock.serving({ pid: process.pid, port: null }, "/no/such/folder"), true);
 });
