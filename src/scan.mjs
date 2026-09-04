@@ -35,17 +35,32 @@ export const RAW_EXT = new Set([
  * things: gif, heif, jpeg, png, svg, tiff, webp and vips. Anything outside
  * that and inside what `sips --formats` says Image I/O reads is a still
  * keeper can show and sharp cannot open, so it gets the same jpeg proxy a
- * raw does. bmp and jxl are here for that reason alone. heif covers heic and
- * avif both, which is why neither of those needs one.
+ * raw does. bmp and jxl are here for that reason alone.
  *
  * Checked with sips and with sharp rather than remembered: sharp swallows a
  * bmp with "input file contains unsupported image format", which is one
  * unreadable frame per file and no clue in it about why.
+ *
+ * HEIC IS HERE BECAUSE THE HEIF SUPPORT SHARP ADVERTISES IS NOT HEIC.
+ * `sharp.format.heif.input.fileSuffix` on the build this ships is exactly
+ * [".avif"]: the bundled libheif carries no hevc decoder, so it reads a
+ * heic's metadata and then fails on the first pixel with "Support for this
+ * compression format has not been built in". Every photograph off an iphone
+ * was a black tile reading unreadable. sips decodes them without complaint,
+ * and it was already wired up for raw and simply not pointed here.
+ *
+ * TIFF IS HERE FOR THE OTHER HALF OF THE SAME PROBLEM. sharp does read a
+ * tiff, so the thumbnail was fine, and then the bench and the quick look card
+ * were handed image/tiff, which chromium and firefox will not draw. The tile
+ * looked right and the frame could not be judged or cropped. Anyone keeping
+ * flatbed scans or sixteen bit masters lands on this.
  */
 export const PROXY_EXT = new Set([
   ...RAW_EXT,
   ".bmp",
   ".jxl",
+  ".heic", ".heif",
+  ".tif", ".tiff",
 ]);
 
 export const needsProxy = (ext) => PROXY_EXT.has(ext);
