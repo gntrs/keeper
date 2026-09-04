@@ -208,7 +208,14 @@ function chip(v, label, count, key) {
     dot.setAttribute("aria-hidden", "true");
     b.append(dot);
   }
-  b.append(label(v));
+  /* the word rides in its own span so the stylesheet has something to
+     truncate. a 103 character folder name used to make a 930 pixel chip
+     that pushed the count off the side of the sidebar, because there was no
+     element between the button and the text to put an ellipsis on. */
+  const w = document.createElement("span");
+  w.className = "word";
+  w.textContent = label(v);
+  b.append(w);
 
   const n = document.createElement("i");
   n.textContent = count(v);
@@ -313,6 +320,12 @@ export function mountShelf() {
     grid.setAttribute("role", "listbox");
     grid.setAttribute("aria-multiselectable", "true");
     grid.setAttribute("aria-label", "frames");
+    /* The two things everybody does first, click to open and hover to move
+       the cursor, were the two the app never said anywhere. This says them
+       on the wall itself rather than in a strip of chrome above it: it
+       waits for a pointer that has stopped, which is the moment somebody is
+       asking, and a tile with a reason of its own still wins over it. */
+    grid.title = "click a frame to open it. the cursor follows the pointer.";
   }
   const present = Object.keys(S.vocab).filter((c) => countTag(c) > 0);
   setDigits(present.length ? present : Object.keys(S.vocab));
@@ -368,15 +381,17 @@ export function mountShelf() {
 
 /**
  * Clear was standing third in a line of filters wearing a filter's clothes,
- * which made it read as a third thing to switch on. It goes to the far end
- * of the row, quieter than the chips it undoes, and it is only there at all
- * when there is something to undo. Last in the row rather than first past
- * the .grow, so that arriving and leaving moves nothing else.
+ * which made it read as a third thing to switch on. It is quieter than the
+ * chips it undoes, and it is only there at all when there is something to
+ * undo.
+ *
+ * Where it stands is the stylesheet's, not this file's. Reparenting it from
+ * javascript fought whatever order the markup had put it in, and the sidebar
+ * is a column now, so the far end of a row is not a place any more.
  */
 function mountClear() {
   const b = $("#f-clear");
   b.style.color = "var(--ink-3)";
-  b.closest(".row").append(b);
   b.onclick = () => {
     /* This was location.reload(), the one reset that also throws away where
        you were standing: four hundred frames into a filtered pile, clear
@@ -924,7 +939,11 @@ function stack(ids) {
     const s = 62;
     g.save();
     g.shadowColor = "#000000a6"; g.shadowBlur = 10; g.shadowOffsetY = 3;
-    g.fillStyle = "#141416";
+    /* the plate carries the photograph, so it is the stage's own neutral and
+       not a chrome step. #141416 was two points blue, which is the mistake
+       the quick look's own stage records having deleted once already, and
+       blue beside a frame is a bias about the frame. */
+    g.fillStyle = "#101010";
     g.beginPath(); g.roundRect(x, y, s, s, 3); g.fill();
     g.restore();
     if (src?.complete && src.naturalWidth) {
@@ -1128,11 +1147,11 @@ function tile(item, n) {
   });
 
   /**
-   * Click selects and does not open, which is the change a mac user will
-   * feel first. It is what makes a set possible at all: a click that opened
-   * a card could never be the click that starts a range, and picking twelve
-   * frames would mean dismissing twelve cards. Opening moved to the double
-   * click, to space and to return, and the two keys were free.
+   * A plain click opens the frame, and a click with a modifier builds the
+   * pick. It read the other way round for a while, on the argument that a
+   * click which opened a card could never start a range, and the answer to
+   * that turned out to be the modifiers and the swept box rather than
+   * taking the first gesture anybody tries away from them.
    *
    * The cursor comes along on every one of them, so a run started with the
    * mouse carries straight on under the keyboard.
@@ -1660,28 +1679,53 @@ function nukePress() {
 
 async function nuke(ids) {
   armed = null;
-  const going = tilesFor(ids);
-  const ok = await post("/api/trash", { ids });
-  if (!ok) {
+
+  /**
+   * The answer is read rather than counted, because a delete is not all or
+   * nothing. The server runs its own access() over the files after the
+   * platform says it is done, and answers with the ids it saw leave the
+   * drive and the ids that stayed. So this asks for the body rather than
+   * going through post(), which only hands back whether the status was ok.
+   *
+   * The page then drops exactly the set the server dropped. When finder
+   * keeps one of five, four leave the wall and one stays, which is what the
+   * drive says, and the wall and the drive never disagree.
+   */
+  const res = await fetch("/api/trash", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ids }),
+  }).catch(() => null);
+  const d = await res?.json().catch(() => null);
+  const gone = new Set(d?.gone ?? []);
+  /* Held rather than said, because the sentence at the bottom of this
+     function used to overwrite it in the same tick. A delete where two of
+     three files could not be moved reported the one that worked and the
+     person never saw the two that did not: measured in a real browser, the
+     error text was gone 50ms later. What went wrong outranks what went
+     right, and it is the half that needs somebody to go and look. */
+  const trouble = d?.ok
+    ? null
+    : (d?.error || "that did not go to the trash. the file may be on a drive that is gone.");
+  if (trouble) {
     feel("no");
     nope($("#f-nuke"));
-    sayBin("that did not go to the trash. the file may be on a drive that is gone.");
-    return;
   }
+  if (!gone.size) { if (trouble) sayBin(trouble); return; }
+  const dropped = [...gone];
 
   /* The server has already dropped them from the index, so the page drops
      them from its own copy rather than asking for the whole state again:
      re-fetching would throw away the cursor, the selection and the scroll
      position of someone in the middle of a cull. */
-  const gone = new Set(ids);
   S.items = S.items.filter((i) => !gone.has(i.id));
   S.byId = new Map(S.items.map((i) => [i.id, i]));
   for (const id of gone) { sel.delete(id); S.binned.delete(id); }
   /* a card still showing a file that has left the drive would be the most
      dishonest pixel in the app, so it walks to a survivor or shuts. */
-  evict(ids);
+  evict(dropped);
   feel("thud");
-  leave(going, () => { renderShelf(); tally(); });
+  leave(tilesFor(dropped), () => { renderShelf(); tally(); });
   /**
    * The one wall in the stack.
    *
@@ -1691,10 +1735,18 @@ async function nuke(ids) {
    * rather than stepping over it and quietly taking back the tag you made
    * before it, which would look exactly like the delete having been undone.
    */
-  didFinal(`deleting ${many(ids.length)}`,
+  didFinal(`deleting ${many(dropped.length)}`,
     `that one is in ${wastebasket()}. ${restore()} it from ${files()}, not from here.`);
-  sayBin(`${many(ids.length)} in ${wastebasket()}. ${files()} can ${restore()} them.`);
-  setTimeout(() => sayBin(), 6000);
+  /* A partial failure keeps its sentence and keeps it up. The success line
+     clears itself after six seconds because it is a receipt nobody needs to
+     keep reading; a file still sitting on the drive when keeper said it moved
+     it is not a receipt, and it stays until the person does something else. */
+  if (trouble) {
+    sayBin(`${many(dropped.length)} in ${wastebasket()}. ${trouble}`);
+  } else {
+    sayBin(`${many(dropped.length)} in ${wastebasket()}. ${files()} can ${restore()} them.`);
+    setTimeout(() => sayBin(), 6000);
+  }
 }
 
 /**
@@ -2034,7 +2086,13 @@ function tallyChip(cls, wordText, n, on, act) {
   b.type = "button";
   b.className = `t ${cls}${on ? " on" : ""}`;
   b.setAttribute("aria-pressed", String(on));
-  b.append(wordText);
+  /* the same .word wrapper the filter chips wear, for the same reason: the
+     bar has one row now, and when it runs out of width the stylesheet
+     drops these three words and keeps the three numbers. */
+  const w = document.createElement("span");
+  w.className = "word";
+  w.textContent = wordText;
+  b.append(w);
   const num = document.createElement("b");
   num.textContent = n;
   b.append(num);

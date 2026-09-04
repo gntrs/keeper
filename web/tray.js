@@ -59,6 +59,10 @@ export async function mountTray() {
   $("#tray-pick").onchange = (e) => pick(e.target.value);
   $("#tray-export").onclick = () => ship();
   $("#tray-folder").onkeydown = (e) => { if (e.key === "Enter") ship(); };
+  /* return in here exports, and nothing on screen said so. the field is the
+     last thing the hand touches before the export, so the sentence belongs
+     on the field and not in a line of chrome under it. */
+  $("#tray-folder").title = "where the copies go. press return to export.";
   buildMode();
   mountGrip();
 
@@ -401,10 +405,15 @@ function arm() {
      on the button belongs to the markup. */
   b.style.minWidth = `${b.offsetWidth}px`;
   /* the icon steps aside for the word. "sure?" is a question and a question
-     cannot be drawn as a bin. */
+     cannot be drawn as a bin.
+
+     the ink is --hot-ink and not --hot, because the accent is a fill and a
+     ring and never a letter, and "sure?" is a word. --hot on this chrome
+     measured 3.77:1, which is under the floor the stylesheet sets for
+     itself. */
   b.dataset.armed = "1";
   b.textContent = "sure?";
-  b.style.color = "var(--hot)";
+  b.style.color = "var(--hot-ink)";
   armed = setTimeout(disarm, SURE);
 }
 

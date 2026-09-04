@@ -5,7 +5,7 @@ import { open } from "/preview.js";
 
 import { nope } from "/motion.js";
 import { feel } from "/feel.js";
-import { did } from "/undo.js";
+import { did, say } from "/undo.js";
 import { files } from "/host.js";
 
 const $ = (s) => document.querySelector(s);
@@ -58,6 +58,10 @@ export function mountBench() {
   $("#p-star").classList.toggle("on", P.star);
 
   buildExport();
+
+  /* What the page booted with is what the file holds, and it is the fallback
+     for the first failed save of the session. */
+  Object.assign(onDisk, S.placements);
 
   addEventListener("pointerdown", onDown);
   addEventListener("pointermove", onMove);
@@ -316,10 +320,17 @@ function setTrial(id) {
 function strip() {
   const hits = S.items.filter((i) => {
     const t = S.tags[i.id] ?? {};
-    /* binned frames are off the wall everywhere else in the app, and the
+    /* A clip is not something this bench can cut. The slot draws its picture
+       through an img, so a clip in one painted a black box, and the export
+       then failed in a terminal the person had already left. It leaves the
+       strip rather than being caught at the drop, because the honest place
+       to refuse something is before it is offered.
+
+       binned frames are off the wall everywhere else in the app, and the
        strip was the one place still offering them. a frame that was thrown
        away has no business being placed. */
-    return !S.binned.has(i.id)
+    return i.kind !== "film"
+      && !S.binned.has(i.id)
       && (!P.star || t.star)
       && (!P.tray || inTray(i.id))
       && (!P.q || i.path.toLowerCase().includes(P.q));
@@ -332,6 +343,10 @@ function strip() {
        "nothing matches that search" under a search box they had not typed in. */
     $("#strip").innerHTML = `<p class="dim" style="grid-column:1/-1">${
       !S.items.length ? "no frames in this folder yet."
+      /* the filter above takes the clips out, so an archive of nothing but
+         film would have blamed a search box nobody typed in. it stops at the
+         first still, so it costs nothing on the archives that have any. */
+      : S.items.every((i) => i.kind === "film") ? "every frame here is a clip, and the bench cuts stills."
       : P.tray ? "the tray is empty. fill it in the shelf, or drag frames into the panel."
       : P.star ? "nothing is kept yet. keep a few in the shelf first."
       : "nothing matches that search."
@@ -438,12 +453,16 @@ function retag() {
 async function restoreSlot(slotId, was) {
   const held = S.placements[slotId];
   let ok;
+  /* A server that has been stopped makes fetch reject rather than answer, and
+     post hands that straight on. Unrefused, the rejection would leave every
+     write below thinking it had landed. Caught here, a keeper that is gone is
+     the same answer as a keeper that said no, which is the true one. */
   if (was) {
     S.placements[slotId] = was;
-    ok = await post("/api/place", { slot: slotId, id: was.id, place: was.place });
+    ok = await post("/api/place", { slot: slotId, id: was.id, place: was.place }).catch(() => false);
   } else {
     delete S.placements[slotId];
-    ok = await post(`/api/place?slot=${encodeURIComponent(slotId)}`, null, "DELETE");
+    ok = await post(`/api/place?slot=${encodeURIComponent(slotId)}`, null, "DELETE").catch(() => false);
   }
   /* A restore the disk refused is a restore that did not happen, and letting
      the local write stand would leave the page and the file disagreeing
@@ -455,6 +474,12 @@ async function restoreSlot(slotId, was) {
     else delete S.placements[slotId];
     throw new Error(`the disk did not take the restore of ${slotId}`);
   }
+  /* The disk took it, so this is what a failed crop save has to fall back to
+     from now on. An undo that emptied the slot leaves nothing to fall back
+     to, so the entry goes rather than standing there describing a crop the
+     file no longer holds. */
+  if (was) onDisk[slotId] = was;
+  else delete onDisk[slotId];
   /* The crop write is on a timer, so an undo arriving inside that window
      would be followed a fifth of a second later by the very write it just
      took back, landing on the server after the restore and silently undoing
@@ -468,11 +493,40 @@ async function restoreSlot(slotId, was) {
 
 /** the slot is always named. there is no path that fills whichever one is on. */
 async function assign(item, slotId) {
+  /* Refused in the words the server refuses it in, so one act cannot have two
+     answers. The strip no longer offers clips, and this is still here because
+     the tray panel stands beside these slots with whatever the shelf put in
+     it, and a tray frame lands on a slot the same way a strip one does.
+
+     It is said where the numbers go, under the slot the drag landed on, which
+     is where the person is already looking. */
+  if (item.kind === "film") {
+    feel("no");
+    const hit = els.get(slotId);
+    if (hit) hit.nums.textContent = "a clip cannot be placed. the bench cuts stills, and a clip is film.";
+    return;
+  }
+
   const was = S.placements[slotId];
-  const now = { id: item.id, place: { ...CENTERED } };
+  const slot = S.slots.find((s) => s.id === slotId);
+  /* Cover, and not the whole negative. CENTERED is cw 1, the entire frame,
+     which is wider than cover in every slot that is not the shape of the
+     photograph, so the readout divided cover by that 1 and said 67% on a
+     three by two frame sitting exactly at cover in a square hole, and 38% in
+     a reel. Clamped here, where the placement is made, because this one
+     value is what the head reads, what the disk keeps and what the exporter
+     cuts.
+
+     A frame that failed to decode has no size to clamp against and would
+     clamp to NaN, so it keeps the centred default and paint says what is
+     wrong with it. */
+  const place = item.w && item.h && slot
+    ? clamp(CENTERED, item.w, item.h, slot.aspect)
+    : { ...CENTERED };
+  const now = { id: item.id, place };
   S.placements[slotId] = now;
   setActive(slotId);
-  const ok = await post("/api/place", { slot: slotId, id: item.id, place: CENTERED });
+  const ok = await post("/api/place", { slot: slotId, id: item.id, place }).catch(() => false);
 
   /* A placement the disk refused is not a placement, and a slot wearing one
      anyway is the screen promising a file the export cannot cut. The slot
@@ -491,11 +545,21 @@ async function assign(item, slotId) {
     return;
   }
 
+  onDisk[slotId] = now;
   did(`placing a frame in ${slotId}`,
       () => restoreSlot(slotId, was), () => restoreSlot(slotId, now));
   paint(slotId);
   tally();
   retag();
+
+  /* A slot holds one frame for the whole archive, so a second drop onto a
+     filled one throws away a crop somebody chose, and it used to do it in
+     silence: the picture simply changed. It is said after the write rather
+     than asked before it, because the write is already reversible and a
+     dialog in the middle of a drag is worse than a sentence and cmd z. */
+  if (was && was.id !== item.id) {
+    say(`replaced ${S.byId.get(was.id)?.path.split("/").pop() ?? "a frame"} in ${slotId}. undo puts it back.`);
+  }
 }
 
 /**
@@ -609,7 +673,15 @@ async function ship(only = null, btn = $("#bench-export"), out = $("#bench-expor
      anybody reads. */
   const soft = d.soft ? `, ${d.soft} narrower than the slot wants` : "";
   const lost = d.lost ? `, ${d.lost} skipped: the frame is gone from the index` : "";
-  const bad = d.failed ? `, ${d.failed} refused: the terminal has the reason` : "";
+  /* The reason itself, not a note saying where the reason is. Half the people
+     this is for launched keeper from an icon and have no terminal open, and
+     the exporter already sends the sentence per row: a permission, a negative
+     the decoder gave up on, a drive that went away. Named by slot, because
+     with nineteen holes filled "1 refused" is not something anyone can act
+     on. */
+  const why = (d.rows ?? []).filter((r) => r.failed)
+    .map((r) => `${r.slot} (${r.failed})`).join(", ");
+  const bad = d.failed ? `, ${d.failed} refused${why ? `: ${why}` : ""}` : "";
   const file = only ? d.files?.[0] : null;
 
   if (only && !file) {
@@ -717,18 +789,41 @@ function paint(slotId) {
      for a 2400px banner is most of what is being asked, and the soft warning
      always, because it is the one thing here anyone has to act on.
 
-     The object-position line is css to paste into a stylesheet, so it appears
-     only for someone who wrote a keeper.config.json: that file is the exact
-     test for a person who has holes of their own and a stylesheet to put them
-     in. Everybody else was reading a declaration for a page they do not have.
-     A trial never shows it either, because nothing has been decided yet.
+     The declaration always too, for every committed placement. It used to be
+     gated on there being a keeper.config.json, which nobody arriving at
+     keeper has, so the one thing this bench is for had never been on anyone's
+     screen: an archive with 143 kept frames had zero placements. A trial
+     still shows nothing, because nothing has been decided yet.
 
-     `a baked crop` is gone. It was the negative of the line beside it, which
-     made it look like a fault, in the accent, on a crop somebody chose. */
-  const css = S.configured && !fitting && cover
-    ? ` · <code>object-position: ${toObjectPosition(rect, item.w, item.h)}</code>`
-    : "";
+     The same bytes the exporter writes beside the crop, both of them from
+     geometry.mjs, so pasting this and opening that file are two ways of
+     getting the same picture. Past cover there is no object-position that
+     could say it, and the cut is in the exported file instead. */
+  const decl = cover
+    ? `object-fit: cover; object-position: ${toObjectPosition(rect, item.w, item.h)};`
+    : "object-fit: cover;";
+  const css = fitting
+    ? ""
+    : ` · <code>${decl}</code><button type="button" class="copy" title="copy the declaration">copy</button>${
+        cover ? "" : ` · <span class="dim">baked into the export</span>`}`;
   hit.nums.innerHTML = (fitting ? `<span class="prov">trying</span> · ` : "") + size + css + thin;
+
+  /* A declaration on a screen is a thing to retype. The button is inside the
+     numbers line rather than beside the export, because the line is what is
+     being copied and a copy control anywhere else would be a guess about
+     which one. The click is stopped here: the slot's own click commits a
+     trial into an empty hole, and a copy is not a placement. */
+  hit.nums.querySelector(".copy")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const b = e.currentTarget;
+    try {
+      await navigator.clipboard.writeText(decl);
+      b.textContent = "copied";
+    } catch {
+      b.textContent = "could not copy";
+    }
+    setTimeout(() => { b.textContent = "copy"; }, 1400);
+  });
 
   /* 100% is cover, the whole frame filling the hole with nothing thrown away
      that the shape did not demand. Past that you are punching in, and the
@@ -917,6 +1012,19 @@ function onKey(e) {
 }
 
 let saveTimer = {};
+
+/**
+ * The crop the server last took, per slot.
+ *
+ * A save that fails has to put something on the screen, and the only honest
+ * something is the last one that landed. Reverting to whatever the page held
+ * a moment ago would put an unsaved crop back and call it the file's.
+ *
+ * Seeded in mountBench from the placements the page booted with, because the
+ * first nudge after a reload is the one with no earlier write of its own.
+ */
+const onDisk = {};
+
 function set(slotId, raw) {
   const c = ctx(slotId);
   if (!c) return;
@@ -932,6 +1040,18 @@ function set(slotId, raw) {
   S.placements[slotId] = next;
   paint(slotId);
   clearTimeout(saveTimer[slotId]);
-  saveTimer[slotId] = setTimeout(
-    () => post("/api/place", { slot: slotId, id: c.p.id, place }), 220);
+  saveTimer[slotId] = setTimeout(async () => {
+    const ok = await post("/api/place", { slot: slotId, id: c.p.id, place }).catch(() => false);
+    if (ok) { onDisk[slotId] = { id: c.p.id, place }; return; }
+    /* The save used to be fired and forgotten, so a write the disk refused
+       left the screen and the file describing two different photographs, and
+       the next export cut the crop nobody could see any more. A full disk, a
+       folder gone read only and a server that has been stopped all look like
+       this. The slot goes back to the last crop the server took and says so,
+       and the nudge has to be made again, which is the point. */
+    S.placements[slotId] = onDisk[slotId] ?? c.p;
+    paint(slotId);
+    feel("no");
+    say(`the crop in ${slotId} did not reach the disk.`);
+  }, 220);
 }

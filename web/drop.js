@@ -24,9 +24,10 @@
    the browser withheld the path. Those are two different sentences and only
    one of them is ever true.
 
-   The module mounts itself on import and exports nothing. It has to survive
-   a page with no frames on it and a page with two thousand, so it reads
-   nothing out of the app and touches no markup it did not make.
+   The module mounts itself on import and exports one thing, the wait, for
+   the page that loads while a scan is already under way. It has to survive a
+   page with no frames on it and a page with two thousand, so it reads nothing
+   out of the app and touches no markup it did not make.
    --------------------------------------------------------------------- */
 
 import { files } from "/host.js";
@@ -174,6 +175,32 @@ async function ask(route, body, method = "POST") {
     return null;
   }
 }
+
+/**
+ * WHAT THE SERVER SAID, IN A SENTENCE SOMEBODY CAN ACT ON.
+ *
+ * A folder nobody may write to came back onto the card as "EACCES: permission
+ * denied, mkdir", which names a syscall and asks the reader to know what one
+ * is. These are the handful a person actually hits: a read only folder or
+ * drive, a full disk, a folder that has been moved or unplugged, and a file
+ * dropped where a folder was meant. Anything else goes through untouched,
+ * because a message that was written for a person is already better than
+ * whatever a table would do to it, and the raw line stays on the card under
+ * the sentence: the person who wants it is usually the person being asked for
+ * it by somebody helping them.
+ */
+const ERRNO = [
+  [/\bEACCES\b|\bEPERM\b|\bEROFS\b/, "keeper cannot write into that folder. it keeps its index in a .keeper folder beside the photographs, so the folder has to be writable. a read only drive or a locked folder looks like this."],
+  [/\bENOSPC\b/, "the disk is full, so keeper cannot write its index. free some space and open the folder again."],
+  [/\bENOENT\b/, "that folder is not there any more. an unplugged drive looks like this."],
+  [/\bENOTDIR\b/, "that is a file rather than a folder. keeper opens the folder the photographs are in."],
+];
+
+const sentence = (msg) => {
+  const raw = String(msg ?? "").trim();
+  for (const [errno, said] of ERRNO) if (errno.test(raw)) return said;
+  return raw;
+};
 
 /* ------------------------------------------------------------------ */
 /* the drag layer                                                      */
@@ -338,11 +365,8 @@ function fileUrl(text) {
     const s = raw.trim();
     if (!s || s.startsWith("#") || !s.toLowerCase().startsWith("file://")) continue;
     try {
-      const p = decodeURIComponent(new URL(s).pathname);
-      /* finder writes a folder as a url with a trailing slash. the server
-         should be handed the folder and not a path with an empty last
-         segment on the end of it. */
-      return p.length > 1 ? p.replace(/\/+$/, "") : p;
+      const u = new URL(s);
+      return onDisk(decodeURIComponent(u.pathname), u.host);
     } catch {
       /* a line that will not parse is not worth an error message. step 2 is
          standing right there. */
@@ -351,8 +375,41 @@ function fileUrl(text) {
   return null;
 }
 
+/**
+ * A URL PATHNAME IS NOT A PATH, AND ON WINDOWS IT IS NOT EVEN CLOSE.
+ *
+ * Finder writes file:///Volumes/disk/2026, whose pathname is the path. Explorer
+ * writes file:///C:/photos/2026, whose pathname is /C:/photos/2026, with a
+ * slash in front of the drive letter and the separators the wrong way round. That went to the server exactly as it came, the server could not
+ * resolve it, and the panel then told somebody their drop had failed while the
+ * folder sat where it had always been. A share is the same story one level up:
+ * file://nas/photos is \\nas\photos, and the host is where the machine name is.
+ */
+function onDisk(pathname, host) {
+  if (/^\/[A-Za-z]:(\/|$)/.test(pathname)) return tidy(pathname.slice(1).replace(/\//g, "\\"), "\\");
+  if (host && host.toLowerCase() !== "localhost") return tidy(`\\\\${host}${pathname.replace(/\//g, "\\")}`, "\\");
+  return tidy(pathname, "/");
+}
+
+/* finder writes a folder as a url with a trailing slash, and the server should
+   be handed the folder rather than a path with an empty last segment on the end
+   of it. the root of a disk is the one that keeps its separator: C: on its own
+   means whatever folder that drive was last looked at in, which is not a place
+   anybody dropped. */
+function tidy(p, sep) {
+  const cut = p.replace(sep === "/" ? /\/+$/ : /\\+$/, "");
+  return !cut || cut.endsWith(":") ? p : cut;
+}
+
 async function resolve(url, entries, files) {
-  if (url) return open(url);
+  /* the url flavour is the fast way in and it is not always the right one: on
+     windows this page rebuilds the path itself, and a rebuilt path the server
+     will not take is a step that did not come off rather than a failed drop.
+     the next step is standing right there, so it is taken. */
+  if (url) {
+    return open(url, () =>
+      (entries.length || files.length ? resolve(null, entries, files) : chooser()));
+  }
 
   const dir = entries.find((x) => x.isDirectory);
   const name = dir ? dir.name : files[0]?.name ?? "";
@@ -460,11 +517,14 @@ function withheld(name, why) {
 function failed(msg) {
   stop();
   working = false;
+  const raw = String(msg ?? "").trim();
+  const said = sentence(raw);
   paint({
     mode: "fail",
     eyebrow: "not opened",
     line: "that did not open",
-    note: msg,
+    note: said || "that path did not open.",
+    hint: said === raw ? "" : raw,
     acts: [askFinder(), dismiss()],
     esc: true,
   });
@@ -511,7 +571,7 @@ addEventListener("click", (e) => {
 /* opening, and the wait that follows it                               */
 /* ------------------------------------------------------------------ */
 
-async function open(path) {
+async function open(path, next = null) {
   stop();
   working = true;
   paint({ mode: "work", eyebrow: "opening", line: tail(path), note: path });
@@ -519,17 +579,16 @@ async function open(path) {
   const r = await ask("/api/open", { path });
   if (r?.ok) return watch(r.root ?? path);
 
-  if (!r) return failed("the open route did not answer.");
-
   /* 409 is the server saying it already has one of these in flight. what it
      is doing is a better answer than what it just refused, so the progress
      is asked before anything is called an error. */
-  if (r.status === 409) {
+  if (r?.status === 409) {
     const d = await ask("/api/progress", null, "GET");
     if (d?.phase === "scanning" || d?.phase === "thumbnailing") return watch(d.root ?? path);
   }
   working = false;
-  failed(r.error || "that path did not open.");
+  if (next) return next();
+  failed(r ? r.error || "that path did not open." : "the open route did not answer.");
 }
 
 /* which poll is the live one. a candidate clicked while a previous poll is
@@ -545,7 +604,7 @@ function stop() {
   run++;
 }
 
-function watch(where) {
+export function watch(where) {
   stop();
   working = true;
   idles = 0;

@@ -474,8 +474,21 @@ function trim(facts) {
      more than the fact itself was worth. Predicting that arithmetic costs one
      fact too many. It is at most four measurements, once, on opening a
      picture that is about to decode several megabytes. */
+  /* A fact can be cut without the strip ever overflowing.
+   *
+   * The children are flex items, so when the row runs short they shrink
+   * instead of pushing past their parent, and the ellipsis then eats into
+   * whichever one gave way. Measuring only the strip therefore reported it
+   * fitting while `3000x2000` was on screen as `3000x200`, which is the exact
+   * failure the paragraph above says was fixed: a shortened number is a
+   * different number, and it is a plausible one. So a child that cannot draw
+   * itself whole counts as an overflow too. */
+  const cramped = () =>
+    facts.scrollWidth > facts.clientWidth ||
+    [...facts.children].some((el) => el.scrollWidth > el.clientWidth + 1);
+
   for (let i = 0; i < 6; i++) {
-    if (facts.scrollWidth <= facts.clientWidth) return;
+    if (!cramped()) return;
     /* the most expendable one still standing, which is rarely the last */
     let go = null;
     for (const el of facts.children) {

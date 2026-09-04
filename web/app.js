@@ -2,10 +2,11 @@ import { mountShelf, renderShelf } from "/shelf.js";
 import { mountBench, renderBench } from "/bench.js";
 import { mountTray, trayView } from "/tray.js";
 import { mountPreview, previewOpen } from "/preview.js";
-/* mounts itself and exports nothing. it listens on the window, so it has to
-   be here rather than inside a view: a folder can be dropped on the bench
-   just as well as on the shelf. */
-import "/drop.js";
+/* mounts itself on import. it listens on the window, so it has to be here
+   rather than inside a view: a folder can be dropped on the bench just as
+   well as on the shelf. the one thing it exports is the wait, which the boot
+   below borrows for a page that opened while a scan was already running. */
+import { watch } from "/drop.js";
 import { viewIn } from "/motion.js";
 import { feel, mountFeel } from "/feel.js";
 import { paintKeys, pick as chord } from "/host.js";
@@ -14,6 +15,20 @@ import { mountQuit } from "/quit.js";
 import { mountUpdate } from "/update.js";
 import { mountTour } from "/tour.js";
 import { mountSettings } from "/settings.js";
+
+/* Every write carries the token the server put on this page, so a page on
+   another origin, which cannot read this one, cannot make keeper write. One
+   wrapper rather than a header in six files: two of those files are not ours
+   to edit, and a fetch added next month would forget. */
+const TOKEN = window.KEEPER_TOKEN ?? "";
+const bare = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const method = String(init.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") return bare(input, init);
+  const headers = new Headers(init.headers ?? {});
+  headers.set("x-keeper-token", TOKEN);
+  return bare(input, { ...init, headers });
+};
 
 export const S = {
   items: [], tags: {}, placements: {}, slots: [], vocab: {}, hints: {},
@@ -85,6 +100,9 @@ export function tally() {
 export function setView(v) {
   if (v !== "shelf" && v !== "bench") v = "shelf";
   S.view = v;
+  /* on the body as well, because two controls in the bar belong to the shelf
+     and a stylesheet cannot read a variable in a module. */
+  document.body.dataset.view = v;
   if (location.hash.slice(1) !== v) history.replaceState(null, "", `#${v}`);
   for (const b of document.querySelectorAll("header nav button")) {
     b.classList.toggle("on", b.dataset.view === v);
@@ -131,8 +149,60 @@ $("#keys-shut").onclick = () => showKeys(false);
 repaintSettings = mountSettings(showKeys);
 
 /**
- * The four keys that belong to the app rather than to a view, and the rule
- * they are the top of: a bare letter tags a photograph, cmd plus a key does
+ * THE SIDEBAR, AND WHY ITS ANSWER IS READ BEFORE ANYTHING IS FETCHED.
+ *
+ * The filters are a column beside the wall now, and somebody who shut it
+ * wants it shut the next morning too. The stored answer goes on the body here,
+ * above the state fetch, so a column that is not wanted is never painted and
+ * then taken away half a second later.
+ */
+const SIDE = "keeper.side";
+document.body.dataset.side = localStorage.getItem(SIDE) === "shut" ? "shut" : "open";
+
+function setSide(open) {
+  document.body.dataset.side = open ? "open" : "shut";
+  localStorage.setItem(SIDE, open ? "open" : "shut");
+  $("#side-toggle")?.setAttribute("aria-pressed", String(open));
+  feel("tick");
+}
+
+/* the toolbar is not this file's markup, so the toggle is wired when it is
+   there and skipped when it is not: a missing button should be a button that
+   does nothing rather than a page that stops booting. */
+{
+  const b = $("#side-toggle");
+  if (b) {
+    b.onclick = () => setSide(document.body.dataset.side !== "open");
+    b.setAttribute("aria-pressed", String(document.body.dataset.side === "open"));
+  }
+}
+
+/* The nine checks, from inside the app. The mac build puts nothing on PATH,
+   so `keeper doctor` is a command a tester on that build cannot run, and the
+   settings pane is the only place they can reach the same answer. It prints
+   the rows as they come, because the whole point of them is being pasted into
+   a message asking for help. */
+{
+  const b = $("#set-doctor");
+  const out = $("#set-doctor-out");
+  if (b && out) {
+    b.onclick = async () => {
+      b.disabled = true;
+      b.textContent = "checking";
+      const d = await fetch("/api/doctor", { method: "POST" }).then((r) => r.json()).catch(() => null);
+      b.disabled = false;
+      b.textContent = "check again";
+      out.hidden = false;
+      out.textContent = d?.rows
+        ? d.rows.map((r) => `${r.state.padEnd(4)} ${r.what.padEnd(9)} ${r.said}`).join("\n")
+        : "the check did not answer.";
+    };
+  }
+}
+
+/**
+ * The keys that belong to the app rather than to a view, and the rule they
+ * are the top of: a bare letter tags a photograph, cmd plus a key does
  * something to the app. Three of these work on the bench as well as the
  * shelf, and cmd+o has to work on an archive with nothing in it, where
  * shelf.js never mounts and its key handler does not exist. That is why they
@@ -185,6 +255,15 @@ addEventListener("keydown", (e) => {
        the one in the blank state answers instead. */
     if (k === "KeyO") {
       document.querySelector("[data-keeper-choose]")?.click();
+      return e.preventDefault();
+    }
+
+    /* The sidebar. Finder hides its own on option command s, and option s is
+       the chord this app has free on the same physical key. It goes through
+       the button's own click so the paint, the stored answer and the sound
+       happen in one place. */
+    if (k === "KeyS" && e.altKey && !chord(e)) {
+      $("#side-toggle")?.click();
       return e.preventDefault();
     }
 
@@ -246,22 +325,73 @@ S.byId = new Map(S.items.map((i) => [i.id, i]));
 $("#root").dataset.path = `\u202A${S.root}\u202C`;
 
 /**
+ * A PAGE THAT OPENED WHILE THE SCAN WAS STILL RUNNING.
+ *
+ * The state above is answered before the index exists, so an icon launch, the
+ * one every person starts with, used to land on "nothing here yet" and stay
+ * there for good: nothing at boot ever asked what the server was doing. So an
+ * empty shelf asks, and a scan in flight goes to the same wait the drop panel
+ * already uses, which shows the phase and reloads when it is done.
+ *
+ * The session flag is what stops a state that never fills from reloading for
+ * ever: the ready branch gets one reload per tab and then leaves it alone.
+ */
+/* Whether a scan is actually running, which the blank state below has to
+   know about. Both branches trigger on an empty archive, so without this they
+   both painted: the progress panel counting 1,240 of 2,200 with "keeper looked
+   through this folder and found no photographs" legible through the scrim
+   behind it. One of those two sentences is false at that moment, and it is
+   the one that reads as a failure. */
+let scanning = false;
+if (!S.items.length) {
+  const d = await fetch("/api/progress").then((r) => r.json()).catch(() => null);
+  if (d?.phase === "scanning" || d?.phase === "thumbnailing") { scanning = true; watch(d.root); }
+  else if (d?.phase === "ready" && d.frames > 0 && d.root === S.root
+           && !sessionStorage.getItem("keeper.reloaded")) {
+    sessionStorage.setItem("keeper.reloaded", "1");
+    location.reload();
+  }
+}
+if (S.items.length) sessionStorage.removeItem("keeper.reloaded");
+
+/**
  * An archive with nothing in it is not an error and should not read like
  * one. It is the first thing a new user sees, so it is the only place in
  * keeper that explains itself.
  */
-if (!S.items.length) {
+/* The folder is not there any more.
+ *
+ * This outranks everything below it, including having frames in the index,
+ * because every one of those frames is a path that no longer resolves. Left
+ * alone the shelf drew nine hundred broken image icons under a header still
+ * counting nine hundred frames, which is the app insisting nothing is wrong
+ * while none of it works. */
+if (S.gone) {
+  $("#shelf").innerHTML = `
+    <div class="blank">
+      <h2>that folder is not there any more</h2>
+      <p>keeper was reading <span class="num" id="gone-root"></span> and it has been
+         moved, renamed, or it was on a drive that is no longer plugged in.
+         nothing has been lost: the tags and the crops live in that folder and
+         come back with it.</p>
+      <p>plug it back in or put it back where it was and reload, or
+         <button class="chip" type="button" data-keeper-choose>choose another folder</button></p>
+    </div>`;
+  /* textContent and not interpolation: a folder name is somebody else's text
+     and it can hold anything a filesystem allows, angle brackets included. */
+  const where = $("#gone-root");
+  if (where) where.textContent = S.root;
+} else if (!S.items.length && !scanning) {
   $("#shelf").innerHTML = `
     <div class="blank">
       <h2>nothing here yet</h2>
       <p>drag a folder onto this window, or
          <button class="chip" type="button" data-keeper-choose>choose
          one</button>.</p>
-      <p class="hint">keeper looked through <code>${S.root}</code> and found
-         no photographs and no film it can read. it reads jpg, png, webp,
-         avif, tif, heic and dng, and mov, mp4, m4v and mkv. raw files come in
-         through their embedded preview.</p>
-      <pre>keeper ~/Pictures/2026</pre>
+      <p class="hint">${S.blank ? "" : `keeper looked through <code>${S.root}</code>
+         and found no photographs and no film it can read. `}keeper reads jpg,
+         png, webp, avif, tif, heic and dng, and mov, mp4, m4v and mkv. raw
+         files come in through their embedded preview.</p>
     </div>`;
   /* The question mark stays. It used to go with the rest of the furniture,
      and that was right while the only thing behind it was a list of keys for
@@ -274,7 +404,14 @@ if (!S.items.length) {
      The advance toggle does go. It governs a run that cannot happen with
      nothing to run through, and mountAdvance never wires it on an empty
      archive, so a visible button here would answer to nothing. */
-  $("#advance-toggle").hidden = true;
+  /* Optional, because the blank state has just replaced the shelf's markup
+     wholesale and whether this button survived that depends on where it sits
+     in the tree. It sat inside the shelf once, and this line threw there, and
+     an uncaught throw here kills the rest of the boot: the bench, the tray
+     and the view are all wired after it, so an empty archive came up dark
+     with nothing on screen to say why. */
+  const advance = $("#advance-toggle");
+  if (advance) advance.hidden = true;
 }
 
 /* The blank state above throws the filter row away along with the grid, so
