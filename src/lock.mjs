@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, unlink } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, unlink } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
@@ -85,7 +85,31 @@ const busy = (held, file) =>
  * the command line taking the archive and serve() listening, and there the pid
  * is all there is.
  */
-export async function serving(held) {
+/**
+ * Whether two paths name the same folder, erring hard toward yes.
+ *
+ * A wrong no here is the expensive one. Say no about a keeper that really is
+ * holding this archive and the claim is deleted, a second keeper opens the
+ * same folder, and two processes write the same tags.json: the exact silent
+ * disaster the lock exists to prevent. A wrong yes only means refusing to
+ * open a folder that was in fact free, which is a sentence on screen and a
+ * second attempt.
+ *
+ * So a missing answer is yes, and a path that will not resolve is yes. The
+ * realpath is what makes it useful at all: the browser claims the resolved
+ * path while a command line claims whatever was typed, so /tmp/shoot and
+ * /private/tmp/shoot are the same folder arriving under two names.
+ */
+async function sameFolder(a, b) {
+  if (!a || !b || a === b) return true;
+  try {
+    return (await realpath(a)) === (await realpath(b));
+  } catch {
+    return true;
+  }
+}
+
+export async function serving(held, root) {
   if (!held?.port) return true;
   try {
     const ac = new AbortController();
@@ -94,7 +118,19 @@ export async function serving(held) {
     clearTimeout(bell);
     if (!r.ok) return false;
     const j = await r.json();
-    return j?.keeper === true && j?.pid === held.pid;
+    if (j?.keeper !== true || j?.pid !== held.pid) return false;
+    /**
+     * AND IT HAS TO BE HOLDING THIS FOLDER, NOT SOME FOLDER.
+     *
+     * A claim travels with the folder it sits in, because it is a file inside
+     * it. Duplicate a shoot in the finder, restore one from a backup, copy a
+     * card onto a second drive, and the copy arrives carrying the original's
+     * pid, port and token. The pid is alive and the port answers, so keeper
+     * refuses to open the copy and points at a window showing an entirely
+     * different folder. Measured, not assumed: a copied archive was refused
+     * while its ping named the original's path.
+     */
+    return sameFolder(j?.root, root);
   } catch {
     return false;
   }
@@ -113,7 +149,7 @@ export async function claim(root, { port = null, token = null } = {}) {
     const held = await holder(root);
     if (held && held.pid === process.pid) {
       fh = await open(file, "w");
-    } else if (held && alive(held.pid) && await serving(held)) {
+    } else if (held && alive(held.pid) && await serving(held, root)) {
       const e = new Error(busy(held, file));
       e.code = "EBUSY";
       throw e;

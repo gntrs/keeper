@@ -398,7 +398,7 @@ async function main() {
        does leave a claim beside the photographs, and that claim names the
        port its window is on. */
     const held = await holder(here);
-    if (held && alive(held.pid) && held.port && await serving(held)) {
+    if (held && alive(held.pid) && held.port && await serving(held, here)) {
       const there = `http://127.0.0.1:${held.port}`;
       if (!flags["no-open"]) await openIn(there);
       say(`  ${hot(there)}`);
