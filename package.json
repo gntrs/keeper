@@ -1,6 +1,6 @@
 {
   "name": "keeper",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "point it at a drive. get back the frames worth keeping, cropped into the holes they have to fill.",
   "type": "module",
   "bin": { "keeper": "bin/keeper.mjs" },
