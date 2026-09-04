@@ -29,9 +29,9 @@ and that the publisher is unknown.
 It says that because this has not been signed with a paid certificate, not
 because anything is wrong with it. Click "more info", then "run anyway".
 
-If you would rather not take that on trust, everything here is open source
-and the code is at github.com/gntrs/keeper. You can read it, and you can
-build this same folder yourself from it.
+If you would rather not take that on trust, the whole of the code is at
+github.com/gntrs/keeper. You can read it, and you can build this same
+folder yourself from it.
 
 
 UPDATES
@@ -75,5 +75,5 @@ WHERE THINGS ARE
   doctor.cmd    checks this machine
   app\          the program
   node\         the runtime it needs
-  LICENSE       apache 2.0
+  LICENSE       what you may do with keeper. free while it is in testing
   NOTICE        the other people's work that is inside this folder

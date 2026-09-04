@@ -18,4 +18,4 @@ no archive, no counts, no cookie.
 
 you found this by turning on hidden files, which is a reasonable thing to
 do to something you just downloaded. all of the above is checkable: it is
-open source, apache 2.0, github.com/gntrs/keeper
+readable, the whole of it, at github.com/gntrs/keeper

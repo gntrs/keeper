@@ -392,10 +392,19 @@ which is read as a sentence.
 
 ## licence
 
-apache 2.0.
+source available, not open source. free while keeper is in testing, and it is
+in testing now: use it for anything, at home or at work, on as many machines
+as you like, no payment, no account, no key and no licence check.
+[`LICENSE`](LICENSE) says it in words rather than in a badge.
 
-it was mit until there was something to download. a dmg is not source: it
+what you cannot do is sell it, redistribute it, or run it as a service. later
+versions may be sold under a one time licence, and every version published
+while keeper is in testing stays free under this licence forever, so a copy
+you already have never stops working and never has to be paid for.
+
+it was mit, then apache 2.0 while there was nothing to sell. those releases
+are still apache and that cannot be taken back. a dmg is not source: it
 carries node, sharp and libvips, and libvips is lgpl, so shipping that binary
 means saying whose work is inside it and letting somebody swap it.
-[`NOTICE`](NOTICE) does both and names the file. nothing about how you may
-use keeper changed, and it is still free.
+[`NOTICE`](NOTICE) does both and names the file, and nothing in keeper's own
+licence takes away anything those licences give you.
