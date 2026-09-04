@@ -266,9 +266,22 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         return sendFile(res, path.join(WEB, route.slice(1)), { cache: "max-age=604800" });
       }
 
+      /**
+       * A THUMBNAIL THAT IS NOT A PICTURE IS A MISSING THUMBNAIL, NOT A HIT.
+       *
+       * An empty file under the right name is what a run killed mid encode
+       * used to leave, and serving it with a 200 is the worst of the three
+       * possible answers: the browser has no picture, the tile is blank, and
+       * nothing anywhere said so. The scan cannot make these any more, and
+       * this is what stops the ones already on disk from being passed off as
+       * a photograph.
+       */
       if (route.startsWith("/thumb/")) {
         const id = route.slice(7).replace(/[^a-f0-9]/g, "");
-        return sendFile(res, path.join(paths(root).thumbs, `${id}.webp`), { cache: "no-cache", req });
+        const file = path.join(paths(root).thumbs, `${id}.webp`);
+        const found = await stat(file).catch(() => null);
+        if (!found?.size) return json(res, 404, { error: "no thumbnail for that frame" });
+        return sendFile(res, file, { cache: "no-cache", req });
       }
 
       /**
@@ -288,6 +301,15 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         const index = await readIndex(root);
         const hit = index?.items?.find((i) => i.id === id);
         if (!hit) return json(res, 404, { error: "unknown frame" });
+        /**
+         * The frame is in the index and the photograph is not on the drive,
+         * which is a folder that moved under a keeper that was already open.
+         * Said as its own answer, because the card that receives it has one
+         * useful thing to tell somebody and it is not "not found": it is that
+         * this file is not where it was, and a rescan will settle it.
+         */
+        const there = await stat(path.join(root, hit.path)).then(() => true).catch(() => false);
+        if (!there) return json(res, 410, { error: "that file is not where keeper left it" });
         let file;
         try {
           file = await readableSource(root, hit);
