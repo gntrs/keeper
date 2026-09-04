@@ -16,13 +16,23 @@
         of dozen of the names inside it is enough to tell one folder called
         2026 from the other four on the disk.
      3. the native folder dialog, which is the only thing on this machine
-        that can hand a browser a path and mean it. it opens by itself when
-        the first two come up empty, because at that point it is the only
-        move left and asking permission to make it is a wasted click.
+        that can hand a browser a path and mean it. for a folder it opens by
+        itself when the first two come up empty, because at that point it is
+        the only move left and asking permission to make it is a wasted
+        click. for anything that was never a folder it stays behind a button,
+        because a system dialog nobody asked for, over an app that cannot be
+        touched until it is found and dismissed, is a worse answer than one
+        sentence saying keeper opens folders.
 
    Nothing in here says the drop failed when what actually happened is that
    the browser withheld the path. Those are two different sentences and only
    one of them is ever true.
+
+   And nothing a person can drag onto this window may leave it needing a
+   reload. Every panel that waits on somebody carries a way out, every one of
+   them puts the busy flag down on its way past, and the work that starts in
+   a drop or a click goes out through attempt(), so a throw ends on a card
+   with a sentence and a button rather than on a scrim with neither.
 
    The module mounts itself on import and exports one thing, the wait, for
    the page that loads while a scan is already under way. It has to survive a
@@ -74,6 +84,11 @@ document.body.append(root);
    dialog up, so cancelling it puts them back where they were rather than on
    a blank screen that has forgotten the question. */
 let was = null;
+/* and whatever is on the card right now, which is not always the same thing:
+   the card that says a dialog is open is worth putting back after a drag
+   crosses the window and leaves again, and is not worth going back to when
+   that dialog is answered. */
+let showing = null;
 let escapes = false;
 
 function paint(o) {
@@ -95,8 +110,13 @@ function paint(o) {
   acts.replaceChildren(...(o.acts ?? []).map(act));
   acts.hidden = !o.acts?.length;
 
+  showing = o;
   escapes = !!o.esc;
-  if (o.esc) was = o;
+  /* a panel that asks a question is the one to come back to when the dialog
+     on top of it is cancelled. the panel that is itself the wait for that
+     dialog is not: painting it again would say the dialog is open a moment
+     after it was closed. */
+  if (o.esc && o.back !== false) was = o;
 }
 
 function hide() {
@@ -118,7 +138,7 @@ function act({ text, run, quiet }) {
   return b;
 }
 
-const askFinder = () => ({ text: "choose a folder", run: chooser });
+const askFinder = () => ({ text: "choose a folder", run: () => dialog() });
 const dismiss = () => ({ text: "not now", run: hide, quiet: true });
 
 function row(c) {
@@ -140,7 +160,7 @@ function row(c) {
     b.append(n);
   }
 
-  b.onclick = () => open(c.path);
+  b.onclick = () => attempt(open(c.path), "that path did not open.");
   li.append(b);
   return li;
 }
@@ -268,7 +288,29 @@ const carries = (e) => {
 let depth = 0;
 let alive = 0;
 let sweep = 0;
+
+/* THE FLAG IS UP WHILE THE MACHINE IS BUSY AND DOWN WHILE A PERSON IS.
+   It used to go up inside open(), which left the locate round trip and the
+   whole time a folder dialog was on screen counted as idle, so a second drop
+   in either of those windows went all the way through and sent a second of
+   everything. It goes up the moment a drop is accepted now, and every panel
+   that ends up waiting on somebody puts it back down, because a card with a
+   button on it is a question and not work in flight. */
 let working = false;
+
+/* WHICH JOB THE WINDOW BELONGS TO.
+   A folder dialog stays open for as long as somebody takes to find a folder,
+   and in that minute they can give up on it, come back to the window and drag
+   the folder in by hand instead. The answer that arrives from the abandoned
+   dialog is then an answer to a question nobody is asking, and acting on it
+   stopped the poll of the archive that was already opening and left it
+   opening behind a hidden card, with nothing on screen and no error anywhere.
+   So a job takes the seat when it starts, and an answer that comes back to
+   find the seat taken says nothing. The seat moves only when a new job
+   starts, never when a card is simply put away: somebody who dismissed the
+   card and then picked a folder in the dialog still gets that folder. */
+let seat = 0;
+const claim = () => ++seat;
 
 /* what was on screen when the drag arrived, so a drag that crosses the
    window and leaves again does not take a list of candidates with it. */
@@ -279,7 +321,7 @@ addEventListener("dragenter", (e) => {
   depth++;
   alive = performance.now();
   if (working || root.dataset.mode === "drag") return;
-  under = !root.hidden && escapes ? was : null;
+  under = !root.hidden && escapes ? showing : null;
   invite(e.dataTransfer.items?.length ?? 0);
   /* a drop released over another window fires no leave and no end, and the
      overlay would then sit over the app until the next reload. dragover
@@ -316,9 +358,13 @@ addEventListener("drop", (e) => {
   clearInterval(sweep);
   /* an archive is already opening. a second one landing on top of it is two
      scans fighting over one index, and the card that is up is answering a
-     more useful question than an error about it would. */
+     more useful question than an error about it would. a card that is waiting
+     on a person is not that, so a folder dropped while one of those is up is
+     taken: it is a better answer to the question on the card than the card
+     was going to get any other way. */
   if (working) return;
-  take(e.dataTransfer);
+  working = true;
+  attempt(take(e.dataTransfer), "that drop could not be read.");
 });
 
 /** the drag left without dropping, so the panel goes back to whatever it was */
@@ -341,17 +387,21 @@ function invite(n) {
 /* step 1 and step 2, out of one drop                                  */
 /* ------------------------------------------------------------------ */
 
-function take(dt) {
+async function take(dt) {
   /* Everything this drop knows has to be read now, synchronously. The
      dataTransfer is emptied the moment the handler returns, so a single
      await before these three reads leaves an empty object behind and no
-     error anywhere to say what happened. */
+     error anywhere to say what happened. The async here does not change that:
+     the body of one runs to its first await in the same tick as the call, and
+     there is no await above these lines. It is here so that a throw anywhere
+     below becomes a rejection the drop handler can answer, rather than an
+     exception nobody catches with the guard left up behind it. */
   const url = fileUrl(dt.getData("text/uri-list")) ?? fileUrl(dt.getData("text/plain"));
   const entries = [...(dt.items ?? [])]
     .map((i) => (i.kind === "file" ? i.webkitGetAsEntry?.() ?? null : null))
     .filter(Boolean);
   const files = [...(dt.files ?? [])].map((f) => ({ name: f.name, size: f.size }));
-  resolve(url, entries, files);
+  return resolve(url, entries, files);
 }
 
 /**
@@ -435,14 +485,23 @@ async function resolve(url, entries, files) {
   if (list.length === 1) return open(list[0].path);
   if (list.length > 1) return offer(list, name);
 
-  /* Spotlight came back empty, so step 3 happens on its own rather than
-     behind a button. The card that used to sit here spent four lines
+  /* Spotlight came back empty. For a folder, step 3 happens on its own rather
+     than behind a button. The card that used to sit here spent four lines
      explaining what a browser is and is not told about a dropped folder, and
      then asked for one more click to do the only thing left to do. The finder
      dialog opening is that explanation, said in the one language this person
      already speaks, and it is a click shorter. Nothing was lost: the drop did
      not fail, and nothing here says it did. */
-  chooser();
+  if (dir) return chooser();
+
+  /* A drop that was never a folder is a different sentence, and it used to
+     get the same dialog: a photograph, a pdf or a text file put a system
+     modal on screen that nobody asked for, in front of a card with no button
+     on it, and the only way back to the app was to find that dialog behind
+     the window and dismiss it. A drop of loose files is worth the search
+     above, because the folder they came out of is the folder somebody meant.
+     It is not worth a dialog nobody asked for when the search comes up empty. */
+  notFolder(name, files.length);
 }
 
 /** the names and sizes of what is directly inside, which is all spotlight needs */
@@ -481,10 +540,15 @@ const sizeOf = (entry) =>
   });
 
 /* ------------------------------------------------------------------ */
-/* the three panels a person actually reads                            */
+/* the panels a person actually reads                                  */
 /* ------------------------------------------------------------------ */
 
+/* Every one of these is the end of a drop, and every one of them puts the
+   guard down on its way past: what is on screen after this is a question
+   waiting on somebody, and a folder dropped onto it is a fine answer. */
+
 function offer(list, name) {
+  working = false;
   paint({
     mode: "pick",
     eyebrow: "which one",
@@ -513,6 +577,23 @@ function withheld(name, why) {
   });
 }
 
+/** the drop was read and there is no folder anywhere in it */
+function notFolder(name, n) {
+  stop();
+  working = false;
+  paint({
+    mode: "pick",
+    eyebrow: "one more step",
+    line: n > 1 ? "those are files, not a folder"
+      : name ? `${name} is a file, not a folder`
+      : "that is a file, not a folder",
+    note: "keeper opens the folder the photographs are in, and a browser is never told which folder a dropped file came out of.",
+    hint: "point at the folder once and keeper has it from there.",
+    acts: [askFinder(), dismiss()],
+    esc: true,
+  });
+}
+
 /** something really did go wrong, and it says which thing */
 function failed(msg) {
   stop();
@@ -530,32 +611,94 @@ function failed(msg) {
   });
 }
 
+/**
+ * WORK THAT STARTS IN AN EVENT HANDLER HAS NOBODY WAITING ON IT.
+ *
+ * A drop, a click on a candidate, a click on the button that opens the
+ * dialog: none of them is awaited by anything, so a throw inside one is an
+ * unhandled rejection. Nothing on screen would change, the scrim would stay
+ * over the window with no button on it, and the guard that turns the next
+ * drop away would stay up for the rest of the session. Going out through here
+ * means the last thing any of them can do is put a sentence and a way out on
+ * the card.
+ */
+const attempt = (p, said) =>
+  p.catch((e) => {
+    console.error("[keeper]", e);
+    failed(said);
+  });
+
 /* ------------------------------------------------------------------ */
 /* step 3, the native chooser                                          */
 /* ------------------------------------------------------------------ */
+
+/* the dialog that is already on screen. a second call while one is open must
+   not raise a second one: there is one dialog in front of somebody and
+   answering it once is the whole of what they agreed to do. both callers wait
+   on the one request and the answer lands on whichever of them holds the seat
+   by the time it comes back. */
+let pending = null;
 
 /**
  * The request stays open for as long as the dialog is on screen, which can
  * be a minute if someone goes hunting through their disk. A spinner with no
  * words on it would read as a hang, so the card says where the dialog is,
  * once, quietly, and then waits as long as it takes.
+ *
+ * It waits with a way out. The card carried no button and no escape, and a
+ * dialog that opens behind the window rather than in front of it is common
+ * enough that this was a full screen scrim over the app with nothing to press
+ * and no way to know why. Putting the card away does not cancel the dialog
+ * and does not throw the answer away: the seat has not moved, so a folder
+ * picked afterwards still opens.
  */
 async function chooser() {
   stop();
+  /* the machine is not busy here, a person is, so a folder dragged in while
+     the dialog sits there is taken as the answer it plainly is. */
+  working = false;
+  const mine = claim();
   paint({
     mode: "work",
     eyebrow: files(),
     line: "pick the folder",
     note: "the dialog is open in front of this window. keeper is waiting for it.",
+    hint: "it can end up behind this window. not now puts this card away and leaves the dialog open.",
+    acts: [dismiss()],
+    esc: true,
+    back: false,
   });
 
-  const d = await ask("/api/choose", {});
+  let d;
+  try {
+    d = await (pending ??= ask("/api/choose", {}));
+  } finally {
+    /* whatever came back, the dialog is closed and the next call is entitled
+       to open a new one. */
+    pending = null;
+  }
+
+  /* SOMEBODY WENT BACK TO THE WINDOW AND DROPPED THE FOLDER IN INSTEAD.
+     This dialog is then answering a question nobody is asking any more, and
+     all three answers below reach into whatever is running: a cancel put the
+     card away and stopped the poll of the archive that was opening, which
+     left it opening behind a hidden panel with nothing on screen and no error
+     anywhere. Two things say it is stale, and both have to be asked. The seat
+     covers a job that has started. The flag covers the seconds before that,
+     while the drop is still being worked out and has not opened anything yet,
+     which is a narrow window and is exactly the one this was measured going
+     wrong in. */
+  if (mine !== seat || working) return;
+
   /* cancel is an answer, not an error. it goes back to whatever was on
      screen before the dialog went up. */
   if (d?.cancelled) return resume();
   if (d?.path) return open(d.path);
   failed(d?.error || "the folder dialog came back with nothing.");
 }
+
+/* the way in from a button or a click, where nothing is awaiting the answer */
+const dialog = () => attempt(chooser(), "the folder dialog could not be opened.");
 
 /* the empty state on a fresh archive belongs to app.js and this module
    exports nothing, so the way in from there is a click on anything wearing
@@ -564,7 +707,7 @@ async function chooser() {
 addEventListener("click", (e) => {
   if (!e.target.closest?.("[data-keeper-choose]")) return;
   e.preventDefault();
-  chooser();
+  dialog();
 });
 
 /**
@@ -588,7 +731,7 @@ addEventListener("click", (e) => {
   e.preventDefault();
   const where = b.dataset.path;
   if (!where || working) return;
-  open(where, null, true);
+  attempt(open(where, null, true), "that folder did not open again.");
 });
 
 /* ------------------------------------------------------------------ */
@@ -598,6 +741,7 @@ addEventListener("click", (e) => {
 async function open(path, next = null, rescan = false) {
   stop();
   working = true;
+  claim();
   paint({
     mode: "work",
     /* A rescan is the same route and the same wait, and it is not the same
@@ -619,7 +763,10 @@ async function open(path, next = null, rescan = false) {
     const d = await ask("/api/progress", null, "GET");
     if (d?.phase === "scanning" || d?.phase === "thumbnailing") return watch(d.root ?? path);
   }
-  working = false;
+  /* the guard stays up across a handoff. the step that follows is the same
+     drop still being worked out, and dropping it here for the length of one
+     call is a window in which a second drop gets in underneath. whatever the
+     next step ends on puts it down. */
   if (next) return next();
   failed(r ? r.error || "that path did not open." : "the open route did not answer.");
 }
@@ -640,6 +787,7 @@ function stop() {
 export function watch(where) {
   stop();
   working = true;
+  claim();
   idles = 0;
   misses = 0;
   tick(run, where);
