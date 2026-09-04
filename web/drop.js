@@ -567,16 +567,49 @@ addEventListener("click", (e) => {
   chooser();
 });
 
+/**
+ * LOOK AGAIN AT THE FOLDER ALREADY OPEN.
+ *
+ * Same attribute trick as the chooser above, for the same reason: this module
+ * exports nothing and imports nothing from the page, so the way in is a class
+ * of element rather than a function somebody has to import in the right
+ * order. The path rides on the button because asking the server for it would
+ * be a second request for something the page already has written down.
+ *
+ * Without this there was no rescan anywhere in the window at all. The scan
+ * short circuits on an index that is already there, so a photograph added to
+ * an open folder never appeared, a folder renamed inside the archive left
+ * every star under it stranded, and a frame deleted behind keeper's back sat
+ * on the wall until somebody found the command line.
+ */
+addEventListener("click", (e) => {
+  const b = e.target.closest?.("[data-keeper-again]");
+  if (!b) return;
+  e.preventDefault();
+  const where = b.dataset.path;
+  if (!where || working) return;
+  open(where, null, true);
+});
+
 /* ------------------------------------------------------------------ */
 /* opening, and the wait that follows it                               */
 /* ------------------------------------------------------------------ */
 
-async function open(path, next = null) {
+async function open(path, next = null, rescan = false) {
   stop();
   working = true;
-  paint({ mode: "work", eyebrow: "opening", line: tail(path), note: path });
+  paint({
+    mode: "work",
+    /* A rescan is the same route and the same wait, and it is not the same
+       sentence. Somebody who pressed look again is watching a folder they
+       already have open, and being told it is opening reads as keeper having
+       forgotten where it was. */
+    eyebrow: rescan ? "looking again" : "opening",
+    line: tail(path),
+    note: path,
+  });
 
-  const r = await ask("/api/open", { path });
+  const r = await ask("/api/open", { path, rescan });
   if (r?.ok) return watch(r.root ?? path);
 
   /* 409 is the server saying it already has one of these in flight. what it

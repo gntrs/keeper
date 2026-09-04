@@ -146,6 +146,17 @@
   <button id="root" type="button" data-keeper-choose data-icon
           title="open a different folder"></button>
 
+  <!-- A WORD, NOT A GLYPH, and icons.css says why: an icon earns its place
+       only where a word will not fit or where the control repeats down the
+       page, and this is a 220px column holding one of these. It is also the
+       only route to a rescan that exists in the window: the flag has been on
+       the command line since the first version, and until this button there
+       was no way to ask for one without a terminal, so a photograph added to
+       an open folder never appeared and a folder renamed inside the archive
+       left its stars stranded with nothing to clear them. -->
+  <button id="again" type="button" data-keeper-again
+          title="look for photographs added, renamed or removed since this folder was opened">look again</button>
+
   <section>
     <h4 class="label">what</h4>
     <div class="row" id="f-tag"></div>

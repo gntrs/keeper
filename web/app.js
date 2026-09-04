@@ -338,6 +338,19 @@ S.byId = new Map(S.items.map((i) => [i.id, i]));
    rendered as `Volumes/disk/` with the root slash quietly walked to the
    back. U+202A holds the string itself ltr inside an rtl box. */
 $("#root").dataset.path = `\u202A${S.root}\u202C`;
+/* The same path, plainly, on the button beside it. drop.js reads it from
+   there rather than importing anything or asking the server, and it wants the
+   real string: the marks above are for the css that draws the path backwards,
+   and a folder name with two invisible characters glued to it is not a folder
+   any operating system has. */
+{
+  const again = $("#again");
+  if (again) {
+    if (S.root) again.dataset.path = S.root;
+    /* Nothing to look again at until there is a folder. */
+    else again.disabled = true;
+  }
+}
 
 /**
  * A PAGE THAT OPENED WHILE THE SCAN WAS STILL RUNNING.

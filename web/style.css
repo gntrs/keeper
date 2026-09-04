@@ -311,6 +311,19 @@ header.bar nav.seg button.on { background: #ffffff14; color: var(--ink); }
 }
 #root:hover { color: var(--ink); background: #ffffff12; }
 
+/* Under the path, in the path's own type, one step quieter than it. It is a
+   rare thing to press and it sits beside the thing it is about, which is the
+   whole argument for it being here rather than behind the question mark. */
+#again {
+  display: block; width: 100%; text-align: left;
+  border: 0; background: none; cursor: pointer;
+  padding: 3px var(--s2); margin: calc(var(--s2) * -1) 0 var(--s2);
+  border-radius: var(--r);
+  font: 400 .72rem/1.5 var(--mono); color: var(--ink-3);
+}
+#again:hover { color: var(--ink); background: #ffffff12; }
+#again[disabled] { opacity: .45; cursor: default; background: none; }
+
 /* The progress strip. Three pixels under the bar that answer "how far
    through the day am I" without a number: kept in the accent, binned in a
    quiet white, undecided in the hairline grey. The widths come from the
