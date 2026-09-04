@@ -95,10 +95,21 @@ async function body(req) {
  * erases the rest, while every request in the burst reports ok. So the
  * read, the change and the write are made one turn each: the queue is this
  * process, which is the only writer these files have.
+ *
+ * AND EVERY JOB NAMES THE ARCHIVE IT IS FOR, taken when the request arrived
+ * rather than read when the job runs. The folder is a variable /api/open
+ * reassigns, and the page sends one request per frame for a bulk keep, so
+ * dropping a new folder on the window a second after pressing keep used to
+ * land the rest of that burst in the folder that had just been opened.
+ * Measured: 240 tag writes left the first archive holding 1 row of 30 and put
+ * 30 of its ids into the second, 200 bin writes left 2 of 200, and on two
+ * copies of one shoot, which share ids because an id is a hash of the path
+ * inside the archive, a delete emptied the index of the archive nobody had
+ * touched. Every one of them answered 200.
  */
 let turn = Promise.resolve();
-function amend(job) {
-  const run = turn.then(job, job);
+function amend(at, job) {
+  const run = turn.then(() => job(at), () => job(at));
   turn = run.then(() => {}, () => {});
   return run;
 }
@@ -726,11 +737,11 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         const ids = Array.isArray(b.ids) ? b.ids : [];
         if (!ids.length) return json(res, 400, { error: "no frames named" });
 
-        const next = await amend(async () => {
-          const have = new Set(await readBinned(root));
+        const next = await amend(root, async (here) => {
+          const have = new Set(await readBinned(here));
           for (const id of ids) b.put ? have.delete(id) : have.add(id);
           const out = [...have];
-          await writeBinned(root, out);
+          await writeBinned(here, out);
           return out;
         });
         return json(res, 200, { ok: true, binned: next });
@@ -753,11 +764,18 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
       if (route === "/api/trash" && req.method === "POST") {
         if (!machine) return json(res, 400, { error: `deleting needs ${HOSTS}` });
 
+        /* Taken once, at the top, and used for the whole of it. This route
+           reads the index, reads the bin, builds absolute paths and then
+           moves files, with an await between every pair of those, and the
+           folder underneath it can be reassigned by /api/open at any of them.
+           Deleting out of one archive while reading the index of another is
+           the worst version of that, so it is not left to chance here. */
+        const here = root;
         const b = await body(req);
         const ids = Array.isArray(b.ids) ? b.ids : [];
         if (!ids.length) return json(res, 400, { error: "no frames named" });
 
-        const index = await readIndex(root);
+        const index = await readIndex(here);
         const known = new Map((index?.items ?? []).map((i) => [i.id, i]));
         const hits = ids.map((id) => known.get(id)).filter(Boolean);
         if (hits.length !== ids.length) return json(res, 404, { error: "unknown frame" });
@@ -768,12 +786,12 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
            file is only reachable from a screen you had to go to on purpose.
            A single request that both binned and trashed would put the file
            back within one keystroke of a photograph. */
-        const set = new Set(await readBinned(root));
+        const set = new Set(await readBinned(here));
         if (!ids.every((id) => set.has(id))) {
           return json(res, 409, { error: "only frames already in the bin can be deleted" });
         }
 
-        const abs = hits.map((h) => path.join(root, h.path));
+        const abs = hits.map((h) => path.join(here, h.path));
 
         /* WHAT THE PLATFORM SAYS HAPPENED IS NOT WHAT HAPPENED, AND ONLY ONE
            OF THE TWO IS WORTH ACTING ON. On windows a file another program
@@ -802,7 +820,7 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
            placements are deliberately left alone, because a frame put back
            from the wastebasket comes back to its own tags: an id is a hash of
            the path and the path did not change. */
-        const out = await amend(async () => {
+        const out = await amend(here, async () => {
           const gone = [];
           const left = [];
           for (let i = 0; i < hits.length; i++) {
@@ -814,15 +832,15 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
             }
           }
           const drop = new Set(gone);
-          const now = await readIndex(root);
-          await writeIndex(root, {
+          const now = await readIndex(here);
+          await writeIndex(here, {
             ...now,
             items: (now?.items ?? []).filter((i) => !drop.has(i.id)),
           });
           // out of the bin as well, because the bin is a list of frames on
           // the drive and these are not on the drive any more
-          const binned = await readBinned(root);
-          await writeBinned(root, binned.filter((id) => !drop.has(id)));
+          const binned = await readBinned(here);
+          await writeBinned(here, binned.filter((id) => !drop.has(id)));
           return { gone, left };
         });
 
@@ -860,15 +878,15 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         }
 
         const wanted = rows.filter((r) => r && typeof r.id === "string" && r.id);
-        await amend(async () => {
-          const tags = await readTags(root);
+        await amend(root, async (here) => {
+          const tags = await readTags(here);
           for (const r of wanted) {
             const cur = tags[r.id] ?? {};
             if ("tag" in r) cur.tag = r.tag || undefined;
             if ("star" in r) cur.star = r.star ? 1 : 0;
             tags[r.id] = cur;
           }
-          await writeTags(root, tags);
+          await writeTags(here, tags);
         });
         return json(res, 200, { ok: true, applied: wanted.length });
       }
@@ -890,19 +908,19 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         if (hit.kind === "film") {
           return json(res, 400, { error: "a clip cannot be placed. the bench cuts stills, and a clip is film." });
         }
-        await amend(async () => {
-          const p = await readPlacements(root);
+        await amend(root, async (here) => {
+          const p = await readPlacements(here);
           p[b.slot] = { id: b.id, place: b.place };
-          await writePlacements(root, p);
+          await writePlacements(here, p);
         });
         return json(res, 200, { ok: true });
       }
 
       if (route === "/api/place" && req.method === "DELETE") {
-        await amend(async () => {
-          const p = await readPlacements(root);
+        await amend(root, async (here) => {
+          const p = await readPlacements(here);
           delete p[url.searchParams.get("slot")];
-          await writePlacements(root, p);
+          await writePlacements(here, p);
         });
         return json(res, 200, { ok: true });
       }
@@ -919,11 +937,11 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
 
       if (route === "/api/trays" && req.method === "POST") {
         const b = await body(req);
-        const { doc, tray } = await amend(async () => {
-          const doc2 = await readTrays(root);
+        const { doc, tray } = await amend(root, async (here) => {
+          const doc2 = await readTrays(here);
           const tray2 = newTray(doc2, b.name);
           doc2.active = tray2.id;
-          await writeTrays(root, doc2);
+          await writeTrays(here, doc2);
           return { doc: doc2, tray: tray2 };
         });
         return json(res, 200, { ok: true, tray, ...doc });
@@ -957,8 +975,8 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
           return json(res, 400, { error: `no export mode called ${b.mode}` });
         }
 
-        const doc = await amend(async () => {
-          const doc2 = await readTrays(root);
+        const doc = await amend(root, async (here) => {
+          const doc2 = await readTrays(here);
           const tray = trayById(doc2, b.id);
           if (!tray) return null;
 
@@ -973,7 +991,7 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
           if (b.remove?.length) removeFrom(tray, b.remove);
           if (b.active) doc2.active = tray.id;
 
-          await writeTrays(root, doc2);
+          await writeTrays(here, doc2);
           return doc2;
         });
         if (!doc) return json(res, 404, { error: "no such tray" });
@@ -981,11 +999,11 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
       }
 
       if (route === "/api/trays" && req.method === "DELETE") {
-        const { doc, last, gone } = await amend(async () => {
-          const doc2 = await readTrays(root);
+        const { doc, last, gone } = await amend(root, async (here) => {
+          const doc2 = await readTrays(here);
           const last2 = doc2.trays.length === 1;
           const gone2 = dropTray(doc2, url.searchParams.get("id"));
-          if (gone2.ok) await writeTrays(root, doc2);
+          if (gone2.ok) await writeTrays(here, doc2);
           return { doc: doc2, last: last2, gone: gone2 };
         });
         if (!gone.ok) return json(res, 404, { error: "no such tray" });
@@ -1022,13 +1040,13 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
              straight from here was a write outside the queue holding a copy of
              trays.json from before the export started, and a rename typed
              while an export ran was measured being erased by it. */
-          await amend(async () => {
-            const d = await readTrays(root);
+          await amend(root, async (here) => {
+            const d = await readTrays(here);
             const t = trayById(d, b.id);
             if (t) {
               t.mode = out.mode;
               t.dest = out.dest;
-              await writeTrays(root, d);
+              await writeTrays(here, d);
             }
           });
           return json(res, 200, {
