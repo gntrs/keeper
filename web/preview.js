@@ -221,6 +221,23 @@ export function open(item, run = filtered) {
     media.onload = () => size(media.naturalWidth, media.naturalHeight);
   }
   /**
+   * A BLACK CARD IS NOT AN ANSWER.
+   *
+   * Every path into this card ends at one img and, until this existed, a
+   * request that came back anything other than a photograph ended at nothing
+   * at all: the card opened, the meta bar printed the size and the path, and
+   * the frame above it was a black rectangle with no reason in it. Measured,
+   * not assumed: a file moved in the finder with keeper still open, opened
+   * from the shelf, gives exactly that.
+   *
+   * The server is asked what happened rather than guessed at, because the two
+   * cases want different sentences and only it knows which one this is. A
+   * frame whose file has moved is a rescan away from being right; a frame
+   * whose thumbnail failed to decode is a different problem with a different
+   * fix, and telling somebody the wrong one costs them the afternoon.
+   */
+  media.onerror = () => explain(media, item);
+  /**
    * A NEGATIVE SAYS SO, IN THE CORNER.
    *
    * No browser draws an ARW, so a raw frame is shown through a jpeg proxy
@@ -263,6 +280,55 @@ export function open(item, run = filtered) {
   host.classList.add("deep");
   stir();
   fit();
+}
+
+/**
+ * Replaces the picture with the reason there is no picture.
+ *
+ * The stage keeps the raw mark and anything else already on it, so this
+ * swaps only the media element and the card is otherwise untouched: the path
+ * is still there to read, and reveal in finder is still there to press, which
+ * on a moved file is the single most useful button on the screen.
+ */
+async function explain(media, item) {
+  if (media !== $("#preview .preview-stage")?.firstChild) return;
+  let said = "keeper could not open this frame.";
+  try {
+    const r = await fetch(`/full/${item.id}`);
+    if (r.ok) {
+      /* The file went out fine and the browser would not draw it, which is a
+         different problem with a different fix and is worth separating: the
+         usual cause is a name that does not match what is inside the file.
+         The body is cancelled rather than read, because there is nothing in
+         it worth having and it can be twenty megabytes of it. */
+      r.body?.cancel();
+      said = "that file is there and the browser could not draw it. it may not be the kind of picture its name says it is.";
+    } else {
+      const body = await r.json().catch(() => null);
+      if (body?.error) said = body.error;
+    }
+  } catch {
+    said = "keeper is not answering. the window that was serving this folder may have been closed.";
+  }
+  const note = document.createElement("p");
+  note.className = "stage-gone";
+  note.textContent = said;
+  media.replaceWith(note);
+  /* The stage was sized to the frame's own 3000x2000 before the request came
+     back, so leaving it there gives a card the size of a photograph with one
+     line of text adrift in the middle of it. The measurement is dropped and
+     the sentence is allowed to size the box, and real is cleared as well so
+     the resize handler cannot lay the old number back down. */
+  real = { w: 0, h: 0 };
+  /* Sized for the sentence and for the row of facts underneath it, which is
+     the wider of the two: left to shrink-wrap the text alone the card came
+     out at about 300px and the meta strip clipped its own resolution and
+     wrapped the tray button onto a second line. Never past the same 88% of
+     the window every other measurement in this card respects. */
+  const stage = $("#preview .preview-stage");
+  stage.style.width = `${Math.round(Math.min(innerWidth * 0.88, 520))}px`;
+  stage.style.height = "220px";
+  trim($("#preview .preview-facts"));
 }
 
 /**

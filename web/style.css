@@ -1415,6 +1415,9 @@ figure .why {
    about. the reason itself rides on the tile's title, because a decoder
    message is a sentence and this is a space for one word. */
 figure .why.bad { color: var(--warn); }
+/* see the note beside nopreview in shelf.js: hidden, not gone, so the tile
+   keeps the height its aspect-ratio gives it. */
+figure.nopreview img { visibility: hidden; }
 
 /* --- empty states --------------------------------------------------- */
 .blank {
@@ -1999,6 +2002,16 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
   /* the stage touches the photograph, so it is the neutral deep, not a
      chrome step: the old #08080a was two points blue and blue is a bias. */
   background: var(--deep);
+}
+/* The sentence that stands where the photograph would be, when there is no
+   photograph to stand there. Centred in the stage rather than pinned to a
+   corner, because it is the only thing on that surface and a note in the
+   corner of a black rectangle reads as an error the app is embarrassed by.
+   Ink at the quiet step: it is a fact about a file, not an alarm. */
+.stage-gone {
+  margin: auto; padding: var(--s5);
+  max-width: 34ch; text-align: center;
+  font: .82rem/1.55 var(--sans); color: var(--ink-2);
 }
 .preview-stage img, .preview-stage video {
   display: block; margin: auto;

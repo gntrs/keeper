@@ -195,6 +195,15 @@ function slotEl(slot) {
   const empty = document.createElement("div");
   empty.className = "empty";
   empty.textContent = "drag a frame here";
+  /* The same failure the quick look card had: a slot holding a frame whose
+     file has moved drew a black hole with a crop rectangle over nothing, and
+     the numbers under it went on describing a photograph that is not there.
+     The slot keeps its empty state's voice and says the actual reason. */
+  img.addEventListener("error", () => {
+    img.hidden = true;
+    empty.hidden = false;
+    empty.textContent = "that file is not where keeper left it";
+  });
   box.append(img, empty);
 
   const nums = document.createElement("div");
@@ -750,6 +759,10 @@ function paint(slotId) {
   if (!p) {
     hit.img.hidden = true;
     hit.empty.hidden = false;
+    /* back to the invitation. the empty box doubles as the place a failure is
+       reported, so a slot emptied after one would otherwise go on saying a
+       file had moved while asking for nothing. */
+    hit.empty.textContent = "drag a frame here";
     hit.nums.textContent = "";
     hit.zoom.hidden = true;
     return;
@@ -762,6 +775,7 @@ function paint(slotId) {
   }
 
   hit.empty.hidden = true;
+  hit.empty.textContent = "drag a frame here";
   hit.img.hidden = false;
   const want = `/full/${item.id}`;
   // a trial points fourteen of these at one url in the same tick, and the

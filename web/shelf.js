@@ -996,7 +996,61 @@ function dress(item, n) {
        poster, and two words in the same place is one word too many. */
     item.error && "unread",
     !item.error && item.kind === "film" && !item.w && "noposter",
+    /* a thumbnail that would not load. it lives in a set rather than on the
+       element because renderShelf patches a tile in place by rewriting this
+       whole class name, and a class only missing() knew about was wiped by
+       the next keystroke: the tile kept its word and grew the browser's
+       broken picture glyph back underneath it, which is the exact thing the
+       note beside missing() says it exists to prevent. */
+    blank.has(item.id) && "nopreview",
   ].filter(Boolean).join(" ");
+}
+
+/**
+ * A TILE THAT CANNOT SHOW ITS PHOTOGRAPH SAYS SO.
+ *
+ * Until this existed the answer was the browser's own broken picture glyph on
+ * a black square, which says nothing, offers nothing and looks identical to a
+ * frame keeper simply has not got to yet. Two of them in a wall of two
+ * thousand read as the app being wrong rather than as two thumbnails being
+ * missing, which is a much smaller thing and a fixable one.
+ *
+ * One retry first, and only one. A thumbnail request can lose a race with the
+ * scan that is still writing it, or with the folder being re-pointed under
+ * the page, and both of those heal on their own within a moment. What does
+ * not heal is a thumbnail that is not there, and after the second failure the
+ * tile stops asking and starts explaining. The count is kept per frame rather
+ * than per element because the shelf rebuilds its tiles on every render, and
+ * a counter that lived on the element would reset each time and retry for
+ * ever.
+ */
+const retried = new Set();
+const blank = new Set();
+
+function missing(fig, item, img) {
+  if (!retried.has(item.id)) {
+    retried.add(item.id);
+    setTimeout(() => {
+      img.addEventListener("error", () => missing(fig, item, img), { once: true });
+      img.src = `/thumb/${item.id}?again=1`;
+    }, 400);
+    return;
+  }
+  /* the index already had a word for this frame, and its reason is the better
+     one: it names the decoder's own complaint. */
+  if (fig.querySelector(".why")) return;
+  /* The picture stays in the layout and stops being painted. Removing it
+     would collapse the tile, because its aspect-ratio is what gives the row
+     its height, and leaving it visible would put the browser's own broken
+     picture glyph in the corner underneath keeper's word for the same thing,
+     which is two answers to one question. */
+  blank.add(item.id);
+  fig.classList.add("nopreview");
+  const why = document.createElement("span");
+  why.className = "why";
+  why.textContent = "no preview";
+  fig.append(why);
+  fig.title = "keeper has no thumbnail for this frame. rescan the folder to build it.";
 }
 
 function tile(item, n) {
@@ -1016,6 +1070,7 @@ function tile(item, n) {
 
   const img = new Image();
   img.loading = "lazy"; img.decoding = "async"; img.src = `/thumb/${item.id}`; img.alt = "";
+  img.addEventListener("error", () => missing(fig, item, img), { once: true });
   fig.append(img);
 
   /* WHY THIS TILE IS BLANK, WHICH THE INDEX ALREADY KNEW.
