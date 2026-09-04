@@ -65,7 +65,12 @@
   background: var(--hot);
   color: #ffffff;
 }
-.tour-next:hover { background: #f01536; color: #ffffff; }
+/* the lift is made out of the one red there is rather than out of a new hex,
+   the same way every other hover on the accent in this app is. #f01536 sat
+   here and was a fifth red in no token block, and it took the white label on
+   this button to 4.32:1, under AA, on the one control a card is asking you
+   to press. */
+.tour-next:hover { filter: brightness(1.16); }
 
 /* the entry, re-run on every step by tour.js taking the class off and
    putting it back. it is two pixels and a fade, because the card has

@@ -41,6 +41,23 @@
 </head>
 <body>
 
+<!--
+  THE TOOLBAR, ONE ROW, AND WHY IT IS ONE ROW.
+
+  Everything used to be on screen at once: the bar, then a filter block that
+  came out 474 pixels tall at 800 wide because sixteen tag chips, six folder
+  chips and the only row all wrapped. At 800 by 600 that meant 434 of the 600
+  pixels were furniture before a single photograph, and the window itself
+  scrolled. A tool whose whole job is showing pictures had put its controls
+  in front of them.
+
+  So the room is split the way a mac application splits it. One toolbar
+  across the top that never wraps, a source list down the side that holds
+  every filter, and the wall gets the rest. What is up here is what is true
+  of the whole window: which archive, which view, how the day is going, and
+  the two panels. Everything that filters what the wall is showing went into
+  the sidebar, where a filter belongs.
+-->
 <header class="bar">
   <!--
     A red square and the word, set tight to each other so they read as one
@@ -54,22 +71,30 @@
     </svg>
     <strong>keeper</strong>
   </span>
-  <nav>
+  <!--
+    Two places you can be, drawn as one control rather than as two words
+    that happen to sit next to each other. A segmented control says the
+    choice is exclusive before it is read, which is the whole reason every
+    toolbar on this machine uses one for exactly this.
+  -->
+  <nav class="seg">
     <button data-view="shelf" class="on">shelf</button>
     <button data-view="bench">bench</button>
   </nav>
   <span id="tally"></span>
   <span class="grow"></span>
   <!--
-    Whether a decision walks you onward to the next frame nobody has decided
-    about. shelf.js owns the state, the click and the persisted bit; the
-    keycap on the label is honest because app.js answers the chord even with
-    a photograph open, where the shelf hands the bare k to the card. It sits
-    up here rather than in the filter row because it changes what the
-    keyboard does, not what the wall is showing.
+    The search moved up here out of the filter row, because it asks about the
+    whole archive rather than about a folder or a tag, and because it is the
+    one filter a hand reaches for without looking. It belongs to the shelf, so
+    the stylesheet takes it away on the bench, where the strip has its own.
   -->
-  <button id="advance-toggle" class="chip" type="button" aria-pressed="false"
-          title="after a decision, land on the next frame nobody has decided about">auto advance <kbd>⌥K</kbd></button>
+  <span class="find shelf"><input type="search" id="f-q" placeholder="search the path"></span>
+  <!-- the sidebar, and its answer is remembered. app.js owns the stored bit
+       and the option s chord; this is the only thing on screen that shows it. -->
+  <button id="side-toggle" class="shelf" type="button" data-icon="only"
+          aria-pressed="true" title="show or hide the sidebar, option s"></button>
+  <button id="tray-toggle" type="button" aria-expanded="false">tray</button>
   <!-- the only way in to the shortcuts, other than the key it names -->
   <button id="keys-toggle" type="button" aria-expanded="false"
           title="shortcuts">?</button>
@@ -79,11 +104,6 @@
        the window, not by finding a file on the disk. -->
   <button id="ver" class="label" type="button" hidden
           title="check for a newer keeper"></button>
-  <button id="tray-toggle" type="button" aria-expanded="false">tray</button>
-  <!-- the folder you are looking at, and the control that changes it.
-       drop.js listens for [data-keeper-choose] anywhere on the page. -->
-  <button id="root" type="button" data-keeper-choose data-icon
-          title="open a different folder"></button>
 </header>
 
 <!--
@@ -96,15 +116,51 @@
 -->
 <div id="progress" aria-hidden="true"><i class="p-kept"></i><i class="p-bin"></i><i class="p-left"></i></div>
 
-<section id="shelf" class="view">
-  <div id="filters">
-    <div class="row"><b class="label">what</b><span id="f-tag"></span></div>
-    <div class="row"><b class="label">where</b><span id="f-dir"></span></div>
+<!--
+  The window below the toolbar: the source list, then whichever view is up.
+
+  THE SIDEBAR IS A SIBLING OF THE VIEWS AND NOT A CHILD OF THE SHELF, which
+  looks like the wrong nesting and is not. app.js replaces the whole of
+  #shelf with the blank state on an archive with nothing in it, and it then
+  reaches for #advance-toggle by id. A sidebar inside #shelf would be thrown
+  away by that write and the reach would land on nothing, which stops the
+  page booting. Out here the column survives, and the stylesheet takes it off
+  the screen on the bench and on the blank state, which is what was wanted
+  from it either way.
+-->
+<main class="frame">
+
+<!--
+  THE SOURCE LIST.
+
+  Every filter in one column of rows: a leading key or hue dot, the name, and
+  the count held right in the mono cut. Not a field of chips. A chip row
+  wraps, and sixteen tags wrapping is the slab this layout exists to delete;
+  a list of rows is the same information in a fixed width that scrolls on its
+  own and never pushes the photographs anywhere.
+-->
+<aside id="filters">
+  <!-- the folder you are looking at, and the control that changes it.
+       drop.js listens for [data-keeper-choose] anywhere on the page, so
+       option o still finds this with the column shut. -->
+  <button id="root" type="button" data-keeper-choose data-icon
+          title="open a different folder"></button>
+
+  <section>
+    <h4 class="label">what</h4>
+    <div class="row" id="f-tag"></div>
+  </section>
+
+  <section>
+    <h4 class="label">where</h4>
+    <div class="row" id="f-dir"></div>
+  </section>
+
+  <section>
+    <h4 class="label">only</h4>
     <div class="row">
-      <b class="label">only</b>
-      <button class="chip" id="f-star">kept <i></i></button>
-      <button class="chip" id="f-untagged">untagged <i></i></button>
-      <button class="chip" id="f-clear">clear</button>
+      <button class="chip" id="f-star"><span class="word">kept</span> <i></i></button>
+      <button class="chip" id="f-untagged"><span class="word">untagged</span> <i></i></button>
       <!--
         The bin, and what is in it.
 
@@ -119,44 +175,77 @@
         do rather than carrying an icon, because it is the one control in
         keeper that touches an original file and the one place a word is
         worth the room it takes.
+
+        The two of them are last in the row and adjacent, because shelf.js
+        moves the pair into the bin's own bar and puts them back here by
+        remembering this parent and the node after them.
       -->
-      <button class="chip" id="f-binned">in the bin <i></i></button>
+      <button class="chip" id="f-binned"><span class="word">in the bin</span> <i></i></button>
+      <button class="chip" id="f-clear">clear</button>
       <button class="chip" id="f-bin" hidden>set aside</button>
       <button class="chip" id="f-nuke" hidden>delete off the drive</button>
-      <span class="find"><input type="search" id="f-q" placeholder="search the path"></span>
-      <span class="grow"></span>
-      <!--
-        how many frames across. a contact sheet is a density argument and the
-        right density is different for culling a thousand and for choosing
-        between four, so it is a control rather than a number in a
-        stylesheet. the readout counts columns rather than naming a size,
-        because how many fit is the thing you are actually deciding.
-      -->
-      <label class="size">
-        <span class="label">size</span>
-        <input type="range" id="f-size" min="120" max="380" step="4" value="208"
-               aria-label="how many frames across">
-        <output id="f-size-n" class="num"></output>
-      </label>
     </div>
-  </div>
-  <div id="grid"></div>
+  </section>
+
   <!--
-    The loop, taught on the one screen with nothing to practise it on.
-    Five keycaps under the sentence: the daily rhythm in one line, so the
-    keys are familiar before the frames are. The sentence above belongs to
-    shelf.js, which writes it as text and throws this line away in the
-    process; app.js watches and puts the line back, the same guard the
-    tally keeps over its own chips. There is no export key to print, so
-    the fifth cap is the tray, which is where an export starts.
+    The foot of the column, and it stays put while the filters above it
+    scroll. Both of these are settings about the run rather than filters on
+    it: how big the frames are drawn, and whether a decision walks you on to
+    the next one. Neither changes what the wall is showing.
   -->
-  <p id="none" hidden>nothing matches that.<br>
-    <span class="none-keys"><kbd>k</kbd> keep <kbd>⌫</kbd> set aside <kbd>␣</kbd> look <kbd>⌘Z</kbd> undo <kbd>⌘⏎</kbd> tray</span></p>
+  <footer>
+    <!--
+      how many frames across. a contact sheet is a density argument and the
+      right density is different for culling a thousand and for choosing
+      between four, so it is a control rather than a number in a stylesheet.
+      the readout counts columns rather than naming a size, because how many
+      fit is the thing you are actually deciding.
+    -->
+    <label class="size">
+      <span class="size-say">
+        <span class="label">size</span>
+        <output id="f-size-n" class="num"></output>
+      </span>
+      <input type="range" id="f-size" min="120" max="380" step="4" value="208"
+             aria-label="how many frames across">
+    </label>
+    <!--
+      Whether a decision walks you onward to the next frame nobody has
+      decided about. shelf.js owns the state, the click and the persisted
+      bit; the keycap on the label is honest because app.js answers the chord
+      even with a photograph open, where the shelf hands the bare k to the
+      card.
+    -->
+    <button id="advance-toggle" class="chip" type="button" aria-pressed="false"
+            title="after a decision, land on the next frame nobody has decided about">auto advance <kbd>⌥K</kbd></button>
+  </footer>
+</aside>
+
+<section id="shelf" class="view">
+  <!--
+    The wall, and nothing competes with it. Its own gutter stands between the
+    sidebar's hairline and the first frame, so nothing warm ever shares an
+    edge with a photograph.
+  -->
+  <div class="wall">
+    <div id="grid"></div>
+    <!--
+      The loop, taught on the one screen with nothing to practise it on.
+      Five keycaps under the sentence: the daily rhythm in one line, so the
+      keys are familiar before the frames are. The sentence above belongs to
+      shelf.js, which writes it as text and throws this line away in the
+      process; app.js watches and puts the line back, the same guard the
+      tally keeps over its own chips. There is no export key to print, so
+      the fifth cap is the tray, which is where an export starts.
+    -->
+    <p id="none" hidden>nothing matches that.<br>
+      <span class="none-keys"><kbd>k</kbd> keep <kbd>⌫</kbd> set aside <kbd>␣</kbd> look <kbd>⌘Z</kbd> undo <kbd>⌘⏎</kbd> tray</span></p>
+  </div>
   <!--
     The bin's own bar, and it is empty on purpose.
 
     `put back` and `delete off the drive` are not written here. They are the
-    same two buttons that sit in the filter row on the shelf, moved into this
+    same two buttons that sit in the sidebar's only section, moved into this
     bar when you enter the bin and moved back when you leave. One element
     each, so there is one set of handlers, one label that already knows how
     to say `put back` in here and `set aside` out there, and no second copy
@@ -206,6 +295,8 @@
     <p id="bench-export-result" class="dim"></p>
   </div>
 </section>
+
+</main>
 
 <!--
   The tray sits outside both views rather than inside the shelf, because it
@@ -267,18 +358,24 @@
   resolves cmd+r, cmd+o and cmd+1 through cmd+9 above the page on a mac, and
   the control versions of all three above the page on a pc, so preventDefault
   runs and the tab reloads anyway. Same problem both sides, same answer.
+
+  A gesture with no key is still a shortcut. Click to open a frame and hover
+  to move the cursor are the first two things anybody does in this app and
+  neither of them was written down anywhere, which made the sheet a list of
+  the things people were least likely to reach for.
 -->
 <footer id="keys" hidden>
   <!--
     Two panes behind one key, because they answer the same question.
 
     The settings were three switches scattered across the app: the sound
-    lived up here beside the shortcuts, auto advance lives in the bar, and
-    whether keeper may look for a newer keeper could only ever be answered
-    once, on a card that never came back. Somebody who wanted to change their
-    mind about any of them had nowhere to go and no reason to think there
-    was anywhere. So the panel that already answers "how does this respond to
-    me" answers all of it now, on the key people already press to ask.
+    lived up here beside the shortcuts, auto advance lives in the sidebar,
+    and whether keeper may look for a newer keeper could only ever be
+    answered once, on a card that never came back. Somebody who wanted to
+    change their mind about any of them had nowhere to go and no reason to
+    think there was anywhere. So the panel that already answers "how does
+    this respond to me" answers all of it now, on the key people already
+    press to ask.
 
     Tabs and not a second sheet: the shortcuts are what you came for and they
     stay one press away, and the settings are the pane you go to on purpose.
@@ -294,13 +391,17 @@
   <div class="keys-cols" data-pane="keys">
     <section>
       <h4 class="label">looking</h4>
+      <div class="k"><span class="ks">click</span><span>open it</span></div>
+      <div class="k"><span class="ks">hover</span><span>the cursor follows the pointer</span></div>
       <div class="k"><span class="ks"><kbd>←↑↓→</kbd></span><span>move</span></div>
       <div class="k"><span class="ks"><kbd>-</kbd><kbd>=</kbd></span><span>smaller, bigger</span></div>
       <div class="k"><span class="ks"><kbd>␣</kbd></span><span>look at this one, again to put it away</span></div>
       <div class="k"><span class="ks"><kbd>⌥1</kbd><kbd>⌥2</kbd></span><span>shelf, bench</span></div>
       <div class="k"><span class="ks"><kbd>⌘F</kbd></span><span>search</span></div>
+      <div class="k"><span class="ks"><kbd>⌥S</kbd></span><span>the sidebar</span></div>
       <div class="k"><span class="ks"><kbd>⌥O</kbd></span><span>another folder</span></div>
       <div class="k"><span class="ks"><kbd>⌥R</kbd></span><span data-files>show it in finder</span></div>
+      <div class="k"><span class="ks"><kbd>?</kbd></span><span>this sheet</span></div>
     </section>
     <section>
       <h4 class="label">tagging</h4>
@@ -312,6 +413,18 @@
       <div class="k"><span class="ks"><kbd>⇧⌘Z</kbd></span><span>do it again</span></div>
       <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>set it aside, nothing is deleted</span></div>
     </section>
+    <!--
+      The card the space bar opens has four keys of its own and the sheet
+      named none of them, so the arrows that page a run and the z that goes
+      to one pixel to one were reachable only by somebody who tried them.
+    -->
+    <section>
+      <h4 class="label">quick look</h4>
+      <div class="k"><span class="ks"><kbd>←→</kbd></span><span>the one beside it</span></div>
+      <div class="k"><span class="ks"><kbd>z</kbd></span><span>fit, or one pixel to one</span></div>
+      <div class="k"><span class="ks"><kbd>␣</kbd></span><span>put it away</span></div>
+      <div class="k"><span class="ks"><kbd>⎋</kbd></span><span>close</span></div>
+    </section>
     <section>
       <h4 class="label">picking</h4>
       <div class="k"><span class="ks"><kbd>⇧</kbd>click</span><span>a run of them</span></div>
@@ -320,6 +433,7 @@
       <div class="k"><span class="ks">drag out</span><span>the whole pick, to another app</span></div>
       <div class="k"><span class="ks"><kbd>⌘A</kbd></span><span>all, again for none</span></div>
       <div class="k"><span class="ks"><kbd>⌘⏎</kbd></span><span>the pick, into the tray</span></div>
+      <div class="k"><span class="ks"><kbd>⏎</kbd></span><span>in the tray's folder field, export it</span></div>
       <div class="k"><span class="ks"><kbd>⎋</kbd></span><span>let the pick go</span></div>
     </section>
     <section>
@@ -331,13 +445,15 @@
       <div class="k"><span class="ks"><kbd>⏎</kbd></span><span>into the chosen empty slot</span></div>
       <div class="k"><span class="ks"><kbd>⇥</kbd></span><span>walk the slots</span></div>
       <div class="k"><span class="ks"><kbd>⌥</kbd>wheel</span><span>punch in, or pinch</span></div>
+      <div class="k"><span class="ks"><kbd>=</kbd><kbd>-</kbd></span><span>punch in, pull back</span></div>
+      <div class="k"><span class="ks"><kbd>⇧</kbd><kbd>←↑↓→</kbd></span><span>move the crop in bigger steps</span></div>
       <div class="k"><span class="ks"><kbd>0</kbd></span><span>the whole frame back</span></div>
       <div class="k"><span class="ks"><kbd>⌫</kbd></span><span>empty the slot</span></div>
     </section>
   </div>
 
   <!--
-    Four switches and a sentence about where things are kept.
+    Five switches and a sentence about where things are kept.
 
     Every one of them says what it does to your machine rather than naming
     itself. "checking for a newer keeper" and not "updates", because the
@@ -357,14 +473,14 @@
       <button class="chip" id="feel-toggle" type="button" aria-pressed="false">sound off</button>
     </div>
 
-    <!-- the same switch as the one in the bar and the same one ⌥K throws.
-         settings.js clicks that button rather than keeping a second copy of
-         the state, so the two can never disagree. -->
+    <!-- the same switch as the one in the sidebar and the same one ⌥K
+         throws. settings.js clicks that button rather than keeping a second
+         copy of the state, so the two can never disagree. -->
     <div class="set" id="set-advance-row">
       <div class="set-say">
         <b>auto advance</b>
         <p>after a decision, land on the next frame nobody has decided about.
-           the same switch as the one in the bar, and <kbd>⌥K</kbd>.</p>
+           the same switch as the one in the sidebar, and <kbd>⌥K</kbd>.</p>
       </div>
       <button class="chip" id="set-advance" type="button" aria-pressed="true">on</button>
     </div>
@@ -384,6 +500,18 @@
         <p>the cards a first run gets, over your own archive.</p>
       </div>
       <button class="chip" id="set-tour" type="button">show it again</button>
+    </div>
+
+    <!-- the mac build ships nothing on PATH, so `keeper doctor` is a command
+         a tester on that build cannot run, and this pane is the only place
+         they can reach the same nine answers. -->
+    <div class="set" id="set-doctor-row">
+      <div class="set-say">
+        <b>what works on this machine</b>
+        <p>nine checks, in sentences. copy the answer when you ask for help.</p>
+        <pre id="set-doctor-out" class="num" hidden></pre>
+      </div>
+      <button class="chip" id="set-doctor" type="button">check</button>
     </div>
 
     <p class="set-foot">everything keeper writes about your photographs lives

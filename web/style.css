@@ -173,14 +173,29 @@ button { transition: color var(--fast) var(--ease), background var(--fast) var(-
 }
 ::selection { background: var(--hot); color: #fff; }
 
-/* --- top bar ------------------------------------------------------- */
+/* --- the toolbar --------------------------------------------------- */
+/* ONE ROW, A FIXED HEIGHT, AND IT NEVER WRAPS.
+
+   It used to wrap, and wrapping was the honest fix at the time: the row held
+   the folder path, the advance switch and quit as well, and squeezed it had
+   to put something somewhere. What it actually did was make the top of the
+   window a different height at every window size, on a page that cannot
+   scroll, which is how the shelf ended up with 434 of 600 pixels spent
+   before a photograph.
+
+   So the row was emptied instead of taught to break. Everything that filters
+   the wall went into the sidebar, the path went with it, and what is left is
+   the archive, the view, the day and the two panels. That fits in 52 pixels
+   at 800 wide with room over, which is what lets the height be a number
+   again: the tray, the sheet and the wall can all be laid out against it. */
 header.bar {
-  display: flex; align-items: center; gap: var(--s5);
-  padding: var(--s3) var(--s5);
-  flex: none;
+  display: flex; align-items: center; gap: var(--s4);
+  padding: 0 var(--s4);
+  flex: none; height: 52px; flex-wrap: nowrap;
   /* the first step of the chrome ladder. the bar is furniture, not wall,
      and painting it says so: everything below the strip is the work. */
   background: var(--chrome);
+  border-bottom: 1px solid var(--line);
 }
 /* The mark and the word, set tight. The gap is a hair under half the square
    so the two read as one object, and the word keeps the size of the type
@@ -189,18 +204,29 @@ header.bar {
 .mark { display: flex; flex: none; align-items: center; gap: var(--s2); }
 .mark svg { display: block; width: 20px; height: 20px; }
 .mark strong { font: 500 1rem/1 var(--sans); letter-spacing: -.01em; }
-header.bar nav { display: flex; gap: var(--s1); }
-header.bar nav button {
-  border: 0; background: none; color: var(--ink-3);
-  padding: var(--s2) var(--s4); border-radius: var(--r); cursor: pointer;
-  font: 500 .95rem/1 var(--sans); text-transform: lowercase; letter-spacing: 0;
+/* THE VIEW SWITCH, AS ONE CONTROL AND NOT AS TWO WORDS.
+
+   Two buttons side by side are two buttons: nothing about them says only one
+   of the pair can be true at a time. A segmented control says it before it
+   is read, out of a groove and two pixels of inset, which is why every
+   toolbar on this machine uses one for exactly this and why the shape is
+   worth borrowing rather than inventing something. The groove is a white
+   alpha so it composites over the chrome without a second hex. */
+header.bar nav.seg {
+  display: flex; gap: 0; flex: none;
+  background: #ffffff0a; border-radius: 6px; padding: 2px;
 }
-header.bar nav button:hover { color: var(--ink); }
+header.bar nav.seg button {
+  border: 0; background: none; color: var(--ink-3);
+  padding: 5px 12px; border-radius: var(--r); cursor: pointer;
+  font: 500 .88rem/1.2 var(--sans); text-transform: lowercase; letter-spacing: 0;
+}
+header.bar nav.seg button:hover { color: var(--ink-2); }
 /* the view you are looking at is already telling you which view it is, so
    this used to be the loudest thing on the page for no reason. red in
    keeper now means one of two things and only these: you chose this, or you
    have to deal with this. a tab is neither. */
-header.bar nav button.on { background: #ffffff12; color: var(--ink); }
+header.bar nav.seg button.on { background: #ffffff14; color: var(--ink); }
 
 /* ---------------------------------------------------------------------
    quit, which exists only when keeper was opened from its icon.
@@ -230,12 +256,19 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
    two in the second ink. The counts ride at full strength, out of
    fit.css's count-opacity lift entirely, because the number is the
    point of this control rather than an aside to it. */
-#tally { display: flex; align-items: center; gap: var(--s1); min-width: 0; }
+/* At rest it is a quiet run of numbers and not a row of boxes: no ground, no
+   border, the word in the third ink and the number in the mono cut beside
+   it. A count is a reading, and a reading that draws a box around itself is
+   asking to be pressed. The edge only arrives under the pointer, which is
+   the toolbar idiom on this machine and the reason a mac toolbar reads as
+   quiet with a dozen controls in it. */
+#tally { display: flex; align-items: center; gap: var(--s1); min-width: 0; flex: 0 1 auto; }
 #tally .t {
   border: 0; background: none; cursor: pointer;
-  padding: var(--s2) var(--s3); border-radius: var(--r);
-  font: 500 .95rem/1.3 var(--sans); color: var(--ink-2);
+  padding: 5px var(--s2); border-radius: var(--r);
+  font: 500 .88rem/1.2 var(--sans); color: var(--ink-3);
   white-space: nowrap;
+  display: flex; align-items: baseline; gap: .35em;
 }
 #tally .t:hover { background: #ffffff12; color: var(--ink); }
 #tally .t.on { background: #ffffff12; color: var(--ink); }
@@ -244,15 +277,29 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
   font-variant-numeric: tabular-nums; color: var(--ink-2);
 }
 #tally .t-kept b { color: var(--hot-ink); }
-/* The folder you are in, and the way to leave it. Truncated from the left
-   because the tail is the half that identifies it: every path on a shoot
-   drive starts /Volumes/something and ends with the name you care about. */
+/* Under nine hundred the words go and the three numbers stay. The number is
+   what the control is for, the colour already says which of the three it is,
+   and the alternative is a toolbar that wraps. */
+@media (max-width: 900px) {
+  #tally .t .word { display: none; }
+  #tally .t { gap: 0; }
+}
+
+/* The folder you are in, and the way to leave it. It stands at the head of
+   the source list rather than in the toolbar, because which archive is open
+   is the first thing a mac sidebar says and because a path is the one thing
+   up there that could be any length at all.
+
+   Truncated from the left, because the tail is the half that identifies it:
+   every path on a shoot drive starts /Volumes/something and ends with the
+   name you care about. */
 #root {
   --ph: var(--ph-folder);
-  max-width: 30vw; min-width: 0;
-  border: 0; background: none; padding: var(--s1) var(--s2);
+  width: 100%; max-width: 100%; min-width: 0; flex: none;
+  border: 0; background: none; padding: 5px var(--s2);
   border-radius: var(--r); cursor: pointer;
-  font: 400 .78rem/1 var(--mono); color: var(--ink-3);
+  font: 400 .78rem/1.5 var(--mono); color: var(--ink-3);
+  margin-bottom: var(--s2);
 }
 /* the path itself keeps the truncation. it is on the ::after rather than the
    button because the button is a flex row now and rtl on the row would put
@@ -280,21 +327,123 @@ header.bar nav button.on { background: #ffffff12; color: var(--ink); }
 #progress .p-bin { background: #ffffff33; }
 #progress .p-left { background: var(--line); }
 
-.view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* the room under the toolbar: the source list, then whichever view is up */
+.frame { flex: 1; min-height: 0; display: flex; flex-direction: row; }
+.view { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .view[hidden] { display: none; }
+/* the wall gets everything the sidebar does not, and nothing else is in it */
+.wall { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
-/* --- filters. space does the separating, not boxes ----------------- */
-/* the filter row rides the same chrome step as the bar above it, so the
-   top of the window reads as one piece of furniture over the wall. the
-   photographs never touch it: the grid's own gutter is between. */
-#filters { padding: var(--s2) var(--s5) var(--s5); flex: none;
-           background: var(--chrome); }
-#filters .row {
-  display: flex; flex-wrap: wrap; align-items: center;
-  gap: var(--s2); margin-bottom: var(--s2);
+/* ---------------------------------------------------------------------
+   THE SOURCE LIST.
+
+   Every filter in one fixed width column of rows, the way a mac application
+   puts its places down the left. It replaces a block of chips that came out
+   474 pixels tall at 800 wide, because sixteen tags, six folders and the
+   only row all wrapped, and that block was pushing the photographs off the
+   bottom of a window that cannot scroll.
+
+   A row is a leading key or hue dot, the name, and the count held right in
+   the mono cut. Rows and not chips, because a chip row is sized by its
+   contents and a column is sized by the window: nothing in here can ever
+   again decide how much of the screen the wall gets.
+
+   It rides the first chrome step, like the toolbar above it, and it never
+   touches a photograph: the wall's own gutter stands between this hairline
+   and the first frame.
+   --------------------------------------------------------------------- */
+#filters {
+  width: 220px; flex: none; min-width: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--chrome);
+  border-right: 1px solid var(--line);
+  padding: var(--s3) var(--s2) 0;
+  display: flex; flex-direction: column;
 }
-#filters .row:last-child { margin-bottom: 0; }
-#filters .row > b { width: 52px; flex: none; }
+/* shut from the toolbar, and the answer is remembered in app.js. gone on
+   the bench, which has no wall to filter, and gone on an archive with
+   nothing in it, where every row in here would answer to nothing. */
+body[data-side="shut"] #filters,
+body[data-view="bench"] #filters,
+body:has(#shelf .blank) #filters { display: none; }
+
+#filters section { flex: none; }
+/* the heading belongs to the rows under it and not to the section above,
+   so there is more air over it than under it */
+#filters section h4.label { margin: var(--s3) var(--s2) var(--s1); }
+#filters .row { display: flex; flex-direction: column; gap: 1px; align-items: stretch; }
+
+/* A row, not a chip. Full width, the label allowed to run out of room and
+   say so, the count pinned to the right edge in tabular figures so a column
+   of them lines up on the unit digit. */
+#filters .chip {
+  display: flex; align-items: center; gap: var(--s2);
+  width: 100%; min-width: 0; padding: 4px var(--s2);
+  text-align: left; border-radius: var(--r);
+  font: 500 .86rem/1.3 var(--sans);
+}
+#filters .chip .word {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* A 103 character folder name used to make a 930 pixel chip that never
+   truncated and pushed its own count off the side. Here it is a row and the
+   row is 220 wide, so it has to give somewhere, and it gives at the head:
+   the tail of a folder name is the half that tells two shoots apart, the
+   same argument the path on #root is truncated by. The direction flip is
+   how css truncates from the left, and text-align puts the visible tail
+   back on the left edge where the eye starts. */
+#filters #f-dir .chip .word { direction: rtl; text-align: left; }
+#filters .chip i {
+  margin-left: auto; flex: none;
+  font: 500 .78rem/1 var(--mono); font-variant-numeric: tabular-nums;
+}
+#filters .chip .key { flex: none; min-width: 1.2em; font: 400 .72rem/1 var(--mono); }
+#filters .chip .dot { flex: none; margin-right: 0; }
+/* Selection is a filled rounded rect across the whole row, which is what a
+   source list draws and what makes a column of them scan as one list with
+   one thing chosen. The chip's red wash is for a row of chips over a wall
+   of photographs and has nothing to say in here: a tag row and a folder row
+   are both just chosen, and the ladder says chosen perfectly well. */
+#filters .chip.on,
+#filters .chip.on:has(.dot) {
+  background: #ffffff14; color: var(--ink); box-shadow: none;
+}
+#filters .chip.on:hover,
+#filters .chip.on:has(.dot):hover { background: #ffffff1f; }
+/* the bin keeps its solid accent. it is not a filter you added to a set, it
+   is the other room, and it is the one row in here that says so. */
+#filters #f-binned.on { background: var(--hot); color: #fff; }
+
+/* The foot of the column, and it stays put while the filters scroll past
+   it. Neither of these is a filter: how large the frames are drawn and
+   whether a decision walks you on are settings about the run, so they sit
+   under a rule with the chrome behind them. */
+#filters > footer {
+  margin-top: auto; flex: none;
+  position: sticky; bottom: 0;
+  background: var(--chrome);
+  border-top: 1px solid var(--line);
+  padding: var(--s3) 0 var(--s3);
+  display: flex; flex-direction: column; gap: var(--s2);
+}
+#filters #advance-toggle {
+  display: flex; align-items: center; gap: var(--s2);
+  width: 100%; padding: 5px var(--s2); text-align: left;
+}
+#filters #advance-toggle kbd { margin-left: auto; }
+
+/* the slider stacks under its own label in a 220 wide column, because a
+   label, a track and a readout on one line leaves the track about forty
+   pixels and a forty pixel track is a switch pretending to be a slider */
+#filters .size {
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--s1);
+  padding: 0 var(--s2);
+}
+#filters .size .size-say { display: flex; align-items: baseline; gap: var(--s2); }
+#filters .size .size-say .label { flex: none; }
+#filters .size output { min-width: 0; margin-left: auto; text-align: right; }
+#filters .size input[type="range"] { width: 100%; }
 
 /* A chip is a control and a tag at once, and both of those are words, so
    the chip wears the sans like the copy around it. It reads a size smaller
@@ -526,17 +675,25 @@ figure.star::after {
 
 /* intray: you put this one in the tray.
 
-   The picture is inset by four pixels and the accent is the mat behind it,
-   so a collected frame is a photograph mounted on red card. The picture then
-   sits just under full opacity, so the red comes up through it as a warmth
-   rather than as a filter. Two signals out of one colour, and the second one
-   survives at the size where a four pixel border alone would not. It also
-   reads in black and white, because a mounted frame is visibly smaller than
-   the ones beside it. Hovering clears the warmth, because the moment you are
-   looking at a frame you should be looking at the frame. */
-figure.intray { background: var(--hot); }
+   The picture is inset by four pixels and the mat behind it is what says so,
+   so a collected frame is a photograph mounted on card. It reads in black
+   and white, because a mounted frame is visibly smaller than the ones beside
+   it.
+
+   THE MAT WAS THE ACCENT AND IS NOT ANY MORE. Four pixels of #e1062c meant
+   the pixel bordering the photograph measured rgb(225,6,44), which is the
+   one thing this file's own first paragraph says never happens: no
+   photograph sits against a warm pixel, ever. place.css states the rule and
+   obeys it four lines later for the strip's spent frames, and this is the
+   same idiom, so it takes the same answer. Alpha white composites
+   equal-RGB on the neutral plate, rgb(182,182,182) on the wall, which is a
+   mat and not a cast.
+
+   The accent has not left the state. It is on the corner button, which is a
+   control and is allowed to be red, and that button stands lit on a
+   collected frame. */
+figure.intray { background: #ffffffb3; }
 figure.intray img { padding: 4px; }
-figure.intray:hover img { opacity: .97; }
 
 /* picked: you swept this one up.
 
@@ -838,6 +995,19 @@ figure.intray .add:hover { filter: brightness(1.16); }
    you chose this, and a crop that does not fit is not a choice. */
 .slot .nums code { font: inherit; color: var(--ink); }
 .slot .nums .warn { color: var(--warn); }
+/* The one line of css the bench exists to hand you, and the way to take it.
+   It is a word rather than a button shape because it sits inside a sentence
+   of numbers, and it is underlined at rest for the same reason a link is:
+   nothing else on that line can be pressed. */
+.slot .nums .copy {
+  margin-left: var(--s2);
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--ink-3); font: inherit;
+  text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: var(--line-strong);
+  transition: color var(--fast) var(--ease), text-decoration-color var(--fast) var(--ease);
+}
+.slot .nums .copy:hover { color: var(--ink); text-decoration-color: currentColor; }
 
 #picker { width: 400px; flex: none; display: flex; flex-direction: column;
           border-left: 1px solid var(--line); }
@@ -912,13 +1082,29 @@ figure.intray .add:hover { filter: brightness(1.16); }
    shadow rather than a second element, so the markup and the open and
    close logic did not have to learn anything. */
 #keys[hidden] { display: none; }
+/* THE CARD IS CAPPED AND SCROLLS ITSELF, WHICH IT DID NOT.
+
+   It was anchored to the bottom edge with no top, no ceiling and nothing to
+   scroll, so its height was whatever the list happened to want. At 800 by
+   600 the list wanted 636 pixels in a 600 pixel window and the card grew
+   upward out of the screen: the tabs and the close button sat at y = -43,
+   above the top of the glass, with no way to reach them. A sheet you cannot
+   close is not a sheet.
+
+   So it is capped at the window less its two margins and given a scroller of
+   its own. The head then stays: it is stuck to the top of that scroller with
+   the card colour behind it, so the way out and the way to the other pane
+   are on screen however long the list gets. */
 #keys {
   position: fixed; left: var(--s5); right: var(--s5); bottom: var(--s5);
+  top: auto;
+  max-height: calc(100vh - var(--s5) * 2);
+  overflow-y: auto; overscroll-behavior: contain;
   z-index: 60;
   background: var(--chrome-2);
   border: 1px solid var(--line-strong);
   border-radius: var(--r);
-  padding: var(--s4) var(--s5) var(--s5);
+  padding: 0 var(--s5) var(--s5);
   box-shadow: 0 0 0 100vmax #000000b8;
   animation: sheet .26s var(--ease);
 }
@@ -926,7 +1112,17 @@ figure.intray .add:hover { filter: brightness(1.16); }
 /* the panel is a place on the screen, so the card stops short of it */
 body:has(#tray:not([hidden])) #keys { right: calc(var(--tray-w) + var(--s5)); }
 
-.keys-head { display: flex; align-items: center; margin-bottom: var(--s4); }
+/* the negative margins are what let a sticky head paint out to the card's
+   own edges: the padding above belongs to the scrolling box, and a head
+   inside that padding would leave a stripe of list showing beside it. */
+.keys-head {
+  display: flex; align-items: center;
+  position: sticky; top: 0; z-index: 2;
+  margin: 0 calc(var(--s5) * -1) var(--s3);
+  padding: var(--s4) var(--s5) var(--s3);
+  background: var(--chrome-2);
+  border-bottom: 1px solid var(--line);
+}
 #keys-shut {
   --ph: var(--ph-x);
   border: 0; background: none; cursor: pointer; color: var(--ink-3);
@@ -949,9 +1145,11 @@ body:has(#tray:not([hidden])) #keys { right: calc(var(--tray-w) + var(--s5)); }
    markup says about it.
    --------------------------------------------------------------------- */
 .keys-tabs { display: flex; gap: var(--s4); }
+/* the vertical padding is target and not decoration: at four pixels the two
+   tabs were twenty pixels tall, which is a word you have to aim at. */
 .keys-tabs button {
   border: 0; border-bottom: 2px solid transparent; background: none;
-  padding: 0 0 4px; cursor: pointer; color: var(--ink-3);
+  padding: 5px 0 6px; cursor: pointer; color: var(--ink-3);
 }
 .keys-tabs button:hover { color: var(--ink-2); }
 /* the accent as a rule under the pane you are in, which is the one meaning
@@ -991,6 +1189,18 @@ body:has(#tray:not([hidden])) #keys { right: calc(var(--tray-w) + var(--s5)); }
 }
 .set > .chip:hover { background: var(--chrome-2); }
 
+/* the nine answers, printed as they come. the whole point of them is being
+   selected and pasted into a message asking for help, so they are set in the
+   mono cut, they keep their own line breaks and nothing is truncated. */
+#set-doctor-out {
+  margin: var(--s2) 0 0;
+  padding: var(--s2) var(--s3);
+  background: var(--chrome); border-radius: var(--r);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font: .78rem/1.5 var(--mono); color: var(--ink-2);
+}
+#set-doctor-out[hidden] { display: none; }
+
 .set-foot {
   margin: var(--s4) 0 0; font-size: .88rem; line-height: 1.5;
   color: var(--ink-3);
@@ -1004,25 +1214,46 @@ body:has(#tray:not([hidden])) #keys { right: calc(var(--tray-w) + var(--s5)); }
   .set > .chip { align-self: flex-start; }
 }
 
+/* As many columns as the card is wide enough for, rather than four that
+   halve to two at a breakpoint. Halving doubles the height of the list in
+   one step, which is exactly what used to push the card off the top of a
+   small window, and a list of shortcuts has no reason to change shape in
+   jumps when it can change shape continuously. */
 .keys-cols {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
   gap: var(--s5) var(--s6); max-width: 1440px;
 }
-.keys-cols h4 { margin: 0 0 var(--s3); }
-/* two columns, the key and what it does. the key column is fixed so every
-   description in a section starts on the same vertical line, which is the
-   whole reason this reads faster than the row it replaced. */
-.k {
-  display: grid; grid-template-columns: 5.4em 1fr; gap: var(--s2);
-  align-items: baseline; padding: 3px 0;
+.keys-cols h4 { margin: 0 0 var(--s3); grid-column: 1 / -1; }
+
+/* THE KEY COLUMN IS SIZED BY THE WIDEST CHORD IN ITS OWN SECTION.
+
+   It used to be 5.4em, a guess, and ⌘⌥click is wider than that at every
+   window size: the keycaps drew straight over the words beside them, on the
+   help screen, which is the last place in an application that is allowed to
+   be broken. A fixed column cannot be right for a list whose rows are not
+   known in advance, so the section itself is the grid and the column is
+   max-content: every row in a section is measured, the widest one sets the
+   width, and nothing can overrun by construction.
+
+   .k becomes display:contents so its two spans land in the section's grid
+   as the two cells they always were. That drops .k's own font, so the type
+   is stated on the section and on the description cell instead. */
+.keys-cols section {
+  display: grid; grid-template-columns: max-content 1fr;
+  column-gap: var(--s3); row-gap: 0; align-items: baseline;
+  align-content: start;
   font: 400 .86rem/1.45 var(--sans); color: var(--ink-2);
 }
+.k { display: contents; }
 .k .ks {
   display: flex; gap: 3px; align-items: baseline;
+  padding: 3px 0;
   font: 400 .74rem/1 var(--mono); color: var(--ink-3);
+  white-space: nowrap;
 }
-@media (max-width: 1180px) {
-  .keys-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.k > span:last-child {
+  padding: 3px 0;
+  font: 400 .86rem/1.45 var(--sans); color: var(--ink-2);
 }
 
 /* The glyphs come out of the system font rather than Geist Mono, which has
@@ -1055,6 +1286,45 @@ kbd, .key {
 }
 #keys-toggle:hover { color: var(--ink); background: #ffffff12; }
 #keys-toggle[aria-expanded="true"] { color: var(--ink); background: #ffffff12; }
+
+/* the sidebar switch, in the question mark's clothes because it is the same
+   kind of thing: a panel that is either there or not. it is lit while the
+   column is open, so the toolbar says which of the two it is looking at
+   without anybody having to press it to find out. */
+#side-toggle {
+  --ph: var(--ph-sidebar);
+  flex: none; width: 24px; height: 24px; padding: 0;
+  border: 0; background: none; cursor: pointer;
+  color: var(--ink-3); border-radius: var(--r);
+  font-size: .9rem;
+}
+#side-toggle:hover { color: var(--ink); background: #ffffff12; }
+#side-toggle[aria-pressed="true"] { color: var(--ink); background: #ffffff12; }
+
+/* Two controls in the toolbar belong to the shelf and to nothing else: the
+   search, whose bench twin lives in the picker's own head, and the switch
+   for a column the bench does not have. A control that answers to nothing
+   is worse than a control that is not there. */
+body[data-view="bench"] .find.shelf,
+body[data-view="bench"] #side-toggle { display: none; }
+/* The search gives ground before the controls around it do, because a
+   shortened field is still a field and a control off the edge is gone. On
+   an icon launch at 800 wide, with the version button and quit both in the
+   row, this is the eight pixels of slack that keeps the row one row.
+
+   In the toolbar it is a field with an edge rather than the underline the
+   panels use. A rule that wide across a bar this quiet was the loudest line
+   on the screen, and a toolbar search on this machine is a rounded well: the
+   shape says where to type without a stroke saying it. */
+header.bar .find {
+  flex: 0 1 auto; min-width: 0;
+  background: #ffffff0a; border-radius: 6px;
+  padding: 3px var(--s2); align-items: center;
+}
+header.bar .find:focus-within { background: #ffffff14; }
+header.bar .find input[type=search] {
+  min-width: 0; border-bottom: 0; padding: 2px 0;
+}
 
 /* Reduced motion means no movement, not no feedback. Everything that slid,
    scaled or rose is turned off, and the two things that appear out of
@@ -1156,11 +1426,9 @@ figure .why.bad { color: var(--warn); }
   font: 500 1.6rem/1.15 var(--sans); letter-spacing: -.02em;
 }
 .blank p { margin: 0 0 var(--s4); color: var(--ink-2); }
-.blank pre {
-  margin: 0 0 var(--s4); padding: var(--s3) var(--s4);
-  background: var(--chrome); border-radius: var(--r);
-  font: .8rem/1.7 var(--mono); color: var(--ink); overflow-x: auto;
-}
+/* the .blank pre rule that used to sit here is gone with the command line
+   the blank state used to print. an archive opened from an icon has no
+   terminal to paste it into, and the folder button above it is the answer. */
 .blank .hint { color: var(--ink-2); font-size: .95rem; }
 .blank code {
   font: .85em var(--mono); background: var(--chrome);
@@ -1182,8 +1450,13 @@ figure .why.bad { color: var(--warn); }
    shade under a thousand pixels, which is five columns at the current tile
    size, still a contact sheet and not a list.
    --------------------------------------------------------------------- */
+/* It starts under the toolbar rather than at the top of the window: 52 for
+   the bar with its own rule inside that, everything here being border box,
+   and three for the progress strip. The bar says what archive this is and
+   how the day is going, and both of those are true of the panel as well, so
+   the panel has no business covering them. */
 #tray {
-  position: fixed; top: 0; right: 0; bottom: 0; z-index: 30;
+  position: fixed; top: 55px; right: 0; bottom: 0; z-index: 30;
   width: var(--tray-w);
   display: flex; flex-direction: column;
   background: var(--chrome);
@@ -1213,9 +1486,12 @@ body[data-tray-resize] #tray-grid { pointer-events: none; }
 
 /* the shelf, the bench and both bars step aside for the panel. this is a
    :has() rule so it holds no matter where the aside sits in the document,
-   and it moves padding rather than width so nothing reflows twice. */
-body:has(#tray:not([hidden])) header.bar,
-body:has(#tray:not([hidden])) #filters { padding-right: calc(var(--tray-w) + var(--s5)); }
+   and it moves padding rather than width so nothing reflows twice.
+
+   The toolbar and the sidebar are out of it now, because the panel starts
+   below the one and beside the other: the bar spans the whole window and
+   the column is 220 pixels the panel never reaches. Only the things the
+   panel actually stands over still give ground. */
 body:has(#tray:not([hidden])) #grid,
 body:has(#tray:not([hidden])) #slots { padding-right: calc(var(--tray-w) + var(--s5)); }
 body:has(#tray:not([hidden])) #bench #picker { margin-right: var(--tray-w); }
@@ -1384,6 +1660,9 @@ body:has(#tray:not([hidden])) #bench-bar { padding-right: calc(var(--tray-w) + v
   box-shadow: 0 -14px 34px #0000007a;
 }
 #bin-bar[hidden] { display: none; }
+/* it stops at the sidebar as well as at the panel: it is a bar over the
+   wall, and the wall now starts 220 pixels in. */
+body:not([data-side="shut"]) #bin-bar { left: 220px; }
 body:has(#tray:not([hidden])) #bin-bar { right: var(--tray-w); }
 body:has(#bin-bar:not([hidden])) #grid { padding-bottom: 84px; }
 
@@ -1594,8 +1873,19 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
      smallest screen this tool is used on. */
   :root { --tray-w: 296px; }
   body:has(#tray:not([hidden])) #grid { padding-left: var(--s4); }
-  body:has(#tray:not([hidden])) header.bar,
-  body:has(#tray:not([hidden])) #filters { padding-left: var(--s4); }
+}
+
+/* THE COLUMN AND THE PANEL DO NOT BOTH FIT ON A SMALL WINDOW.
+
+   At 800 wide with the panel open, 220 of sidebar and 260 of tray leave the
+   wall 272 pixels, which is one column of thumbnails with the gutters taken
+   off: a contact sheet that is not a sheet. A mac window drops the sidebar
+   when there is no room for it and brings it back when there is, so this
+   does the same, and the stored answer is untouched: shut for want of room
+   is not the same fact as shut on purpose, and option s still holds. */
+@media (max-width: 900px) {
+  body:has(#tray:not([hidden])) #filters { display: none; }
+  body:has(#tray:not([hidden])) #bin-bar { left: 0; }
 }
 
 /* ---------------------------------------------------------------------
@@ -1664,12 +1954,28 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
    every picture would open a little smaller than it should, forever, and
    look like a decision rather than a bug. The radius, the shadow and the
    overflow do not enter the sum, which is why they are allowed here. */
+/* THE CARD IS NEUTRAL AND THE STRIP UNDER IT IS THE WARM PART.
+
+   The card was --chrome-2 and the stage is sized to the picture exactly, so
+   at every window size the pixel bordering the photograph was warm chrome,
+   which is the one thing the paragraph at the top of this file says never
+   happens. It was worst at 800 wide, where the strip's 300 pixel minimum
+   width against a 209 pixel portrait left a 91 pixel column of warm card
+   standing beside the picture.
+
+   So the card is the deep, which is the same neutral the stage already is
+   and the same one the surround is: the picture floats on black on every
+   side, whatever shape it is. The strip keeps the chrome step, held off by
+   eight pixels of that black, so it reads as a caption under a photograph
+   rather than as a frame around one. preview.js measures the card less the
+   stage to learn how tall the strip came out, and a margin between them is
+   inside that sum, so the contract above still holds. */
 .preview-card {
   position: relative;
   display: flex; flex-direction: column;
-  min-width: 300px;
+  min-width: min(300px, 100%);
   max-width: min(92vw, 1600px); max-height: 92vh;
-  background: var(--chrome-2);
+  background: var(--deep);
   border-radius: 6px;
   box-shadow: 0 24px 64px #00000073;
   overflow: hidden;
@@ -1748,6 +2054,8 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
    resized under it. */
 .preview-meta {
   flex: none; width: 0; min-width: 100%;
+  background: var(--chrome-2);
+  margin-top: var(--s2);
   padding: var(--s3) var(--s4) var(--s4);
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
   color: var(--ink-2); font-size: .95rem;

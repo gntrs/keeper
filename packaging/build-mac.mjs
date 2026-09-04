@@ -179,9 +179,13 @@ async function main() {
   await mkdir(path.join(stage, ".background"), { recursive: true });
   await cp(path.join(HERE, "macos", "dmg-background.png"), path.join(stage, ".background", "dmg-background.png"));
   await cp(path.join(HERE, "macos", "dmg.DS_Store"), path.join(stage, ".DS_Store"));
-  /* for whoever turns hidden files on, which is a reasonable thing to do to
-     something you just downloaded */
-  await cp(path.join(HERE, "macos", "privacy.txt"), path.join(stage, ".privacy.txt"));
+  /* Visible, because a notice about what a program does with your
+     photographs is worth nothing if reading it requires knowing the shortcut
+     that shows hidden files. The windows build has shipped a readable "read
+     me first.txt" at the top of its folder since it existed and the mac
+     shipped a dot file, so the two platforms disagreed about whether anybody
+     was meant to read this. */
+  await cp(path.join(HERE, "macos", "privacy.txt"), path.join(stage, "privacy.txt"));
 
   const dmg = path.join(OUT, `keeper-${pkg.version}-macos-${arch}.dmg`);
   await rm(dmg, { force: true });

@@ -36,13 +36,14 @@
 #tray-clear[disabled] { color: #ffffff59; }
 
 /* --- the bar survives ------------------------------------------------ */
-/* The header is one flex row on a body that cannot scroll, so when the
-   window came down to half a laptop the row had nowhere to put quit and
-   the folder button except past the right edge, unreachable. Wrapping is
-   the honest fix: at full width every item still fits on one line and
-   nothing changes, and squeezed, the row breaks into two rows instead of
-   hiding the two controls that end a session. */
-header.bar { flex-wrap: wrap; row-gap: var(--s2); }
+/* The wrap rule that lived here is gone with the row it was propping up.
+   The header used to carry the folder path, the advance switch and quit as
+   well, and squeezed it had to break or hide the controls that end a
+   session. It carries none of those now: the path and the switch went into
+   the sidebar, and what is left fits on one line at 800 wide with room
+   over. A row that cannot overflow does not need permission to wrap, and a
+   toolbar whose height changes with the window is a toolbar nothing else
+   can be laid out against. */
 
 /* a flex child refuses to shrink below its content unless told it may */
 #tally { min-width: 0; }
@@ -50,8 +51,8 @@ header.bar { flex-wrap: wrap; row-gap: var(--s2); }
 /* The search field gives ground before the controls around it do. The
    picker's own field is untouched: its #picker-head input width rule
    carries an id and still wins on specificity, so this reaches only the
-   field in the filter row. */
-input[type=search] { width: clamp(120px, 18vw, 240px); }
+   field in the toolbar. */
+input[type=search] { width: clamp(110px, 16vw, 240px); }
 
 /* --- the bench fits -------------------------------------------------- */
 /* Half of a 13 inch screen is somewhere around 720 to 880 css pixels,
@@ -64,14 +65,18 @@ input[type=search] { width: clamp(120px, 18vw, 240px); }
    with no horizontal scroll. */
 @media (max-width: 1100px) {
   header.bar { gap: var(--s3); }
-  #root { max-width: 40vw; }
   #picker { width: 320px; }
   .rack-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 }
 @media (max-width: 900px) {
   :root { --tray-w: 260px; }
   #picker { width: 260px; }
+  header.bar { gap: var(--s2); padding: 0 var(--s3); }
 }
+/* the #root max-width that used to sit in the 1100 block is gone with the
+   folder button's place in the toolbar. it is a row in a 220 pixel column
+   now, so the width it may take is the column's and a viewport unit has
+   nothing to say about it. */
 
 /* The picker's head is the bar problem again at column scale. The label
    and two chips have a min content width around 305px, so the narrowed
@@ -81,6 +86,13 @@ input[type=search] { width: clamp(120px, 18vw, 240px); }
    changes, and squeezed it breaks, with the search taking a full row of
    its own instead of shrinking to nothing. */
 #picker-head { flex-wrap: wrap; row-gap: var(--s2); }
+/* AND THE WRAP ABOVE NEVER FIRED, because nothing told the field it had a
+   floor. A flex item with no minimum shrinks before the row breaks, so the
+   search in the picker's head was eight pixels wide at every window size
+   from 1280 up: a magnifier with a sliver of field after it, in a 400 pixel
+   column with room to spare on a second line. A minimum is what turns
+   shrinking into wrapping, which is what the paragraph above meant. */
+#picker-head .find { flex: 1 1 8rem; min-width: 6rem; }
 
 /* --- the full stop card ---------------------------------------------- */
 /* the card that stops a delete was capped at a flat 30rem, which is
