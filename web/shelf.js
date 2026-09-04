@@ -2033,23 +2033,49 @@ async function markAll(ids, code) {
   const now = tagRows(ids);
   struck = ids;
   feel("tick");
+  /* THE WRITE IS STARTED BEFORE THE PAINT, AND THAT ORDER IS THE POINT.
+     renderShelf redresses every tile on the wall, and there is no
+     virtualisation, so on twenty thousand frames it holds the main thread for
+     minutes. With the request behind it the keystroke never reached the
+     network at all: measured, five full minutes and zero requests sent. fetch
+     hands the request to the browser's network thread there and then, so
+     starting it first means the decision is on the disk while the screen is
+     still catching up, which is the right way round for the one of those two
+     that cannot be redone. */
+  const landed = write(ids.map((id) => ({ id, tag: code })));
   renderShelf();
   tally();
-  const oks = await Promise.all(ids.map((id) => post("/api/tag", { id, tag: code })));
-  const lost = was.filter((row, i) => !oks[i]);
-  if (lost.length) {
-    /* only the refused rows come back. the ones that landed are true on
-       the disk and retracting them would un-tag frames the server kept. */
-    putRows(lost);
+  if (!await landed) {
+    putRows(was);
     renderShelf();
     tally();
     feel("no");
-    say(`${lost.length} of those did not reach the disk.`);
+    say("none of those reached the disk.");
     return;
   }
   did(`tagging ${someFrames(ids.length)} ${S.vocab[code] ?? code}`,
       () => restoreTags(was), () => restoreTags(now));
 }
+
+/**
+ * A WHOLE SELECTION IS ONE REQUEST, AND IT ALWAYS SHOULD HAVE BEEN.
+ *
+ * Both of these used to send one POST per frame into a Promise.all. On a
+ * 2200 frame archive that is 2200 sockets asked for at once, and the browser
+ * refuses most of them: measured, 834 of 2200 died with
+ * ERR_INSUFFICIENT_RESOURCES, the first rejection took out the whole
+ * Promise.all so neither the rollback nor the undo registration below it ever
+ * ran, and the wall repainted as though all 2200 had landed. On 20,000 the
+ * same keystroke took the tab to 2.3GB and never came back.
+ *
+ * The route has taken a batch all along, for the contact sheet the CLI sends,
+ * and its own comment says why: a sheet sent as a hundred requests is a
+ * hundred read modify writes queued behind each other. The page simply never
+ * used it. One request is also one turn of the write queue, so it cannot be
+ * half applied and the rollback is the whole set or nothing, which is the
+ * only story about a keystroke worth telling somebody.
+ */
+const write = (rows) => post("/api/tag", { rows });
 
 /**
  * A mixed set becomes a kept set rather than each frame flipping where it
@@ -2066,16 +2092,16 @@ async function keepAll(ids) {
   const now = tagRows(ids);
   struck = ids;
   feel("tap");
+  // started before the paint, for the reason written out in markAll
+  const landed = write(ids.map((id) => ({ id, star })));
   renderShelf();
   tally();
-  const oks = await Promise.all(ids.map((id) => post("/api/tag", { id, star })));
-  const lost = was.filter((row, i) => !oks[i]);
-  if (lost.length) {
-    putRows(lost);
+  if (!await landed) {
+    putRows(was);
     renderShelf();
     tally();
     feel("no");
-    say(`${lost.length} of those did not reach the disk.`);
+    say("none of those reached the disk.");
     return;
   }
   did(`${star ? "keeping" : "letting go"} ${someFrames(ids.length)}`,

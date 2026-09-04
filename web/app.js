@@ -51,13 +51,28 @@ const $ = (s) => document.querySelector(s);
 export const typed = (e) =>
   e.target instanceof Element && e.target.closest("input, textarea, select");
 
-/** every write goes through here, so nothing is only true on screen */
+/**
+ * Every write goes through here, so nothing is only true on screen.
+ *
+ * A write that could not be sent at all comes back false, like a write the
+ * server refused. It used to reject, and every caller in the app reads this
+ * as a boolean: one rejection took out the whole Promise.all it sat in, which
+ * skipped the rollback and the undo registration underneath and left the
+ * screen saying the work had landed. There is no caller anywhere that wants
+ * an exception out of this.
+ */
 export async function post(route, body, method = "POST") {
-  const res = await fetch(route, {
-    method,
-    headers: { "content-type": "application/json" },
-    body: method === "DELETE" ? undefined : JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(route, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: method === "DELETE" ? undefined : JSON.stringify(body),
+    });
+  } catch (e) {
+    console.error("[keeper]", route, e.message);
+    return false;
+  }
   if (!res.ok) console.error("[keeper]", route, await res.text());
   return res.ok;
 }
