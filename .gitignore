@@ -5,9 +5,7 @@ keeper.config.json
 .DS_Store
 *.log
 
-# the working agreement, which is ours and not the product's. ignored rather
-# than committed because this repo is public today: it goes into the private
-# dev repo once that exists, and never into the public one.
+# the working agreement for this repo, which is ours and not the product's.
 CLAUDE.md
 
 # left over from when the windows launcher made its own empty folder to wait
@@ -21,3 +19,7 @@ start/
 # answers to what shipped.
 packaging/out/
 packaging/cache/
+
+# local notes and settings that belong to this clone rather than to keeper,
+# the same as the file above. neither is anything a person using keeper needs.
+.claude/
