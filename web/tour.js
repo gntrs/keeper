@@ -11,9 +11,17 @@
 
    One sentence on the wall used to be the answer, and one sentence is not
    enough to carry a bin that is not a bin, a tray, and a bench. So this
-   walks the room instead: eight cards, each one ringing the thing it is
-   talking about, in the order the day actually happens in. Look, keep, tag,
-   set aside, pile up, cut to shape.
+   walks the room instead: a short card at a time, each one ringing the thing
+   it is talking about, in the order the day actually happens in. Look, keep,
+   tag, set aside, pile up, cut to shape.
+
+   ONE FACT PER CARD AND THE SHORTEST SENTENCE THAT CARRIES IT. Every card
+   here is read once, by somebody who wants to get to their photographs, and
+   a card is not the place to make keeper's argument. The card that used to
+   open this said the wall was the folder they had just chosen, which they
+   knew, and the promise that nothing gets moved was said on three separate
+   cards. Both are gone. What is left is a key or a gesture the screen does
+   not say anywhere, and the one sentence somebody cannot act without.
 
    IT DOES NOT TAKE THE APP AWAY WHILE IT TALKS. There is no dimmed backdrop
    and nothing is blocked, so every key it names can be pressed the moment it
@@ -40,6 +48,33 @@
    and it is snapshotted before the process writes to the seat, because five
    seconds in a first run and a hundredth look identical.
 
+   A CARD WITH NOTHING TO POINT AT IS NOT SHOWN AT ALL. The set is decided
+   once, at the moment the walkthrough starts, by asking the browser which of
+   these things it has actually laid out. That is not defensive coding, it is
+   the only honest answer: the bin chip is hidden until something is in the
+   bin, and the machine this runs on is by definition the machine whose bin
+   is empty, so the card explaining what delete does was ringing a zero by
+   zero box and saying "in here" at nothing on every first launch there has
+   ever been. The sidebar can be shut, and then two more cards were doing it.
+   A card that rings nothing is worse than no card, so it does not run and
+   the count on the corner of the card says the number that will actually be
+   walked.
+
+   IT DOES NOT WAIT FOR THE UPDATE CARD, AND THAT WAS THE WHOLE BUG. This
+   used to sleep half a second, look for the update card, and then park
+   behind it until it went away. On a first launch the update card is always
+   up, because a seat with no answer in it asks the question, and the card
+   that says a newer keeper is out has no dismiss button on it at all. So the
+   walkthrough waited for something that was never going to leave, on every
+   launch, for ever, on exactly the machine it exists for. Worse, when the
+   check to github took longer than the half second the order flipped: the
+   cards started, the update card landed on top of them, and one escape aimed
+   at the update card ran through this file's own handler and wrote the
+   walkthrough down as answered after one card. The two of them share the
+   screen now. `above()` knows about the update card so an escape spent on it
+   is not also spent on this, and `place()` treats it as furniture to sit
+   clear of rather than something to draw over.
+
    WHEN THE CARDS CHANGE, BUMP `TOUR` IN src/runtime.mjs. It is the revision
    somebody answered, so raising it offers this to everybody once more, and
    the ask above is what keeps that from being rude. Do not raise it for a
@@ -53,9 +88,13 @@ import { mac } from "/host.js";
 /**
  * The day, in order.
  *
- * `at` is what gets the ring, and a step whose element is not on this screen
- * simply loses its ring rather than being dropped: the sentence about the
- * tray is worth reading whether or not the button is where it was.
+ * `at` is what gets the ring, and it is a list because the first thing in it
+ * is not always on the screen. The browser picks: the first one it has laid
+ * out with a real size wins, and a step where none of them are laid out is
+ * dropped before the walkthrough starts rather than shown ringing nothing.
+ * That is why the frame under the cursor is the second answer twice. It is
+ * the thing the key in the sentence acts on, so it is never the wrong thing
+ * to be pointing at.
  *
  * `key` is the step's own escape hatch from being read at. When it matches a
  * real press the card moves on, and the press is never swallowed, so the
@@ -65,46 +104,50 @@ import { mac } from "/host.js";
  */
 const STEPS = [
   {
-    at: "#root",
-    head: "this is the folder you pointed at",
-    say: "every photograph and every clip in it, on one wall. nothing was copied and nothing was moved to get here.",
-  },
-  {
-    at: "#grid figure",
-    head: "the arrows move, space looks",
-    say: "the cursor is the ring on a frame, not the mouse. space opens the one you are on as big as the screen goes, and space again puts it away.",
+    at: ["#grid figure.cursor", "#grid figure"],
+    head: "arrows move, space looks",
+    say: "the ring is where you are, not the mouse.",
     key: (e) => e.key === " " || e.key.startsWith("Arrow"),
   },
   {
-    at: "#tally",
+    at: ["#tally"],
     head: "k keeps it",
-    say: "one key, one hand, no looking down. the count up here is the only thing that moves, and it is the count you are working towards.",
+    say: "this is the count that moves.",
     key: (e) => e.key === "k" || e.key === "K",
   },
   {
-    at: "#f-tag",
-    head: "a letter says what it is",
-    say: "1 to 9 are these tags, and each one also answers to its own letter. pick a run of frames first and one letter tags the lot of them at once.",
+    at: ["#f-tag"],
+    head: "these tag the frame you are on",
+    /* the key and not the digit, because only the first nine rows get one:
+       shelf.js prints the tag's own letter on every row after that, and a
+       card promising digits would be describing a column the reader can see
+       is not all digits. */
+    say: "press the key on its row.",
   },
   {
-    at: "#f-binned",
+    /* the bin chip when there is a bin, and otherwise the frame the key is
+       about to act on. it is hidden on every machine this runs on, which is
+       what made the old wording, "it comes back from in here", point at a
+       gap in the sidebar. */
+    at: ["#f-binned", "#grid figure.cursor", "#grid figure"],
     head: "delete does not delete",
-    say: "it sets the frame aside and the file does not move off your drive. it comes back from in here, and {cmd} z takes back the last thing you did either way.",
+    say: "backspace sets the frame aside. the file stays on your drive.",
+    key: (e) => e.key === "Backspace" || e.key === "Delete",
   },
   {
-    at: "#tray-toggle",
-    head: "a pile you can hand to somebody",
-    say: "{cmd} {enter} sends everything you have picked to the tray. name it, press export, and it comes out as a real folder of real files. your originals stay exactly where they are.",
+    at: ["#tray-toggle"],
+    head: "a pile you can hand over",
+    say: "{cmd} {enter} puts what you picked in here.",
   },
   {
-    at: 'header nav [data-view="bench"]',
+    at: ['header nav [data-view="bench"]'],
     head: "then cut them to shape",
-    say: "the bench tries one frame in every shape at once: a post, a story, a youtube thumbnail, a banner across a page. drag it into the one you want and export that.",
+    say: "one frame in every shape at once. drag it into the one you want.",
   },
   {
-    at: "#keys-toggle",
-    head: "nothing here leaves this machine",
-    say: "no account, no upload, nothing counted. it works with the wifi off. every other key, and the settings, are behind this question mark.",
+    at: ["#keys-toggle"],
+    head: "every other key is on ?",
+    say: "the settings are in there too.",
   },
 ];
 
@@ -114,6 +157,38 @@ let at = 0;
 let card = null;
 let ring = null;
 let live = false;
+/* the steps that had something to point at when this started, which is the
+   only set the count on the card is ever allowed to be counting. */
+let run = [];
+
+/**
+ * The thing on screen a step is about, or nothing.
+ *
+ * Laid out is the test, not present. Half of what these point at is a chip
+ * that exists in the markup on every load and is display:none until it has
+ * a reason to be there, and a hidden element answers querySelector perfectly
+ * happily while measuring zero by zero. Asking the browser for the box is
+ * the only question whose answer is the one the ring needs.
+ */
+function anchor(step) {
+  for (const sel of step.at) {
+    const el = $(sel);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width && r.height) return el;
+  }
+  return null;
+}
+
+/**
+ * The update card, which is the only other thing that ever sits over the app
+ * without taking it away.
+ *
+ * It is drawn under this one, so a card parked on top of it hides the
+ * buttons of a question somebody has to answer, and there is no stacking
+ * order that fixes that. Only room fixes it.
+ */
+const upCard = () => document.querySelector(".up:not([hidden])");
 
 /* ------------------------------------------------------------------ */
 
@@ -165,54 +240,86 @@ function around(el) {
 }
 
 /**
- * The card goes under the thing it is ringing, or over it when there is no
- * room under, and it is kept inside the window either way.
+ * The card goes under the thing it is ringing, or over it, or beside it, and
+ * it is kept inside the window and off the update card either way.
  *
  * Under first because the two things the walkthrough rings most are in the
  * header, and a card that covered the header while explaining the header
  * would be the only bug in here anybody remembered. With no ring at all it
  * sits at the bottom middle, which is the seat the old one-line hint had and
  * the one part of the screen no photograph is ever the point of.
+ *
+ * BESIDE IS THE THIRD ANSWER AND IT IS THERE FOR THE TAG COLUMN. That ring
+ * is the whole sidebar section, four hundred and eighty pixels of it, so on
+ * a window 1280 wide there is no room under it and no room over it either.
+ * Under and over were the only two answers, so the card clamped to the top
+ * edge and was drawn across the top third of the very chips its sentence was
+ * describing. A tall thing has room at its side by definition, which is the
+ * one place a card is never in the way of what it is pointing at.
  */
 function place(r) {
   const gap = 12;
   const edge = 16;
   const w = card.offsetWidth;
   const h = card.offsetHeight;
+  const hit = upCard()?.getBoundingClientRect();
 
-  if (!r) {
-    card.style.left = `${Math.round((innerWidth - w) / 2)}px`;
-    card.style.top = `${innerHeight - h - 40}px`;
-    return;
-  }
+  /* sideways is clamped rather than judged, because sliding a card to the
+     window's edge costs it nothing and there is nothing above or below to
+     slide into. up and down is the whole question. */
+  const near = (l) => Math.min(Math.max(l, edge), Math.max(edge, innerWidth - w - edge));
+  const room = (p) => p.top >= edge && p.top + h <= innerHeight - edge;
+  const free = (p) => !hit
+    || p.left >= hit.right || p.left + w <= hit.left
+    || p.top >= hit.bottom || p.top + h <= hit.top;
 
-  let top = r.bottom + gap;
-  if (top + h > innerHeight - edge) top = r.top - gap - h;
-  top = Math.min(Math.max(top, edge), Math.max(edge, innerHeight - h - edge));
+  const mid = r ? near(r.left + r.width / 2 - w / 2) : near((innerWidth - w) / 2);
+  const tries = r
+    ? [
+        { left: mid, top: r.bottom + gap },
+        { left: mid, top: r.top - gap - h },
+        { left: near(r.right + gap), top: r.top },
+        { left: near(r.left - gap - w), top: r.top },
+      ]
+    : [
+        { left: mid, top: innerHeight - h - 40 },
+        { left: mid, top: edge },
+      ];
 
-  let left = r.left + r.width / 2 - w / 2;
-  left = Math.min(Math.max(left, edge), Math.max(edge, innerWidth - w - edge));
+  /* the first seat with room for the whole card and no update card in it,
+     then the first with room, then under and clamped, which is what the
+     window is small enough to have left. */
+  const seat = tries.find((p) => room(p) && free(p)) ?? tries.find(room) ?? tries[0];
 
-  card.style.left = `${Math.round(left)}px`;
-  card.style.top = `${Math.round(top)}px`;
+  card.style.left = `${Math.round(seat.left)}px`;
+  card.style.top = `${Math.round(
+    Math.min(Math.max(seat.top, edge), Math.max(edge, innerHeight - h - edge)))}px`;
 }
 
-/** re-measure without re-animating, for a window that changed size under it */
+/**
+ * Re-measure without re-animating.
+ *
+ * For a window that changed size under it, for a grid that scrolled, and for
+ * the cursor: two of these steps ring the frame the keyboard is standing on,
+ * and the arrows move that while the card is up. The measurement is one
+ * rectangle, so running it after every keystroke costs nothing and a ring
+ * left behind on the frame somebody has already walked away from costs the
+ * card its meaning.
+ */
 function again() {
   if (!live) return;
-  const step = STEPS[at];
-  place(around(step.at ? $(step.at) : null));
+  place(around(anchor(run[at])));
 }
 
 function go(next) {
   if (!live) return;
   if (next < 0) return;
-  if (next >= STEPS.length) return leave();
+  if (next >= run.length) return leave();
 
   at = next;
-  const step = STEPS[at];
+  const step = run[at];
 
-  card.querySelector(".tour-n").textContent = `${at + 1} / ${STEPS.length}`;
+  card.querySelector(".tour-n").textContent = `${at + 1} / ${run.length}`;
   card.querySelector(".tour-head").textContent = step.head;
   /**
    * The keys are named in the words printed on this machine's keyboard.
@@ -227,7 +334,7 @@ function go(next) {
     .replaceAll("{cmd}", mac() ? "cmd" : "ctrl")
     .replaceAll("{enter}", mac() ? "return" : "enter");
   card.querySelector(".tour-back").hidden = at === 0;
-  card.querySelector(".tour-next").textContent = at === STEPS.length - 1 ? "done" : "next";
+  card.querySelector(".tour-next").textContent = at === run.length - 1 ? "done" : "next";
 
   /* restart the entry move. reading the offset is what forces the browser to
      notice the class went away before it came back, and without it the
@@ -236,7 +343,7 @@ function go(next) {
   void card.offsetWidth;
   card.classList.add("in");
 
-  place(around(step.at ? $(step.at) : null));
+  place(around(anchor(step)));
   feel("tick");
 }
 
@@ -260,9 +367,21 @@ function leave() {
   post("/api/tour", { done: true });
 }
 
-/** anything the walkthrough is standing under rather than over */
+/**
+ * Anything the walkthrough is standing under rather than over.
+ *
+ * The update card is in this list even though it is drawn underneath, and
+ * that is deliberate: this is not a list of what is on top, it is a list of
+ * things that answer escape. The update card does, and it is the only way it
+ * can be dismissed at all once it has stopped asking and started announcing.
+ * Without it in here one escape aimed at that card also ran through this
+ * file and wrote the walkthrough down as answered, so somebody who had read
+ * one card of it never saw the rest and had no way back except the settings
+ * pane they had not been told about yet.
+ */
 const above = () =>
-  document.querySelector("#preview:not([hidden]), #keys:not([hidden]), .drop:not([hidden])");
+  document.querySelector(
+    "#preview:not([hidden]), #keys:not([hidden]), .drop:not([hidden]), .up:not([hidden])");
 
 /**
  * ON THE WAY DOWN, NOT ON THE WAY UP, and that is not a detail.
@@ -275,7 +394,7 @@ const above = () =>
  * every press after that went to the photograph. Capture is the phase that
  * runs before all of them.
  *
- * Return is therefore taken off the app for the eight cards this is up, and
+ * Return is therefore taken off the app for the few cards this is up, and
  * that costs nothing, because return on the shelf is the second way to do
  * what space does and space is what the card in front of you is naming.
  */
@@ -299,7 +418,13 @@ function onKey(e) {
   /* the step's own key, watched and never taken: it is not prevented and not
      stopped, so the frame really is kept and the card only agrees with what
      the app is about to do. */
-  if (STEPS[at].key?.(e)) go(at + 1);
+  if (run[at].key?.(e)) return go(at + 1);
+
+  /* every other key, after the app has had it. the arrows walk the cursor
+     and two of these steps are ringing the frame the cursor is on, so the
+     ring has to go with it. next frame rather than now, because nothing has
+     moved yet at the moment this handler runs: it is on the way down. */
+  requestAnimationFrame(again);
 }
 
 /* ------------------------------------------------------------------ */
@@ -308,6 +433,11 @@ function onKey(e) {
 export function startTour() {
   if (live) return;
   if (!S.items.length) return;
+  /* the set is decided here and then it does not change, because the number
+     in the corner of the card is a promise about how many more of these
+     there are and a set that grew a card halfway through would break it. */
+  run = STEPS.filter(anchor);
+  if (!run.length) return;
   live = true;
   at = 0;
   build();
@@ -320,7 +450,7 @@ export function startTour() {
 }
 
 /**
- * The one card somebody who already uses keeper gets instead of eight.
+ * The one card somebody who already uses keeper gets instead of the walkthrough.
  *
  * It wears the same clothes as a step, because it is the same object making
  * the same offer, and it sits where a step with nothing to point at sits.
@@ -335,9 +465,8 @@ function offer() {
   card.innerHTML =
     `<p class="label tour-n">new in this keeper</p>` +
     `<h3 class="tour-head">there is a walkthrough now</h3>` +
-    `<p class="tour-say">eight cards over your own archive, saying what the ` +
-    `keys do and what delete does not do. about a minute, and you have ` +
-    `probably worked most of it out already.</p>` +
+    `<p class="tour-say">a minute over your own archive, saying what the keys ` +
+    `do and what delete does not do.</p>` +
     `<div class="tour-acts">` +
       `<button class="chip tour-skip" type="button">no thanks</button>` +
       `<span class="grow"></span>` +
@@ -377,38 +506,35 @@ function offer() {
 }
 
 /**
- * On the first launch, and after whatever else was already asking.
+ * On the first launch, and it does not wait for anybody.
  *
  * An archive with nothing in it keeps the walkthrough to itself. The blank
  * page is already its own explanation and there is nothing there for a
  * letter to tag yet, so it waits for the folder that comes next: opening one
  * reloads the page and this runs again with something to walk through.
  *
- * The update card asks a yes or no question on a first icon launch and stays
- * until it is answered. Two things talking at once on the first screen is one
- * too many and the question is the more urgent of them, so the walkthrough
- * waits it out.
+ * IT USED TO PARK BEHIND THE UPDATE CARD AND THAT MEANT IT NEVER RAN. The
+ * header says the whole of it. The short version is that on a first launch
+ * there is always an update card, the loud one has no button that closes it,
+ * and the walkthrough was waiting for it to go. Sharing the screen is the
+ * lesser of the two problems, and `place()` and `above()` are what make the
+ * sharing bearable.
+ *
+ * The one wait left is a turn of the event loop, because the line below this
+ * call in app.js is the one that decides whether the wall or the bench is
+ * what is on screen, and a card measured before that lands on a section that
+ * is about to be hidden.
  */
 export async function mountTour() {
   if (!S.items.length) return;
   if (S.toured) return;
 
-  if (S.app) {
-    const up = () => document.querySelector(".up:not([hidden])");
-    /* the card is put up after a fetch, so looking for it right now is
-       looking too early. */
-    await new Promise((r) => setTimeout(r, 500));
-    if (up()) {
-      await new Promise((resolve) => {
-        const watch = new MutationObserver(() => { if (!up()) { watch.disconnect(); resolve(); } });
-        watch.observe(document.body, {
-          subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"],
-        });
-      });
-      /* let the card finish leaving before another one arrives */
-      await new Promise((r) => setTimeout(r, 320));
-    }
-  }
+  await new Promise((r) => setTimeout(r, 0));
+
+  /* nothing to point at is nothing to say, and it is not an answer either:
+     no card goes up, so nothing is written down and the next launch asks
+     again with whatever is on screen then. */
+  if (!STEPS.some(anchor)) return;
 
   /* the cards for a machine that has never run keeper, the offer for one
      that has. see the header. */

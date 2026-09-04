@@ -482,8 +482,9 @@ await mountTray();
 mountQuit();
 mountUpdate();
 tally();
-/* last, and not awaited. it waits out the update card on a first icon
-   launch, and nothing below it should wait on a question somebody may take a
-   minute to answer. */
+/* last, and not awaited. it shares the screen with the update card rather
+   than waiting behind it, because the loud card has no dismiss button and a
+   walkthrough parked behind one was never seen, and nothing below it should
+   wait on cards somebody may take a minute to read. */
 mountTour();
 setView(location.hash.slice(1) || "shelf");
