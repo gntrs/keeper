@@ -152,7 +152,7 @@ const expand = (p) =>
  * an "is this inside the archive" test quietly returns the wrong answer for
  * anyone whose drive is reached through a link.
  */
-async function settled(p) {
+export async function settled(p) {
   let cur = path.resolve(p);
   const tail = [];
   for (;;) {
@@ -167,7 +167,7 @@ async function settled(p) {
   }
 }
 
-const inside = (parent, child) => {
+export const inside = (parent, child) => {
   const rel = path.relative(parent, child);
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 };
