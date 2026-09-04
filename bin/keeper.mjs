@@ -635,7 +635,10 @@ async function main() {
       }
 
       const index = await readIndex(root);
-      const verb = { copy: ["copying", "copied"], symlink: ["linking", "linked"], alias: ["aliasing", "aliased"] }[mode];
+      const verb = {
+        copy: ["copying", "copied"], symlink: ["linking", "linked"],
+        alias: ["aliasing", "aliased"], shortcut: ["making shortcuts", "shortcuts made"],
+      }[mode];
       const bar = progress(verb[0]);
       bar.tick(`${tray.ids.length} frames`);
       // the refusals are all worth reading, so the bar gets closed off first
@@ -648,7 +651,12 @@ async function main() {
         say(`  ${hot("!")} ${e.message}`);
         process.exit(1);
       }
-      bar.done(`${out.written} ${verb[1]}${out.skipped.length ? hot(`  ${out.skipped.length} skipped`) : ""}`);
+      // three numbers, because folding "already there" into either of the
+      // others made a re-export lie: counted as written it promised files it
+      // had not made, and counted as skipped it read as a tray of failures
+      bar.done(`${out.written} ${verb[1]}`
+        + (out.already.length ? dim(`  ${out.already.length} already there`) : "")
+        + (out.skipped.length ? hot(`  ${out.skipped.length} skipped`) : ""));
       say("");
       say(`  ${dim("they are in")} ${nice(out.dest)}`);
       // which mode ran, every time. a folder of symlinks and a folder of
@@ -658,9 +666,15 @@ async function main() {
         copy: "  the originals have not moved. this was a copy.",
         symlink: "  the originals have not moved and nothing was copied. those are symlinks to them.",
         alias: "  the originals have not moved and nothing was copied. those are finder aliases.",
+        shortcut: "  the originals have not moved and nothing was copied. those are shortcuts to them.",
       }[mode]));
-      if (out.skipped.length) {
-        say(dim("  the skipped ones are either gone from the index or already in that folder."));
+      // each refusal in the frame's own words, because "skipped" on its own
+      // reads as a failure and only the reason says whether it was one. a
+      // skip with no reason is a frame the index dropped after it was trayed.
+      for (const p of out.problems) say(dim(`  ${p.name}: ${p.why}`));
+      const gone = out.skipped.length - out.problems.length;
+      if (gone > 0) {
+        say(dim(`  ${gone} skipped because ${gone === 1 ? "it is" : "they are"} no longer in the index.`));
       }
       return;
     }

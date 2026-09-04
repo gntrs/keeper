@@ -1,4 +1,6 @@
-import { copyFile, lstat, mkdir, readFile, realpath, symlink, writeFile } from "node:fs/promises";
+import {
+  copyFile, lstat, mkdir, open, readdir, readFile, readlink, realpath, stat, symlink, writeFile,
+} from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -61,7 +63,17 @@ export async function readTrays(root) {
     .map((t) => ({
       id: t.id,
       name: String(t.name ?? t.id),
-      ids: Array.isArray(t.ids) ? t.ids.filter((i) => typeof i === "string") : [],
+      /* Deduped on the way in, because a repeated id is not a second frame
+         and every reader downstream treats it as one. An export walked it
+         twice and wrote the same photograph under both of the names it is
+         allowed, so a tray of one frame reported two files. addTo has always
+         refused a duplicate, which is why this was never seen from the
+         browser, and a trays.json edited by hand or written by an older
+         build carried them in under it. A Set keeps the order it was given,
+         and order is the one thing a tray promises. */
+      ids: Array.isArray(t.ids)
+        ? [...new Set(t.ids.filter((i) => typeof i === "string"))]
+        : [],
       /* Both optional, and both left off the object entirely when they are
          not set, so JSON.stringify drops them and a trays.json written
          before either existed round trips unchanged. A tray that has never
@@ -196,6 +208,40 @@ export const inside = (parent, child) => {
  * rather than the file underneath it overwritten. Two folders in an archive
  * both holding `DSC_0041.jpg` is normal, and losing one of them because they
  * landed in the same tray is not a trade anyone would accept.
+ *
+ * EXPORTING A TRAY TWICE INTO THE SAME FOLDER GIVES THE SAME FOLDER.
+ *
+ * That suffix is for two different photographs meeting each other, and it
+ * used to be spent on one photograph meeting itself. The second run found
+ * `DSC_0041.jpg` occupied, read the collision as "try the next name", and
+ * wrote a byte identical second copy called `DSC_0041-<id>.jpg`. Measured
+ * before this was written: forty frames into an empty folder gave forty
+ * files, the same export again gave seventy nine, and the line on the end of
+ * it said 39 copied, which was true and useless. Building a folder for a job
+ * over an afternoon is the ordinary way this feature gets used, so the
+ * ordinary way of using it doubled the shoot.
+ *
+ * A destination file that is already this frame is work that has been done
+ * rather than a collision. It is left alone and counted apart from what was
+ * written, so the sentence at the end reads "40 already there, 3 written"
+ * instead of handing somebody 43 files for a tray of 43.
+ *
+ * Telling that from a different photograph of the same name is a different
+ * question in each mode, and each is answered with the strongest thing that
+ * mode actually knows: a copy by its size, a symlink by where it points, a
+ * platform shortcut by what the file manager resolves it to. Where the
+ * answer cannot be had the frame is skipped and said out loud, because the
+ * one outcome that is not allowed here is quietly writing a photograph the
+ * folder already holds.
+ *
+ * ONE FRAME THAT WILL NOT READ IS ONE FRAME. A single EACCES on frame ten of
+ * twenty used to throw out of the whole export, leaving a folder holding
+ * nine photographs, looking finished, with nothing anywhere saying the other
+ * eleven were missing, and a retry then doubled the nine. Every refusal a
+ * frame can raise is that frame's own now and comes back with its reason
+ * attached. The one exception is the windows symlink permission, which is
+ * about the machine rather than about the photograph and is worth stopping
+ * the whole run for.
  */
 export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
   const how = String(mode ?? "copy");
@@ -218,21 +264,29 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
   const byId = new Map((index?.items ?? []).map((i) => [i.id, i]));
   await mkdir(dest, { recursive: true });
 
-  const taken = new Set();
-  const skipped = [];
+  /* A frame listed twice in one tray is one frame. A Set keeps the order it
+     was given, which is the order the tray was filled in and the only order
+     an export is allowed to walk. */
+  const ids = [...new Set(tray.ids)];
 
-  /* The two names a frame is allowed to land under, in order. The bare one
-     is skipped outright once this run has already used it, so the second
-     frame called DSC_0041.jpg does not have to fail a write to learn that. */
-  const candidates = (item, id) => {
+  const skipped = [];   // in the tray and not in the folder afterwards
+  const already = [];   // in the folder already, as this same frame
+  const problems = [];  // and why, for the ones that were refused
+
+  /**
+   * The two names a frame is allowed to land under, in order. The first is
+   * the photograph's own name. The second carries the frame's id, which is a
+   * hash of its path inside the archive, so that name names one frame and
+   * can never name another, and that is what makes it worth reading back.
+   */
+  const names = (item, id) => {
     const ext = path.extname(item.path);
     const stem = path.basename(item.path, ext);
-    const first = `${stem}${ext}`;
-    return taken.has(first) ? [`${stem}-${id}${ext}`] : [first, `${stem}-${id}${ext}`];
+    return [`${stem}${ext}`, `${stem}-${id}${ext}`];
   };
 
   if (how !== "copy" && how !== "symlink") {
-    return shortcuts({ root, tray, byId, dest, taken, skipped, candidates, how });
+    return shortcuts({ home, ids, byId, dest, skipped, already, problems, names, how });
   }
 
   /**
@@ -251,19 +305,74 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
     ? (item, to) => copyFile(path.join(root, item.path), to, constants.COPYFILE_EXCL)
     : (item, to) => symlink(path.join(home, item.path), to);
 
+  /**
+   * IS THE FILE ALREADY UNDER THAT NAME THIS SAME FRAME, OR A DIFFERENT
+   * PHOTOGRAPH THAT HAPPENS TO SHARE A NAME?
+   *
+   * Everything downstream of this answer is destructive in one direction or
+   * the other. Say yes wrongly and the frame is never written, and the run
+   * reports it as work already done rather than as a frame that did not
+   * land. Say no wrongly and the folder grows a second copy of a photograph
+   * it already holds. So it is asked exactly and not estimated.
+   *
+   * A symlink answers it outright: it either points at this frame's original
+   * or it points somewhere else, and reading it back is the whole test.
+   *
+   * A copy is compared by size and then, only if the sizes agree, by its
+   * bytes. Size alone is not enough and the cheap version of this was a
+   * silent loss: two scans of one negative come off a scanner under the same
+   * name at the same uncompressed byte count, and reading those as one
+   * photograph means the second tray exported into that folder writes
+   * nothing and says everything was already there. The bytes are only ever
+   * read on the path where the alternative was copying the whole file
+   * anyway, and the compare stops at the first block that differs, so the
+   * ordinary re-export of a folder that really is finished costs one pass of
+   * a file that was about to be written end to end.
+   */
+  const sameBytes = async (a, b) => {
+    const [x, y] = await Promise.all([open(a, "r"), open(b, "r")]);
+    try {
+      const one = Buffer.alloc(1 << 16);
+      const two = Buffer.alloc(1 << 16);
+      for (let at = 0; ; at += one.length) {
+        const [p, q] = await Promise.all([x.read(one, 0, one.length, at), y.read(two, 0, two.length, at)]);
+        if (p.bytesRead !== q.bytesRead) return false;
+        if (!p.bytesRead) return true;
+        if (!one.subarray(0, p.bytesRead).equals(two.subarray(0, q.bytesRead))) return false;
+      }
+    } finally {
+      await Promise.all([x.close().catch(() => {}), y.close().catch(() => {})]);
+    }
+  };
+
+  const identical = how === "symlink"
+    ? async (item, at) => (await readlink(at)) === path.join(home, item.path)
+    : async (item, at) => {
+        const src = path.join(root, item.path);
+        const [from, there] = await Promise.all([stat(src), stat(at)]);
+        return from.size === there.size && sameBytes(src, at);
+      };
+  const isSame = (item, at) => identical(item, at).catch(() => false);
+
+  const taken = new Set();
   let written = 0;
-  for (const id of tray.ids) {
+
+  for (const id of ids) {
     const item = byId.get(id);
     if (!item) { skipped.push(id); continue; } // gone from the index since it was trayed
 
+    const [bare, tagged] = names(item, id);
+    /* The bare name is not offered a second time in one run, so the second
+       frame called DSC_0041.jpg does not have to fail a write to learn what
+       the first one already proved. */
     let done = false;
-    for (const name of candidates(item, id)) {
+    for (const name of taken.has(bare) ? [tagged] : [bare, tagged]) {
+      const at = path.join(dest, name);
       try {
-        await write(item, path.join(dest, name));
+        await write(item, at);
         taken.add(name);
         written++;
         done = true;
-        break;
       } catch (e) {
         /* Windows only hands out symlinks to an administrator, or to anyone
            once developer mode is on. It is worth saying which of those it is,
@@ -273,15 +382,50 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
         if (e.code === "EPERM" && how === "symlink" && process.platform === "win32") {
           throw new Error("windows only makes symlinks for an administrator, or for anyone with developer mode turned on in settings. copy and shortcut both work as you are.");
         }
-        if (e.code !== "EEXIST") throw e;
-        taken.add(name);
+        if (e.code === "EEXIST") {
+          /* The name is spoken for either way, so no later frame in this run
+             may be offered it, whichever of the two this turns out to be. */
+          taken.add(name);
+          if (await isSame(item, at)) { already.push(id); done = true; }
+          // otherwise a different photograph holds it, and the next name down
+          // is exactly what the id suffix exists for
+        } else {
+          problems.push({ id, name, why: why(e) });
+          skipped.push(id);
+          done = true;
+        }
       }
+      if (done) break;
     }
-    if (!done) skipped.push(id);
+    if (!done) {
+      skipped.push(id);
+      problems.push({ id, name: bare, why: "both of the names it could use are held by other files" });
+    }
   }
 
-  return { written, skipped, dest, mode: how };
+  return { written, already, skipped, problems, dest, mode: how };
 }
+
+/**
+ * The errno, said as the half of the sentence a photographer can act on.
+ *
+ * These are about one photograph rather than about the archive, which is why
+ * they are not runtime's sentences: `EACCES` here is a frame keeper is not
+ * allowed to read, and being told instead that keeper keeps its index in a
+ * .keeper folder beside the photographs would send somebody looking in the
+ * wrong place entirely.
+ */
+const WHY = {
+  EACCES: "keeper is not allowed to read that one",
+  EPERM: "keeper is not allowed to read that one",
+  ENOENT: "that one is not on the drive any more",
+  ENOSPC: "the disk that folder is on ran out of space",
+  EROFS: "that folder is on a read only disk",
+  EIO: "the drive gave a read error on that one",
+  ENAMETOOLONG: "that name is too long for that folder",
+};
+
+const why = (e) => WHY[e?.code] ?? String(e?.message ?? "").toLowerCase();
 
 /**
  * The platform's own shortcut, made for a whole tray in one call.
@@ -295,35 +439,124 @@ export async function exportTray({ root, tray, folder, index, mode = "copy" }) {
  * on both, which is deciding what each file gets called.
  *
  * The name is chosen by looking first, because neither of them can create
- * exclusively the way copyFile and symlink can. lstat and not stat: a broken
- * link already sitting in the destination still occupies the name, and stat
- * would follow it, find nothing, and report the name free.
+ * exclusively the way copyFile and symlink can. The folder is read once and
+ * compared by name: a broken link already sitting in the destination still
+ * occupies the name, and a stat that followed it would find nothing and
+ * report the name free.
+ *
+ * The name is also the only thing this mode can look at for free. A shortcut
+ * carries no bytes of its own to compare, so whether the file already under
+ * a name is this frame's own shortcut is a question only the file manager
+ * can answer, and it is asked for the whole folder in one call for the same
+ * reason the making of them is.
  */
-async function shortcuts({ root, tray, byId, dest, taken, skipped, candidates, how }) {
-  const free = async (p) => {
-    try { await lstat(p); return false; } catch { return true; }
-  };
+async function shortcuts({ home, ids, byId, dest, skipped, already, problems, names, how }) {
+  const there = new Set(await readdir(dest).catch(() => []));
 
-  const jobs = [];
-  for (const id of tray.ids) {
+  const wants = [];
+  for (const id of ids) {
     const item = byId.get(id);
-    if (!item) { skipped.push(id); continue; }
-
-    let name = null;
-    for (const c of candidates(item, id)) {
-      const asked = host.linkName(c);
-      if (await free(path.join(dest, asked))) { name = asked; break; }
-      taken.add(c);
-    }
-    if (!name) { skipped.push(id); continue; }
-    taken.add(name);
-    jobs.push({ id, name, src: path.join(root, item.path) });
+    if (!item) { skipped.push(id); continue; } // gone from the index since it was trayed
+    /* The archive's resolved path, and not the one it was opened under. It
+       is what the link is made to point at and what the file manager hands
+       back when it is asked what a link points at, and the two have to be
+       the same string or every re-export reads as a folder full of other
+       people's photographs. */
+    wants.push({ id, src: path.join(home, item.path), asked: names(item, id) });
   }
 
-  if (!jobs.length) return { written: 0, skipped, dest, mode: how };
+  /* Every occupied name, asked about once. A question costs an apple event
+     or a com object either way, so the ones worth asking are gathered first
+     and asked together rather than one at a time down the tray. */
+  const held = [];
+  for (const w of wants) {
+    for (const c of w.asked) {
+      const file = host.linkName(c);
+      if (there.has(file)) held.push({ name: file, src: w.src });
+    }
+  }
+  const answer = held.length
+    ? await host.linksAlready(held, dest)
+    : { same: new Set(), unknown: new Set() };
+
+  /* Keyed on both halves, because the same name gets asked about for two
+     different frames when they share a basename and the answer that comes
+     back is not the same one. Stringified rather than joined on a separator:
+     there is no character a filename cannot contain that is also easy to
+     read back, and every one that looks safe is a name somebody's camera
+     will eventually produce. */
+  const key = (name, src) => JSON.stringify([name, src]);
+  const ours = new Set();
+  const murky = new Set();
+  held.forEach((h, i) => {
+    if (answer.same.has(i)) ours.add(key(h.name, h.src));
+    else if (answer.unknown.has(i)) murky.add(key(h.name, h.src));
+  });
+
+  const taken = new Set();
+  const jobs = [];
+  for (const w of wants) {
+    const [bare, tagged] = w.asked;
+    let done = false;
+    for (const c of taken.has(bare) ? [tagged] : [bare, tagged]) {
+      const file = host.linkName(c);
+      taken.add(c);
+      if (!there.has(file)) {
+        jobs.push({ id: w.id, name: file, src: w.src, at: path.join(dest, file) });
+        done = true;
+      } else if (ours.has(key(file, w.src))) {
+        already.push(w.id);
+        done = true;
+      } else if (murky.has(key(file, w.src))) {
+        /* The file manager would not say what is under that name. A broken
+           link and a folder it cannot read both land here, and the safe
+           answer is the one that cannot write a second copy of a photograph
+           the folder may already hold. */
+        problems.push({ id: w.id, name: file, why: `${host.files} would not say what is already there under that name` });
+        skipped.push(w.id);
+        done = true;
+      }
+      // and anything else is a different photograph holding the name, which
+      // is exactly what the id suffixed name below it is for
+      if (done) break;
+    }
+    if (!done) {
+      skipped.push(w.id);
+      problems.push({ id: w.id, name: host.linkName(bare), why: "both of the names it could use are held by other files" });
+    }
+  }
+
+  if (!jobs.length) return { written: 0, already, skipped, problems, dest, mode: how };
 
   const bad = await host.links(jobs, dest);
-  for (const i of bad) if (jobs[i]) skipped.push(jobs[i].id);
+  for (const i of bad) {
+    if (!jobs[i]) continue;
+    skipped.push(jobs[i].id);
+    problems.push({ id: jobs[i].id, name: jobs[i].name, why: `${host.files} would not make that one` });
+  }
 
-  return { written: jobs.length - bad.size, skipped, dest, mode: how };
+  /**
+   * WRITTEN IS COUNTED OFF THE DISK AND NOT OFF WHAT THE SCRIPT SAID.
+   *
+   * `jobs.length - bad.size` is arithmetic on a report, and this is the one
+   * mode where the writing is done by another program. A file manager that
+   * comes back with no error having made nothing is not a hypothetical: it
+   * is the exact shape of the bug that made the windows trash delete nothing
+   * for the whole life of that line while every run looked like a success,
+   * and both trash paths grew a check of the drive because of it. This is
+   * that check, for the other direction.
+   */
+  let written = 0;
+  for (const [i, j] of jobs.entries()) {
+    if (bad.has(i)) continue;
+    try {
+      await lstat(j.at);
+      written++;
+    } catch {
+      skipped.push(j.id);
+      problems.push({ id: j.id, name: j.name, why: `${host.files} reported no trouble and made nothing` });
+    }
+  }
+
+  return { written, already, skipped, problems, dest, mode: how };
 }

@@ -517,34 +517,45 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
       }
 
       /**
+       * The walkthrough has been answered.
+       *
+       * It is a route rather than a line in the browser's own storage for
+       * the reason written over `toured` in runtime.mjs: the origin carries
+       * a port and the port can move.
+       *
+       * `{done:true}` IS THE ONLY BODY THAT WRITES ANYTHING, and anything
+       * else is answered and dropped. It is one line and it is the whole
+       * guarantee the walkthrough makes about itself: what is in the seat is
+       * a person's answer and nothing else is allowed to put it there.
+       * Writing `done:false` looked harmless and is not, twice over. It
+       * stamps `seen` with this version, so the walkthrough is recorded as
+       * answered on a keeper nobody was shown, and it puts a `toured` key in
+       * the seat, which is the exact key `returning()` reads to decide
+       * whether this machine has used keeper before: a first run that wrote
+       * one of these would come back next launch as somebody experienced and
+       * be offered a card about what changed instead of the walkthrough it
+       * had still never seen.
+       */
+      if (route === "/api/tour" && req.method === "POST") {
+        const b = await body(req).catch(() => ({}));
+        if (b?.done !== true) return json(res, 200, { ok: true, toured: false });
+        /* The answer and the version it was answered on, in one write. `seen`
+           belongs to the walkthrough and to nothing else: it was being stamped
+           at boot, so the second launch of a fresh install read as a machine
+           that had already been through this and got the card about what
+           changed instead of the cards it had never been shown. */
+        const { version } = await import("./update.mjs");
+        await setToured(true, await version());
+        return json(res, 200, { ok: true, toured: true });
+      }
+
+      /**
        * Is there a newer keeper, and may we even ask.
        *
        * The permission is checked before the request rather than after, so
        * a keeper nobody has said yes to answers this without a single packet
        * leaving the machine. That ordering is the whole promise.
        */
-      /**
-       * The walkthrough has been through, or is being asked for again.
-       *
-       * It is a route rather than a line in the browser's own storage for
-       * the reason written over `toured` in runtime.mjs: the origin carries
-       * a port and the port can move. `done` is the whole body, and false is
-       * as meaningful as true, because the settings pane offers the
-       * walkthrough again and that has to survive a reload the same way
-       * finishing it does.
-       */
-      if (route === "/api/tour" && req.method === "POST") {
-        const b = await body(req).catch(() => ({}));
-        /* The answer and the version it was answered on, in one write. `seen`
-           belongs to the walkthrough and to nothing else: it was being stamped
-           at boot, so the second launch of a fresh install read as a machine
-           that had already been through this and got the card about what
-           changed instead of the eight cards it had never been shown. */
-        const { version } = await import("./update.mjs");
-        await setToured(!!b?.done, await version());
-        return json(res, 200, { ok: true, toured: !!b?.done });
-      }
-
       if (route === "/api/update" && req.method === "GET") {
         const { asks, check, isClone, version } = await import("./update.mjs");
         const policy = await updatePolicy();
@@ -1061,8 +1072,22 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
               await writeTrays(here, d);
             }
           });
+          /* Three numbers and not two. `already` is the frames that were in
+             that folder before this run and are still exactly what they
+             were, and folding it into either of the others is how a re-export
+             lied twice over: counted as written it promised files it had not
+             made, and counted as skipped it read as a tray full of failures.
+             `trouble` is the first few refusals in the frame's own words,
+             because a count of skips with no reason attached sends somebody
+             to a terminal that, opened from the icon, does not exist. */
           return json(res, 200, {
-            ok: true, written: out.written, skipped: out.skipped.length, dest: out.dest, mode: out.mode,
+            ok: true,
+            written: out.written,
+            already: out.already.length,
+            skipped: out.skipped.length,
+            trouble: out.problems.slice(0, 3).map((p) => `${p.name}: ${p.why}`),
+            dest: out.dest,
+            mode: out.mode,
           });
         } catch (e) {
           return json(res, 400, { error: e.message });

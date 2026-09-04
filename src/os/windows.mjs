@@ -300,6 +300,70 @@ export async function links(jobs, dest) {
 }
 
 /**
+ * WHAT IS ALREADY SITTING UNDER THAT NAME IN THE DESTINATION.
+ *
+ * The same question the mac side asks the finder, asked of the shell, and it
+ * exists for the same reason: exporting a tray into a folder it has been
+ * exported into before must add nothing, and a .lnk carries no bytes of its
+ * own that would tell the two apart. What it carries is a target, and the
+ * shell is the thing that reads one.
+ *
+ * Three answers, in two lists, and the third one is the point. A row in
+ * `same` is a shortcut already aimed at that frame's original. A row in
+ * neither list is a name held by something else, which is an honest
+ * collision and is what the id suffixed name answers. A row in `unknown` is
+ * the shell declining to say, and the caller may not read that as a
+ * collision, because falling through to the second name there writes a
+ * second shortcut to a photograph the folder already holds.
+ *
+ * The rows are the name first and the target second, the opposite way round
+ * from LINK above, because that is the order the question is asked in and a
+ * pair of parallel lists would go wrong the first time one of them had a
+ * blank in it. Case insensitively compared, since two spellings of one path
+ * are one path on this platform.
+ *
+ * NONE OF THIS HALF HAS RUN ON A WINDOWS MACHINE. It is the shape that
+ * matches the mac side, which is measured, rather than a measurement.
+ */
+const SAME = `
+$ErrorActionPreference = 'Stop'
+$rows = [IO.File]::ReadAllLines($env:KEEPER_LIST)
+$sh = New-Object -ComObject WScript.Shell
+$yes = @()
+$dunno = @()
+for ($i = 0; $i -lt $rows.Count - 1; $i += 2) {
+  $n = [string]($i / 2)
+  try {
+    $p = Join-Path $env:KEEPER_DEST $rows[$i]
+    if (Test-Path -LiteralPath $p) {
+      $t = $sh.CreateShortcut($p).TargetPath
+      if ($t -and ($t -ieq $rows[$i + 1])) { $yes += $n }
+    } else { $dunno += $n }
+  } catch { $dunno += $n }
+}
+Write-Output ('same ' + ($yes -join ','))
+Write-Output ('unknown ' + ($dunno -join ','))
+`;
+
+export async function linksAlready(jobs, dest) {
+  const rows = jobs.flatMap((j) => [j.name, j.src]);
+  const read = (out, label) => {
+    const line = out.split(/\r?\n/).find((l) => l.startsWith(`${label} `)) ?? "";
+    return new Set((line.match(/\d+/g) ?? []).map(Number));
+  };
+  try {
+    const out = await withList(rows, (list) =>
+      ps(SAME, { KEEPER_LIST: list, KEEPER_DEST: dest }));
+    return { same: read(out, "same"), unknown: read(out, "unknown") };
+  } catch {
+    /* Powershell locked down, or com refusing. Nothing is known about any of
+       these names, and the caller's answer to not knowing is to leave the
+       folder alone and say so, which is the right answer to this too. */
+    return { same: new Set(), unknown: new Set(jobs.map((_, i) => i)) };
+  }
+}
+
+/**
  * What a shortcut has to be called. Windows only treats a file as one if it
  * ends .lnk, and explorer hides that suffix, so a tray exported as shortcuts
  * still reads as a folder of photograph names.

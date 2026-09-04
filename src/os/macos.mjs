@@ -135,54 +135,185 @@ end run`;
  * them, and it makes them one at a time through apple events, so the naive
  * version is one osascript per frame: two hundred processes, each paying its
  * own interpreter startup and its own round trip, and a tray that takes a
- * minute to export nothing. So the whole set becomes one script with a repeat
- * loop in it and osascript runs once.
+ * minute to export nothing. So a batch of frames becomes one script with a
+ * repeat loop in it and osascript runs once for the batch.
  *
  * The script is fed on stdin rather than through -e. A few hundred paths is
  * tens of kilobytes of argument otherwise, and an argument list has a ceiling
  * while a pipe does not.
  */
-export async function links(jobs, dest) {
-  /* AppleScript string literals take the same two escapes a javascript one
-     does, and a photographer's folder name is exactly the place a stray quote
-     turns a script into a syntax error. */
-  const q = (s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-
-  /* Everything but the one make call is kept outside the tell block. POSIX
-     file and its coercion are AppleScript's own, and the finder is only asked
-     the thing that is actually its job, which is the shortest version of this
-     script that cannot be tripped up by terminology. */
-  const script = [
-    `set srcs to {${jobs.map((j) => q(j.src)).join(", ")}}`,
-    `set nms to {${jobs.map((j) => q(j.name)).join(", ")}}`,
-    `set d to (POSIX file ${q(dest)}) as alias`,
-    "set bad to {}",
-    "repeat with i from 1 to count of srcs",
-    "  try",
-    "    set f to (POSIX file (item i of srcs)) as alias",
-    "    tell application \"Finder\" to make new alias file at d to f with properties {name:(item i of nms)}",
-    "  on error",
-    // one frame the finder would not alias, a file gone from the disk since
-    // the index was built, is a skip and not a reason to abandon the other
-    // hundred and ninety nine
-    "    set end of bad to i",
-    "  end try",
-    "end repeat",
-    "return bad",
-  ].join("\n");
-
-  const out = await new Promise((ok, no) => {
-    const child = execFile("osascript", ["-"], (err, stdout, stderr) => {
-      if (err) return no(new Error(String(stderr || err.message).trim().toLowerCase() || "the finder would not make the aliases"));
+const osa = (script) =>
+  new Promise((ok, no) => {
+    const child = execFile("osascript", ["-"], { maxBuffer: 8 << 20 }, (err, stdout, stderr) => {
+      if (err) return no(new Error(String(stderr || err.message).trim().toLowerCase() || "the finder would not answer"));
       ok(String(stdout));
     });
     child.stdin.end(script);
   });
 
-  /* AppleScript prints a list of integers as "1, 4, 9" and an empty list as
-     nothing at all, so the count of matches is the count of failures and no
-     parse is needed beyond pulling the numbers out. */
-  return new Set((out.match(/\d+/g) ?? []).map((n) => Number(n) - 1));
+/* AppleScript string literals take the same two escapes a javascript one
+   does, and a photographer's folder name is exactly the place a stray quote
+   turns a script into a syntax error. */
+const q = (s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+
+/* AppleScript prints a list of integers as "1, 4, 9" and an empty list as
+   nothing at all, so no parse is needed beyond pulling the numbers out. They
+   are one based coming out of a repeat loop and zero based going back to the
+   caller, and `at` puts the batch back where it came from. */
+const rows = (text, at) => (String(text).match(/\d+/g) ?? []).map((n) => at + Number(n) - 1);
+
+/**
+ * HOW MANY OF THESE FIT IN ONE SCRIPT, WHICH IS FEWER THAN YOU WOULD THINK
+ * AND IS NOT ABOUT HOW LONG THE SCRIPT IS.
+ *
+ * Every path in a batch goes into one AppleScript list literal, and
+ * AppleScript overflows its own stack evaluating a long enough one. Measured
+ * on this machine: 8,000 items parse and run, 8,079 come back as `execution
+ * error: Stack overflow. (-2706)`, and it is a count rather than a byte
+ * budget, since the cliff falls in the same place whether the list is 350KB
+ * or 1.4MB. A tray of eight thousand frames is a real tray, and what it used
+ * to get was that raw applescript error with no mention of trays, frames or
+ * anything a photographer could act on.
+ *
+ * So the tray is cut into batches, and the batch is 500 because the two
+ * costs pull in opposite directions and 500 is where neither one shows.
+ * Sixteen times under the measured ceiling leaves room for a machine less
+ * generous than this one; parse time climbs faster than the list does, so
+ * shorter batches are cheaper to parse rather than dearer (500 items parse
+ * in 43ms, 8,000 in 1.1s); and the price of a batch is one osascript start
+ * against roughly 17ms per frame of finder work, measured over 400 real
+ * aliases at 6.79s in one call and 7.10s in four, which puts a 500 frame
+ * batch at well under a percent of a run it can no longer fail.
+ */
+const BATCH = 500;
+
+export async function links(jobs, dest) {
+  const bad = new Set();
+
+  for (let at = 0; at < jobs.length; at += BATCH) {
+    const batch = jobs.slice(at, at + BATCH);
+
+    /* Everything but the one make call is kept outside the tell block. POSIX
+       file and its coercion are AppleScript's own, and the finder is only
+       asked the thing that is actually its job, which is the shortest version
+       of this script that cannot be tripped up by terminology. */
+    const script = [
+      `set srcs to {${batch.map((j) => q(j.src)).join(", ")}}`,
+      `set nms to {${batch.map((j) => q(j.name)).join(", ")}}`,
+      `set d to (POSIX file ${q(dest)}) as alias`,
+      "set bad to {}",
+      "repeat with i from 1 to count of srcs",
+      "  try",
+      "    set f to (POSIX file (item i of srcs)) as alias",
+      "    tell application \"Finder\" to make new alias file at d to f with properties {name:(item i of nms)}",
+      "  on error",
+      // one frame the finder would not alias, a file gone from the disk since
+      // the index was built, is a skip and not a reason to abandon the other
+      // hundred and ninety nine
+      "    set end of bad to i",
+      "  end try",
+      "end repeat",
+      "return bad",
+    ].join("\n");
+
+    try {
+      for (const i of rows(await osa(script), at)) bad.add(i);
+    } catch (e) {
+      /* A whole batch refused is the machine talking rather than one frame:
+         apple events turned off for this process, or the finder not running.
+         Before anything has landed that is the only useful thing to say, so
+         it is said and the export stops. Once files are in the folder the
+         person needs the count and the list of what is missing more than
+         they need an exception, so the rest of the batches still run and
+         these frames come back as ones the finder would not make. */
+      if (!at) throw e;
+      for (let i = 0; i < batch.length; i++) bad.add(at + i);
+    }
+  }
+
+  return bad;
+}
+
+/**
+ * WHAT IS ALREADY SITTING UNDER THAT NAME IN THE DESTINATION.
+ *
+ * An export into a folder that has been exported into before has to tell its
+ * own work from a different photograph that happens to share a name, and an
+ * alias is the one mode where that answer is not in the file itself. Only
+ * the finder knows what one of these points at.
+ *
+ * THREE ANSWERS AND NOT TWO, which is why two lists come back. An index in
+ * `same` is a link that resolves to exactly that frame's original, so the
+ * frame is already exported and nothing needs writing. An index in neither
+ * list is a name held by something else, which is an honest collision and is
+ * what the id suffixed name exists to answer. An index in `unknown` is the
+ * finder declining to say, and the caller must not read that as a collision:
+ * being wrong in that direction writes a second alias to a photograph the
+ * folder already holds, which is the whole fault this exists to close.
+ *
+ * Integers come back rather than paths, deliberately. A mac filename may
+ * contain a newline, so a list of resolved paths is not a thing that can be
+ * split back apart reliably, and the comparison is cheaper inside the script
+ * than out of it anyway.
+ *
+ * Measured on this machine: `class of item (POSIX file p)` is `alias file`
+ * for a finder alias and for a posix symlink both, and `document file` for
+ * an ordinary photograph, so an ordinary file of the same name falls through
+ * to the collision branch rather than being guessed at. A finder alias whose
+ * original has gone raises -1700 on `original item` instead of answering,
+ * and lands in `unknown` where it belongs.
+ */
+export async function linksAlready(jobs, dest) {
+  const same = new Set();
+  const unknown = new Set();
+
+  for (let at = 0; at < jobs.length; at += BATCH) {
+    const batch = jobs.slice(at, at + BATCH);
+    const script = [
+      `set nms to {${batch.map((j) => q(j.name)).join(", ")}}`,
+      `set srcs to {${batch.map((j) => q(j.src)).join(", ")}}`,
+      `set d to ${q(dest)}`,
+      /* `hits` and not `yes`: yes is an AppleScript constant, and assigning
+         to it is a syntax error the whole script dies of. It failed quietly
+         too, because a script that will not compile is one this function
+         reads as the finder declining to answer about any of these names. */
+      "set hits to {}",
+      "set dunno to {}",
+      "repeat with i from 1 to count of nms",
+      "  set p to (POSIX file (d & \"/\" & (item i of nms)))",
+      "  try",
+      "    tell application \"Finder\"",
+      "      if (class of item p) is alias file then",
+      "        if (POSIX path of ((original item of item p) as alias)) is (item i of srcs) then",
+      "          set end of hits to i",
+      "        end if",
+      "      end if",
+      "    end tell",
+      "  on error",
+      "    set end of dunno to i",
+      "  end try",
+      "end repeat",
+      "set text item delimiters to \",\"",
+      "return (hits as text) & \" \" & (dunno as text)",
+    ].join("\n");
+
+    /* One line, two lists, split on the space between them. Neither half can
+       hold anything but digits and commas, so there is nothing here a
+       filename could reach into. A batch the finder refuses outright says
+       nothing about any of its names, which is exactly `unknown`. */
+    let said = " ";
+    try {
+      said = await osa(script);
+    } catch {
+      for (let i = 0; i < batch.length; i++) unknown.add(at + i);
+      continue;
+    }
+    const [a, b] = said.split(" ");
+    for (const i of rows(a, at)) same.add(i);
+    for (const i of rows(b, at)) unknown.add(i);
+  }
+
+  return { same, unknown };
 }
 
 /**

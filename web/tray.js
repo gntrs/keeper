@@ -611,12 +611,20 @@ async function ship() {
      someone opening a Finder window to find out whether it worked, and the
      skipped count is the number that earns its place: it is how you learn
      that a frame in the tray is no longer on the disk.
+     "already there" is the third number and is folded into neither of the
+     others: a second export into the same folder writes nothing, and
+     "wrote 0 files" on its own reads as a failure when it is the folder
+     being exactly right. The reasons come last, in the frame's own words,
+     because a skip count with nothing beside it sends somebody to a
+     terminal that, opened from the icon, does not exist.
      The verb carries the mode, because a folder of links and a folder of
      copies look identical in finder and weigh nothing alike. */
   out.textContent =
     `${VERB[d.mode ?? mode][1]} ${d.written} ${d.written === 1 ? "file" : "files"} to ${d.dest}` +
+    (d.already ? `, ${d.already} already there` : "") +
     (d.skipped ? `, skipped ${d.skipped}` : "") +
-    ((d.mode ?? mode) === "copy" ? "" : ", nothing was copied");
+    ((d.mode ?? mode) === "copy" ? "" : ", nothing was copied") +
+    (d.trouble?.length ? `. ${d.trouble.join(". ")}` : "");
 
   feel("done");
 
