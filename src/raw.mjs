@@ -117,7 +117,10 @@ export async function readableSource(root, item) {
  * A bmp has no orientation to argue about and falls through untouched.
  */
 export async function originalSize(srcAbs, oriented) {
-  const size = await host.measure(srcAbs);
+  /* Bounded for the same reason the one inside decode is: this runs while an
+     export is being written and a wedged sips would hold it open with nothing
+     on screen. */
+  const size = await host.measure(srcAbs, DECODE_TIMEOUT_MS);
   if (!size) return null;
   const { w, h } = size;
   if (!oriented?.w || !oriented?.h) return size;

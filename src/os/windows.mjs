@@ -478,8 +478,15 @@ export async function canDecode() {
 export const decodeHint =
   "windows has no raw decoder of its own. install ffmpeg and put it on the path, and keeper will read what it can.";
 
-/** the source's own pixels, before any orientation tag is applied */
-export async function measure(src) {
+/**
+ * The source's own pixels, before any orientation tag is applied.
+ *
+ * Bounded, like its opposite number on the mac and for the same reason: an
+ * ffprobe that never returns on a damaged file holds the whole scan with
+ * nothing on screen to say so. This half has never run on a windows machine,
+ * so it is the shape that matches rather than a measurement.
+ */
+export async function measure(src, timeoutMs = 0) {
   try {
     const out = await run("ffprobe", [
       "-v", "error",
@@ -487,7 +494,7 @@ export async function measure(src) {
       "-show_entries", "stream=width,height",
       "-of", "json",
       src,
-    ]);
+    ], { timeout: timeoutMs });
     const st = JSON.parse(out).streams?.[0];
     return st?.width && st?.height ? { w: st.width, h: st.height } : null;
   } catch {

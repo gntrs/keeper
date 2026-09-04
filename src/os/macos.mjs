@@ -244,9 +244,19 @@ const sips = (args, timeout) =>
     throw new Error(said.replace(/^error:\s*/i, "").toLowerCase());
   });
 
-/** the source's own pixels, as sips reports them, which is sensor order */
-export async function measure(src) {
-  const out = await sips(["-g", "pixelWidth", "-g", "pixelHeight", src]).catch(() => "");
+/**
+ * The source's own pixels, as sips reports them, which is sensor order.
+ *
+ * The timeout is not optional and is not a tidy default. Without one this
+ * call is the only sips in the program with no upper bound on it, and a sips
+ * that wedges, which a damaged file on a failing drive will do, holds the
+ * whole scan on "thumbnailing ..." with nothing to distinguish it from a slow
+ * disk. Measured against a sips that slept: the convert gave up at 121
+ * seconds and this one sat for the full 400, then started the convert, and
+ * the frame finally failed at 521.
+ */
+export async function measure(src, timeoutMs = 0) {
+  const out = await sips(["-g", "pixelWidth", "-g", "pixelHeight", src], timeoutMs).catch(() => "");
   const w = Number(/pixelWidth:\s*(\d+)/.exec(out)?.[1]);
   const h = Number(/pixelHeight:\s*(\d+)/.exec(out)?.[1]);
   return w && h ? { w, h } : null;
@@ -269,7 +279,7 @@ export async function measure(src) {
  * fail the convert anyway, and the failure is the useful answer.
  */
 export async function decode(src, out, longEdge, quality, timeoutMs) {
-  const size = await measure(src).catch(() => null);
+  const size = await measure(src, timeoutMs).catch(() => null);
   const resample = !size || Math.max(size.w, size.h) > longEdge
     ? ["--resampleHeightWidthMax", String(longEdge)]
     : [];
