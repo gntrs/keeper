@@ -159,6 +159,30 @@ if the assistant miscounts a sheet, keeper **refuses that whole sheet**
 rather than applying it. one bad count would silently shift every label after
 it onto the wrong photograph, which would make the whole thing worthless.
 
+## audio off a link
+
+keeper opens a folder of photographs and film, and a piece of work often
+needs a piece of music as well. the downloads tab takes a youtube or spotify
+link and saves the audio as an mp3 into a folder you pick.
+
+it is off until you turn it on, and turning it on is a card that says what
+that costs before any of it happens: the internet, and two programs keeper
+does not ship, [yt-dlp](https://github.com/yt-dlp/yt-dlp) and
+[spotDL](https://github.com/spotDL/spotify-downloader). say yes and keeper
+fetches those two from their own github releases, once on this machine, into
+its own folder. say no and none of it happens and it does not ask again.
+
+a spotify link is a name rather than a file. spotdl is the one thing here
+that can turn that name into the track it stands for, and that is all it
+does: the download itself is yt-dlp both times. it is the half that has to
+stay current, so it is the half keeper keeps current.
+
+one track a link. a playlist link gets the track it points at rather than the
+playlist, so a link pasted out of habit cannot start two hundred downloads.
+
+what you may do with what comes down is between you and whoever made it.
+keeper does not check and does not know.
+
 ## is it safe
 
 it is the first thing to check about anything you point at your photographs,
@@ -171,10 +195,17 @@ turned off. you can test that: turn the wifi off and use it.
 **nothing is counted or reported.** no analytics, no crash reports, no usage
 tracking. not turned off by default, not in there at all.
 
-**one thing can reach the internet and it asks you first.** keeper can check
-whether a newer keeper exists. a card asks you once, in words. say no and it
-never asks again and never makes the request. say yes and it fetches one
-small file that carries no name, no photographs, and nothing about you.
+**two things can reach the internet and both ask you first.** keeper can check
+whether a newer keeper exists: a card asks you once, in words, and saying no
+means it never asks again and never makes the request. saying yes fetches one
+small file that carries no name, no photographs, and nothing about you. and
+the downloads tab, which is off until you turn it on, and which is the only
+part of keeper that fetches something that is not keeper.
+
+**neither of those sends anything about you.** not a photograph, not a file
+name, not a folder name, not a count of anything. the wifi test above still
+holds for everything else in here: turn it off and the shelf, the bench, the
+tags, the crops and the exports all still work.
 
 **your photographs are read and never written to.** keeper makes one folder
 inside yours, called `.keeper`, and puts its small copies, your labels and
@@ -369,11 +400,14 @@ everything keeper writes goes in `<archive>/.keeper/`: the index, the small
 copies, the contact sheets, your tags, your placements and your trays. delete
 that folder and the archive is exactly as it was.
 
-opened from its icon it keeps two more files, and they are everything it has
-ever written outside an archive: which archive was open last, and which port
-it is on. `~/Library/Application Support/keeper` on macos,
-`%LOCALAPPDATA%\keeper` on windows. deleting them loses the memory of where
-you were and nothing else.
+opened from its icon it keeps a little more, and this is all of it: which
+archive was open last, which port it is on, and what you have answered about
+updates and about downloads. `~/Library/Application Support/keeper` on macos,
+`%LOCALAPPDATA%\keeper` on windows. if you turned downloads on, yt-dlp and
+spotdl sit in a `bin` folder beside those, which is also why an update to
+keeper never has to fetch them again. deleting the lot loses the memory of
+where you were, and means those two are fetched again next time you ask for
+them.
 
 ## the look
 
