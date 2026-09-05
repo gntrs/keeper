@@ -163,7 +163,14 @@ it onto the wrong photograph, which would make the whole thing worthless.
 
 keeper opens a folder of photographs and film, and a piece of work often
 needs a piece of music as well. the downloads tab takes a youtube or spotify
-link and saves the audio as an mp3 into a folder you pick.
+link and saves what is behind it into a folder you pick.
+
+**you choose what it saves as.** mp3 because it plays in everything, m4a for
+the same quality in a smaller file, the original audio with no re-encoding at
+all, or the video, as an mp4. and how good: **max** is not a preset, it is
+whatever that link actually offers, so a 4k source comes down as 4k and a
+source that only has 720 comes down as 720. the two below it trade quality
+for a smaller file, in that order. what you pick is remembered.
 
 it is off until you turn it on, and turning it on is a card that says what
 that costs before any of it happens: the internet, and two programs keeper
