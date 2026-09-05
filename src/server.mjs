@@ -26,6 +26,7 @@ import { loadConfig } from "./config.mjs";
 import {
   appDir, plain, rememberArchive, rememberRan, returning, setToured, setUpdatePolicy, toured, updatePolicy,
   downloadsPolicy, setDownloadsPolicy, downloadsFolder, setDownloadsFolder,
+  downloadsAs, setDownloadsAs,
 } from "./runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -665,8 +666,10 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
        * to know they exist and never has to fetch them again.
        */
       if (route === "/api/downloads" && req.method === "GET") {
-        const { haveYtDlp, haveSpotdl, haveFfmpeg } = await import("./downloaders.mjs");
+        const { haveYtDlp, haveSpotdl, haveFfmpeg, FORMATS, QUALITIES, defaultsFor } = await import("./downloaders.mjs");
         const policy = await downloadsPolicy();
+        const chose = await downloadsAs();
+        const fell = defaultsFor();
         return json(res, 200, {
           policy,
           folder: await downloadsFolder(),
@@ -675,7 +678,28 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
              machine already, and saying so on the form beats saying it after
              a download that cannot be turned into an mp3. */
           ffmpeg: await haveFfmpeg(),
+          /* the page draws its controls from these rather than carrying its
+             own copy of the list, so the two can never disagree about what
+             keeper will actually accept. */
+          formats: FORMATS,
+          qualities: QUALITIES,
+          as: {
+            format: FORMATS[chose.format] ? chose.format : fell.format,
+            quality: QUALITIES[chose.quality] ? chose.quality : fell.quality,
+            detail: chose.detail,
+          },
         });
+      }
+
+      if (route === "/api/downloads/as" && req.method === "POST") {
+        const { FORMATS, QUALITIES, defaultsFor } = await import("./downloaders.mjs");
+        const b = await body(req).catch(() => ({}));
+        const fell = defaultsFor();
+        const format = FORMATS[b?.format] ? b.format : fell.format;
+        const quality = QUALITIES[b?.quality] ? b.quality : fell.quality;
+        const detail = b?.detail === "full" ? "full" : "simple";
+        await setDownloadsAs(format, quality, detail);
+        return json(res, 200, { ok: true, as: { format, quality, detail } });
       }
 
       if (route === "/api/downloads/allow" && req.method === "POST") {
@@ -731,9 +755,18 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         const folder = String(b?.folder ?? (await downloadsFolder()) ?? "").trim();
         if (!folder) return json(res, 400, { error: "no folder chosen yet" });
 
-        const { detectKind, startDownload } = await import("./downloaders.mjs");
+        const { detectKind, startDownload, FORMATS, QUALITIES, defaultsFor } = await import("./downloaders.mjs");
         const kind = b?.kind === "youtube" || b?.kind === "spotify" ? b.kind : detectKind(url);
         if (!kind) return json(res, 400, { error: "that does not look like a youtube or spotify link" });
+
+        /* what to save it as: whatever the page asked for if keeper knows the
+           name, else whatever was remembered, else the default. startDownload
+           checks these again, because a route is not the last line of defence
+           for what reaches a command line. */
+        const held = await downloadsAs();
+        const fell = defaultsFor();
+        const format = FORMATS[b?.format] ? b.format : (FORMATS[held.format] ? held.format : fell.format);
+        const quality = QUALITIES[b?.quality] ? b.quality : (QUALITIES[held.quality] ? held.quality : fell.quality);
 
         /* a page reloaded mid download leaves a job nothing will ever poll
            again, and one per reload adds up over a long session. finished
@@ -745,7 +778,7 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
         const id = randomBytes(8).toString("hex");
         const job = { at: Date.now(), done: false, ok: false, lines: [], files: [], error: null };
         jobs.set(id, job);
-        startDownload({ url, kind, outDir: folder }, (line) => job.lines.push(line))
+        startDownload({ url, kind, outDir: folder, format, quality }, (line) => job.lines.push(line))
           .then((out) => { job.done = true; job.ok = out.ok; job.files = out.files ?? []; job.error = out.error ?? null; })
           .catch((e) => { job.done = true; job.ok = false; job.error = e.message; });
         return json(res, 200, { id });

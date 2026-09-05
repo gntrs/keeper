@@ -133,6 +133,29 @@ export async function downloadsFolder() {
 export const setDownloadsFolder = (dir) => reseat({ downloadsFolder: dir });
 
 /**
+ * What a download is saved as, remembered between launches.
+ *
+ * Kept as two plain strings and checked against the tables in
+ * downloaders.mjs when they are used, rather than validated here: this file
+ * remembers answers, it does not know what a good one looks like.
+ */
+export async function downloadsAs() {
+  const said = await seat();
+  return {
+    format: typeof said.downloadsFormat === "string" ? said.downloadsFormat : null,
+    quality: typeof said.downloadsQuality === "string" ? said.downloadsQuality : null,
+    /* how much of what the programs say is put on the screen. it lives here
+       rather than in the browser for the same reason the walkthrough's answer
+       does: keeper's page carries whichever port was free, so a preference
+       kept against the origin comes back empty on the day 7777 was taken. */
+    detail: said.downloadsDetail === "full" ? "full" : "simple",
+  };
+}
+
+export const setDownloadsAs = (format, quality, detail) =>
+  reseat({ downloadsFormat: format, downloadsQuality: quality, downloadsDetail: detail });
+
+/**
  * WHICH WALKTHROUGH HAS BEEN ANSWERED, NOT WHETHER ONE HAS.
  *
  * A number and not a bit, because keeper is going to gain things and the

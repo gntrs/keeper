@@ -212,21 +212,21 @@ header.bar {
    toolbar on this machine uses one for exactly this and why the shape is
    worth borrowing rather than inventing something. The groove is a white
    alpha so it composites over the chrome without a second hex. */
-header.bar nav.seg {
+header.bar nav.seg, nav.dl-seg {
   display: flex; gap: 0; flex: none;
   background: #ffffff0a; border-radius: 6px; padding: 2px;
 }
-header.bar nav.seg button {
+header.bar nav.seg button, nav.dl-seg button {
   border: 0; background: none; color: var(--ink-3);
   padding: 5px 12px; border-radius: var(--r); cursor: pointer;
   font: 500 .88rem/1.2 var(--sans); text-transform: lowercase; letter-spacing: 0;
 }
-header.bar nav.seg button:hover { color: var(--ink-2); }
+header.bar nav.seg button:hover, nav.dl-seg button:hover { color: var(--ink-2); }
 /* the view you are looking at is already telling you which view it is, so
    this used to be the loudest thing on the page for no reason. red in
    keeper now means one of two things and only these: you chose this, or you
    have to deal with this. a tab is neither. */
-header.bar nav.seg button.on { background: #ffffff14; color: var(--ink); }
+header.bar nav.seg button.on, nav.dl-seg button.on { background: #ffffff14; color: var(--ink); }
 
 /* ---------------------------------------------------------------------
    quit, which exists only when keeper was opened from its icon.
@@ -1830,12 +1830,21 @@ body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
 body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 
 /* --- the downloads tab ---------------------------------------------------
-   the card is the same .up shape everything else in keeper that talks off
-   the machine uses, just living in the tab's own flow instead of pinned to
-   a corner over a wall of photographs. */
-.dl { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: var(--s6) var(--s4); overflow-y: auto; }
-.dl-card { position: relative; right: auto; bottom: auto; width: min(480px, 100%); }
 
+   TWO SHAPES, AND THE SPLIT IS THE WHOLE RULE HERE TOO. A question is a
+   card, narrow and centred, because a yes or no wants one place to look. Work
+   is a desk that uses the window, because the moment there is a download
+   there is something with real content in it: the program's own output. That
+   used to be folded into a 160px box in the middle of a screen that was
+   otherwise empty. */
+.dl { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* the card, for the states that are a question */
+.dl-card {
+  position: relative; right: auto; bottom: auto;
+  width: min(480px, calc(100% - var(--s5) * 2));
+  margin: var(--s7) auto;
+}
 .dl-guts[hidden] { display: none; }
 .dl-guts { margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s3); }
 
@@ -1850,35 +1859,197 @@ body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
 .dl-step[data-state="no"] { color: var(--hot-ink); }
 .dl-say { color: var(--ink-3); font-size: .82rem; }
 
-.dl-form { display: flex; flex-direction: column; gap: var(--s3); }
-.dl-url {
-  font: inherit; font-size: .92rem; color: var(--ink); background: var(--chrome);
-  border: 1px solid var(--line-strong); border-radius: var(--r); padding: var(--s3);
-  width: 100%;
+/* the desk, for the states that are work */
+.dl-desk {
+  flex: 1; min-height: 0;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: var(--s6) var(--s5) var(--s5);
+  display: flex; flex-direction: column; gap: var(--s4);
 }
-.dl-url:focus-visible { outline: 2px solid #e1062c8a; outline-offset: 1px; }
+/* the section itself already animates on the way in: app.js hands #downloads
+   to motion.js's viewIn on every view change, the same as the shelf and the
+   bench. A second entrance on the desk inside it would be two things moving
+   for one arrival. */
+
+/* the kicker doubles as the status line, so it is the one piece of text on
+   this screen that changes while you watch it. mono, wide and quiet, which
+   is the same treatment every other label in keeper gets. */
+.dl-kick { margin: 0; transition: color var(--fast) var(--ease); }
+.dl-desk.busy .dl-kick { color: var(--ink-2); }
+
+.dl-head { display: flex; flex-direction: column; gap: var(--s3); }
+
+/* the field is the biggest thing on the screen until something is running,
+   because pasting a link is the only thing to do here. */
+.dl-field { display: flex; gap: var(--s2); align-items: stretch; }
+.dl-url {
+  flex: 1; min-width: 0;
+  font: inherit; font-size: 1rem; color: var(--ink);
+  background: var(--chrome);
+  border: 1px solid var(--line-strong); border-radius: var(--r);
+  padding: var(--s3) var(--s4);
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.dl-url:hover { border-color: #ffffff33; }
+.dl-url:focus { outline: none; border-color: #e1062c8a; background: var(--chrome-2); }
+.dl-url:focus-visible { outline: none; }
 .dl-url::placeholder { color: var(--ink-3); }
+.dl-url:disabled { color: var(--ink-3); background: var(--chrome); }
+.dl-go { flex: none; padding-inline: var(--s4); }
+.dl-go:disabled { opacity: .45; }
 
 .dl-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 .dl-path { font-family: var(--mono); font-size: .8rem; color: var(--ink-2); overflow-wrap: anywhere; }
-.dl-note { margin: 0; font-size: .78rem; color: var(--ink-3); }
-/* amber, because it is the one thing on this card somebody has to go and do */
+.dl-none { color: var(--ink-3); }
+
+/* what it gets saved as: one row. the chips say what they are, so the word
+   "format" above them was only explaining that mp3 is a format, and quality
+   is the answer almost nobody changes, so it does not get the same room as
+   the one they do. */
+.dl-pick { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.dl-formats { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.dl-chip { box-shadow: inset 0 0 0 1px var(--line); }
+.dl-chip:hover:not(:disabled) { color: var(--ink); background: var(--chrome-2); }
+.dl-chip.on {
+  color: var(--hot-ink);
+  background: #e1062c1c;
+  box-shadow: inset 0 0 0 1px #e1062c59;
+}
+.dl-chip:disabled { opacity: .45; }
+
+.dl-quality {
+  margin-left: auto;
+  font: inherit; font-size: .8rem; font-family: var(--mono);
+  color: var(--ink-2); background: var(--chrome);
+  border: 1px solid var(--line); border-radius: var(--r);
+  padding: var(--s1) var(--s2);
+}
+.dl-quality:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
+.dl-quality:disabled { opacity: .45; }
+.dl-quality[hidden] { display: none; }
+/* amber, because it is the one thing here somebody has to go and do */
 .dl-warn {
   margin: 0; font-size: .8rem; line-height: 1.45; color: var(--warn);
   border-left: 2px solid #e0a4583d; padding-left: var(--s3);
 }
 
-.dl-log {
-  font-family: var(--mono); font-size: .78rem; line-height: 1.5; color: var(--ink-2);
-  background: var(--chrome); border: 1px solid var(--line);
-  border-radius: var(--r); padding: var(--s2) var(--s3);
-  max-height: 160px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+/* the readout: whatever is happening, said either way. it is one block with
+   its own head rather than three loose things stacked up, so the switch
+   between the two readings is attached to the thing it changes. */
+.dl-shell {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--s3);
 }
-.dl-line { opacity: .85; }
+.dl-shell[hidden] { display: none; }
+.dl-shellhead { display: flex; align-items: center; gap: var(--s3); }
+.dl-shellhead .label { margin: 0; }
+.dl-seg { margin-left: auto; }
+.dl-seg button { padding: 4px 10px; font-size: .8rem; }
 
-.dl-files { display: flex; flex-direction: column; gap: var(--s2); }
-.dl-file { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+/* THE PLAIN READING. five short lines that tick off, for the person who
+   wants to know it is working rather than what a container format is. the
+   dot carries the state and the words never change, so the shape of the
+   list is the same every run and only its colour moves down it. */
+.dl-steps-run { display: flex; flex-direction: column; gap: var(--s2); }
+.dl-stepr {
+  display: flex; align-items: center; gap: var(--s3);
+  font-size: .95rem; color: var(--ink-3);
+  transition: color var(--mid) var(--ease);
+}
+.dl-stepr i {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+  transition: background var(--mid) var(--ease), box-shadow var(--mid) var(--ease);
+}
+.dl-stepr[data-state="done"] { color: var(--ink-2); }
+.dl-stepr[data-state="done"] i { background: var(--ok); box-shadow: none; }
+.dl-stepr[data-state="doing"] { color: var(--ink); }
+.dl-stepr[data-state="doing"] i { background: var(--warn); box-shadow: none; animation: dlPulse 1.4s var(--ease) infinite; }
+
+@keyframes dlPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .55; transform: scale(.82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-stepr[data-state="doing"] i { animation: none; }
+}
+
+.dl-fault {
+  margin: var(--s3) 0 0; font-size: .9rem; line-height: 1.5; color: var(--hot-ink);
+}
+
+/* the meter. three pixels, because a progress bar that is any taller starts
+   competing with the thing it is describing. */
+.dl-meter {
+  height: 3px; border-radius: 2px; overflow: hidden;
+  background: var(--chrome-2); flex: none;
+}
+.dl-meter[hidden] { display: none; }
+.dl-fill {
+  display: block; height: 100%; width: 0;
+  background: var(--hot); border-radius: 2px;
+  transition: width var(--fast) linear;
+}
+.dl-stat {
+  margin: 0; font-family: var(--mono); font-size: .76rem; color: var(--ink-2);
+  font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+.dl-stat[hidden] { display: none; }
+
+/* THE CONSOLE, which is the reason this screen is a desk.
+
+   yt-dlp prints [tag] and then a sentence, so the tag gets its own column
+   and stops being noise in the middle of the line. Everything is quoted
+   output at --ink-2 except the handful of lines keeper wrote itself, which
+   are full strength with an accent rule down the left, so it is always
+   obvious which words are ours and which came off the program. */
+.dl-console {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* the honest view, and the only one that looks like a terminal because it is
+   one: every line the programs printed, in the face they printed it in. */
+.dl-console[data-mode="full"] {
+  min-height: 120px;
+  background: var(--chrome); border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--s3) var(--s4);
+  font-family: var(--mono); font-size: .78rem; line-height: 1.65;
+}
+/* the plain view wears no box at all. it is five sentences. */
+.dl-console[data-mode="simple"] { padding: var(--s1) 0; }
+.dl-l {
+  display: grid; grid-template-columns: 124px 1fr; gap: var(--s3);
+  padding: 1px 0;
+}
+.dl-console[hidden] { display: none; }
+.dl-t { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-m { color: var(--ink-2); overflow-wrap: anywhere; }
+
+/* keeper's own voice, marked rather than coloured: the accent is a fill and
+   a ring in this app and never a word. */
+.dl-is-note { margin-left: calc(var(--s4) * -1); padding-left: calc(var(--s4) - 2px); border-left: 2px solid #e1062c6b; }
+.dl-is-note .dl-m { color: var(--ink); }
+.dl-is-note .dl-t { color: var(--ink-2); }
+
+.dl-is-good .dl-m { color: var(--ok); }
+.dl-is-bad .dl-m { color: var(--hot-ink); }
+.dl-is-warn .dl-m { color: var(--warn); }
+
+/* what landed, so the desk still says something after the console is done */
+.dl-landed { flex: none; display: flex; flex-direction: column; gap: var(--s2); }
+.dl-landed[hidden] { display: none; }
+.dl-file { display: flex; align-items: center; gap: var(--s3); }
 .dl-file .dl-path { flex: 1; min-width: 0; }
+
+@media (max-width: 720px) {
+  .dl-desk { padding: var(--s5) var(--s4) var(--s4); }
+  .dl-field { flex-direction: column; }
+  .dl-l { grid-template-columns: 1fr; gap: 0; }
+  .dl-t { font-size: .72rem; }
+}
 
 /* the drop state. the accent, one hairline in from the edge, so the panel
    lights up without the layout moving by a pixel. the lift is the second

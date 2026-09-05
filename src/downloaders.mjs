@@ -497,19 +497,70 @@ export async function haveFfmpeg() {
   return (await ffmpegAt()) !== false;
 }
 
+/**
+ * WHAT TO SAVE, AND HOW GOOD.
+ *
+ * Two questions rather than a list of a dozen presets, because they are the
+ * two a person actually has: what kind of file do I want, and how much do I
+ * care about size. Everything is an allowed key looked up in here and never
+ * a string from the page reaching a command line, so a browser cannot ask
+ * yt-dlp for an argument keeper did not write.
+ *
+ * `source` is the honest top of the audio list. mp3 is a re-encode of
+ * whatever came down, so it can only ever be a little worse than the thing
+ * it was made from; keeping the original stream is both faster and better,
+ * and it is only second by default because an mp3 plays in everything.
+ */
+export const FORMATS = {
+  mp3: { label: "mp3", what: "audio", say: "plays in everything" },
+  m4a: { label: "m4a", what: "audio", say: "aac, smaller than mp3 at the same quality" },
+  source: { label: "original audio", what: "audio", say: "the stream as it came, no re-encode" },
+  video: { label: "video", what: "video", say: "picture as well, saved as mp4" },
+};
+
+export const QUALITIES = {
+  max: { label: "max", say: "the best the link actually offers" },
+  good: { label: "good", say: "smaller, and nobody can hear it" },
+  small: { label: "small", say: "for when the disk matters more" },
+};
+
+/* how good, per kind. the audio numbers are yt-dlp's own 0 to 10 scale where
+   0 is best, and the video ones are a ceiling on height rather than a
+   target, so a link that only has 720 still comes down at 720. */
+const AUDIO_Q = { max: "0", good: "5", small: "9" };
+const VIDEO_CAP = { max: "", good: "[height<=1080]", small: "[height<=720]" };
+
+export const defaultsFor = () => ({ format: "mp3", quality: "max" });
+
 /* --no-playlist on purpose. a playlist url pasted out of habit must not
    silently start two hundred downloads into somebody's folder. */
-const GRAB = (url, outDir, ffmpeg) => [
-  "-x",
-  "--audio-format", "mp3",
-  "--audio-quality", "0",
-  "--embed-thumbnail",
-  "--add-metadata",
-  "--no-playlist",
-  ...(ffmpeg ? ["--ffmpeg-location", ffmpeg] : []),
-  "-o", path.join(outDir, "%(title)s.%(ext)s"),
-  url,
-];
+function GRAB(url, outDir, ffmpeg, format, quality) {
+  const args = [
+    "--no-playlist",
+    "--add-metadata",
+    "--embed-thumbnail",
+    ...(ffmpeg ? ["--ffmpeg-location", ffmpeg] : []),
+    "-o", path.join(outDir, "%(title)s.%(ext)s"),
+  ];
+
+  if (FORMATS[format]?.what === "video") {
+    const cap = VIDEO_CAP[quality] ?? "";
+    /* best picture plus best sound, and the single best file as the fallback
+       for a source that does not offer them apart. */
+    args.push("-f", `bv*${cap}+ba/b${cap}`, "--merge-output-format", "mp4");
+  } else {
+    args.push("-x");
+    if (format === "source") {
+      /* no re-encode at all. whatever the site handed over is what lands. */
+      args.push("--audio-format", "best");
+    } else {
+      args.push("--audio-format", format, "--audio-quality", AUDIO_Q[quality] ?? "0");
+    }
+  }
+
+  args.push(url);
+  return args;
+}
 
 /**
  * SPOTDL RESOLVES THE TRACK AND DOES NOT DOWNLOAD IT.
@@ -598,7 +649,7 @@ const WORKED = [
 /* what this could have produced, for the fallback below. anything else
    appearing in the folder while a download runs belongs to whoever put it
    there. */
-const OURS = /\.(mp3|m4a|opus|ogg|flac|wav|aac)$/i;
+const OURS = /\.(mp3|m4a|opus|ogg|flac|wav|aac|mp4|mkv|webm|mov)$/i;
 
 const NO_FFMPEG = "keeper needs ffmpeg to turn a download into an mp3, and cannot find one on this machine. install ffmpeg from ffmpeg.org, then open keeper again.";
 
@@ -688,9 +739,14 @@ function gave(said, fallback, say) {
  * afterwards, and both go into the same log the download writes to.
  */
 async function findBehind(url, onLine) {
+  /* tagged, because the page prints this stream verbatim and a reader of it
+     is entitled to know which words are keeper's and which came off one of
+     the programs. an untagged line there used to be attributed to keeper on
+     the strength of having no tag, which quietly credited yt-dlp's sentences
+     to us in the one view whose whole job is being literal. */
   const say = (text) => {
     try {
-      onLine(text);
+      onLine(`[keeper] ${text}`);
     } catch {
       /* a listener that throws is the page's problem, not the lookup's */
     }
@@ -754,10 +810,16 @@ async function findBehind(url, onLine) {
  * rather than taken off the exit code alone; `files` is a best effort at
  * naming what landed and is allowed to come back short.
  */
-export async function startDownload({ url, kind, outDir }, onLine = () => {}) {
+export async function startDownload({ url, kind, outDir, format, quality }, onLine = () => {}) {
   if (kind !== "youtube" && kind !== "spotify") {
     return { ok: false, error: `keeper does not know how to download "${kind}". it handles youtube and spotify links.` };
   }
+
+  /* an unknown key falls back rather than failing, and never reaches a
+     command line either way. the page can only ask for what is in the two
+     tables above. */
+  const want = FORMATS[format] ? format : defaultsFor().format;
+  const howGood = QUALITIES[quality] ? quality : defaultsFor().quality;
   if (typeof url !== "string" || !url.trim()) {
     return { ok: false, error: "no link was given" };
   }
@@ -814,7 +876,7 @@ export async function startDownload({ url, kind, outDir }, onLine = () => {}) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(bin, GRAB(target, outDir, ffmpeg), {
+      child = spawn(bin, GRAB(target, outDir, ffmpeg, want, howGood), {
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
         /* this is not going to a terminal, so the colour is dead weight, and
