@@ -15,6 +15,7 @@ import { mountQuit } from "/quit.js";
 import { mountUpdate } from "/update.js";
 import { mountTour } from "/tour.js";
 import { mountSettings } from "/settings.js";
+import { mountDownloads } from "/downloads.js";
 
 /* Every write carries the token the server put on this page, so a page on
    another origin, which cannot read this one, cannot make keeper write. One
@@ -113,7 +114,7 @@ export function tally() {
  * every time.
  */
 export function setView(v) {
-  if (v !== "shelf" && v !== "bench") v = "shelf";
+  if (v !== "shelf" && v !== "bench" && v !== "downloads") v = "shelf";
   S.view = v;
   /* on the body as well, because two controls in the bar belong to the shelf
      and a stylesheet cannot read a variable in a module. */
@@ -122,9 +123,10 @@ export function setView(v) {
   for (const b of document.querySelectorAll("header nav button")) {
     b.classList.toggle("on", b.dataset.view === v);
   }
-  const was = $("#shelf").hidden ? "bench" : "shelf";
+  const was = ["shelf", "bench", "downloads"].find((n) => !document.getElementById(n)?.hidden) ?? "shelf";
   $("#shelf").hidden = v !== "shelf";
   $("#bench").hidden = v !== "bench";
+  $("#downloads").hidden = v !== "downloads";
   trayView(v);
   if (v === "bench") renderBench();
   /* only when the view actually changed. setView runs on every hashchange
@@ -481,6 +483,7 @@ await mountTray();
    only the server knows. */
 mountQuit();
 mountUpdate();
+mountDownloads();
 tally();
 /* last, and not awaited. it shares the screen with the update card rather
    than waiting behind it, because the loud card has no dismiss button and a

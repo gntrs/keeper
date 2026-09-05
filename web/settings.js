@@ -66,6 +66,17 @@ function paint() {
     b.setAttribute("aria-pressed", String(on));
   }
 
+  /* downloads has nothing to do with app-vs-checkout, so it shows either
+     way. this row is only how you turn it back ON after saying never: the
+     downloads tab itself asks the first time and owns setup. */
+  {
+    const b = $("#set-downloads");
+    const on = S.downloads === "on";
+    b.textContent = on ? "on" : S.downloads === "off" ? "off" : "not asked yet";
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  }
+
   /* the walkthrough walks a real wall of frames, so there is nothing for it
      to say on an archive with none. */
   const bare = !S.items.length;
@@ -112,6 +123,30 @@ export function mountSettings(onOpen) {
       /* github not answering is not a reason for the switch to lie about
          what was written, and the write happened before the request did. */
       S.updates = want ? "on" : "off";
+    }
+    b.disabled = false;
+    feel("tick");
+    paint();
+  };
+
+  /**
+   * The same on/off as updates, one step simpler: the downloads tab is the
+   * one that runs setup and asks the first time, so this only ever writes
+   * the policy and never fetches anything itself.
+   */
+  $("#set-downloads").onclick = async () => {
+    const want = S.downloads !== "on";
+    const b = $("#set-downloads");
+    b.disabled = true;
+    try {
+      const res = await fetch("/api/downloads/allow", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ yes: want }),
+      });
+      S.downloads = (await res.json())?.policy ?? S.downloads;
+    } catch {
+      S.downloads = want ? "on" : "off";
     }
     b.disabled = false;
     feel("tick");

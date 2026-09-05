@@ -113,6 +113,26 @@ export async function updatePolicy() {
 export const setUpdatePolicy = (yes) => reseat({ updates: yes ? "on" : "off" });
 
 /**
+ * Whether keeper may fetch yt-dlp and spotDL and use them to pull audio off
+ * the internet. Same shape as the update policy and for the same reason:
+ * `ask` is the honest default, and nothing here runs until it is answered.
+ */
+export async function downloadsPolicy() {
+  const said = (await seat()).downloads;
+  return said === "on" || said === "off" ? said : "ask";
+}
+
+export const setDownloadsPolicy = (yes) => reseat({ downloads: yes ? "on" : "off" });
+
+/** the folder downloads land in, remembered so it is not asked for every time */
+export async function downloadsFolder() {
+  const dir = (await seat()).downloadsFolder;
+  return typeof dir === "string" && dir ? dir : null;
+}
+
+export const setDownloadsFolder = (dir) => reseat({ downloadsFolder: dir });
+
+/**
  * WHICH WALKTHROUGH HAS BEEN ANSWERED, NOT WHETHER ONE HAS.
  *
  * A number and not a bit, because keeper is going to gain things and the

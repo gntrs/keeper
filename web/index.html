@@ -80,6 +80,7 @@
   <nav class="seg">
     <button data-view="shelf" class="on">shelf</button>
     <button data-view="bench">bench</button>
+    <button data-view="downloads">downloads</button>
   </nav>
   <span id="tally"></span>
   <span class="grow"></span>
@@ -307,6 +308,13 @@
   </div>
 </section>
 
+<!--
+  Audio off youtube and spotify links. It is the one view that needs the
+  internet, so downloads.js owns the whole of what is inside it and paints
+  from nothing rather than this markup carrying any of the states itself.
+-->
+<section id="downloads" class="view" hidden></section>
+
 </main>
 
 <!--
@@ -503,6 +511,15 @@
            nothing about you. off means no request is made at all.</p>
       </div>
       <button class="chip" id="set-updates" type="button" aria-pressed="false">off</button>
+    </div>
+
+    <div class="set" id="set-downloads-row">
+      <div class="set-say">
+        <b>pulling audio off youtube and spotify</b>
+        <p>fetches two small helper programs off github the first time it is
+           used. off means no request is made at all.</p>
+      </div>
+      <button class="chip" id="set-downloads" type="button" aria-pressed="false">off</button>
     </div>
 
     <div class="set" id="set-tour-row">

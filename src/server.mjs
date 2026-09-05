@@ -23,7 +23,10 @@ import { HOSTS, host as platform } from "./os/index.mjs";
 import { readableSource } from "./raw.mjs";
 import { clock } from "./film.mjs";
 import { loadConfig } from "./config.mjs";
-import { appDir, plain, rememberArchive, rememberRan, returning, setToured, setUpdatePolicy, toured, updatePolicy } from "./runtime.mjs";
+import {
+  appDir, plain, rememberArchive, rememberRan, returning, setToured, setUpdatePolicy, toured, updatePolicy,
+  downloadsPolicy, setDownloadsPolicy, downloadsFolder, setDownloadsFolder,
+} from "./runtime.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "..", "web");
@@ -190,6 +193,12 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
      file: the claim file is lock.mjs's, and it goes there so the CLI on this
      machine can find it. */
   const TOKEN = randomBytes(16).toString("hex");
+
+  /* one download's live output, id to job, for exactly as long as this
+     process runs. cleared on the read that finds it done, so a job that was
+     never polled again just sits there until the process exits rather than
+     growing without bound across a long session. */
+  const jobs = new Map();
 
   /* The port that was actually taken, which is not the port that was asked
      for when the caller asked for 0 and let the operating system pick. Filled
@@ -394,6 +403,7 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
           // page's origin carries a port that can change under it.
           toured: await toured(),
           updates: await updatePolicy(),
+          downloads: await downloadsPolicy(),
           // whether keeper had already been used on this machine before this
           // launch. it decides how the walkthrough introduces itself: a first
           // run gets the cards, and somebody who already knows keeper gets
@@ -644,6 +654,126 @@ export async function serve({ root, config: opened, port = 7777, host = "127.0.0
           }, 200);
         }
         return;
+      }
+
+      /**
+       * Audio off a youtube or spotify link, and the one place in keeper that
+       * needs the internet for more than a version check. Gated exactly like
+       * the updater: ask once, write the answer, touch nothing until it says
+       * yes. The helper programs themselves, yt-dlp and spotDL, live outside
+       * ROOT in appDir()'s own bin folder, so an update to keeper never has
+       * to know they exist and never has to fetch them again.
+       */
+      if (route === "/api/downloads" && req.method === "GET") {
+        const { haveYtDlp, haveSpotdl, haveFfmpeg } = await import("./downloaders.mjs");
+        const policy = await downloadsPolicy();
+        return json(res, 200, {
+          policy,
+          folder: await downloadsFolder(),
+          ready: { ytdlp: await haveYtDlp(), spotdl: await haveSpotdl() },
+          /* not one of the two keeper fetches: this one has to be on the
+             machine already, and saying so on the form beats saying it after
+             a download that cannot be turned into an mp3. */
+          ffmpeg: await haveFfmpeg(),
+        });
+      }
+
+      if (route === "/api/downloads/allow" && req.method === "POST") {
+        const b = await body(req).catch(() => ({}));
+        await setDownloadsPolicy(!!b?.yes);
+        return json(res, 200, { ok: true, policy: !!b?.yes ? "on" : "off" });
+      }
+
+      /**
+       * Fetches whichever of yt-dlp and spotDL is not already on disk. Each
+       * one only runs if the policy is on, because a page reload while the
+       * card was still asking must not turn into a download the person never
+       * answered yes to.
+       */
+      if (route === "/api/downloads/setup" && req.method === "POST") {
+        if ((await downloadsPolicy()) !== "on") return json(res, 403, { error: "downloads are not turned on" });
+        const { haveYtDlp, haveSpotdl, ensureYtDlp, ensureSpotdl } = await import("./downloaders.mjs");
+        const out = { ytdlp: await haveYtDlp(), spotdl: await haveSpotdl() };
+        try {
+          if (!out.ytdlp) { await ensureYtDlp(); out.ytdlp = true; }
+          if (!out.spotdl) { await ensureSpotdl(); out.spotdl = true; }
+        } catch (e) {
+          return json(res, 502, { error: e.message, ...out });
+        }
+        return json(res, 200, { ok: true, ...out });
+      }
+
+      /**
+       * Remembers a folder the page already chose. It does not run the
+       * dialog itself: /api/choose is that, already, and a second copy of
+       * the same osascript call would just be a route that agrees with
+       * itself.
+       */
+      if (route === "/api/downloads/folder" && req.method === "POST") {
+        const b = await body(req).catch(() => ({}));
+        const dir = String(b?.dir ?? "").trim();
+        if (!dir) return json(res, 400, { error: "no folder" });
+        await setDownloadsFolder(dir);
+        return json(res, 200, { ok: true, folder: dir });
+      }
+
+      /**
+       * Starts a download and answers before it finishes. The job lives in
+       * memory for exactly as long as this process does, which is fine: it
+       * is a queue of one browser tab talking to one local server, not
+       * something that has to survive a restart.
+       */
+      if (route === "/api/downloads/start" && req.method === "POST") {
+        if ((await downloadsPolicy()) !== "on") return json(res, 403, { error: "downloads are not turned on" });
+        const b = await body(req).catch(() => ({}));
+        const url = String(b?.url ?? "").trim();
+        if (!url) return json(res, 400, { error: "no link" });
+        const folder = String(b?.folder ?? (await downloadsFolder()) ?? "").trim();
+        if (!folder) return json(res, 400, { error: "no folder chosen yet" });
+
+        const { detectKind, startDownload } = await import("./downloaders.mjs");
+        const kind = b?.kind === "youtube" || b?.kind === "spotify" ? b.kind : detectKind(url);
+        if (!kind) return json(res, 400, { error: "that does not look like a youtube or spotify link" });
+
+        /* a page reloaded mid download leaves a job nothing will ever poll
+           again, and one per reload adds up over a long session. finished
+           ones are dropped by the read that finds them done; this catches the
+           ones no read ever comes for. */
+        const stale = Date.now() - 30 * 60 * 1000;
+        for (const [old, held] of jobs) if (held.at < stale) jobs.delete(old);
+
+        const id = randomBytes(8).toString("hex");
+        const job = { at: Date.now(), done: false, ok: false, lines: [], files: [], error: null };
+        jobs.set(id, job);
+        startDownload({ url, kind, outDir: folder }, (line) => job.lines.push(line))
+          .then((out) => { job.done = true; job.ok = out.ok; job.files = out.files ?? []; job.error = out.error ?? null; })
+          .catch((e) => { job.done = true; job.ok = false; job.error = e.message; });
+        return json(res, 200, { id });
+      }
+
+      if (route.startsWith("/api/downloads/jobs/") && req.method === "GET") {
+        const id = route.slice("/api/downloads/jobs/".length).replace(/[^a-f0-9]/g, "");
+        const job = jobs.get(id);
+        /* said as a sentence rather than as an id, because the two ways to
+           reach this are a poll that arrived after the one that finished the
+           job, and a page reloaded mid download. neither is somebody who
+           wants to hear the word "job". */
+        if (!job) {
+          return json(res, 404, {
+            error: "keeper is not following that download any more. if the file is not in your folder, start it again.",
+          });
+        }
+        if (job.done) jobs.delete(id);
+        return json(res, 200, job);
+      }
+
+      if (route === "/api/downloads/reveal" && req.method === "POST") {
+        if (!machine) return json(res, 400, { error: `reveal needs ${HOSTS}` });
+        const b = await body(req).catch(() => ({}));
+        const file = String(b?.file ?? "");
+        if (!file) return json(res, 400, { error: "no file" });
+        machine.reveal(file);
+        return json(res, 200, { ok: true });
       }
 
       /**

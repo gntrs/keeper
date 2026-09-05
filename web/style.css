@@ -378,6 +378,7 @@ header.bar nav.seg button.on { background: #ffffff14; color: var(--ink); }
    nothing in it, where every row in here would answer to nothing. */
 body[data-side="shut"] #filters,
 body[data-view="bench"] #filters,
+body[data-view="downloads"] #filters,
 body:has(#shelf .blank) #filters { display: none; }
 
 #filters section { flex: none; }
@@ -1319,7 +1320,10 @@ kbd, .key {
    for a column the bench does not have. A control that answers to nothing
    is worse than a control that is not there. */
 body[data-view="bench"] .find.shelf,
-body[data-view="bench"] #side-toggle { display: none; }
+body[data-view="bench"] #side-toggle,
+body[data-view="downloads"] .find.shelf,
+body[data-view="downloads"] #side-toggle,
+body[data-view="downloads"] #tray-toggle { display: none; }
 /* The search gives ground before the controls around it do, because a
    shortened field is still a field and a control off the edge is gone. On
    an icon launch at 800 wide, with the version button and quit both in the
@@ -1824,6 +1828,57 @@ body:has(#tray:not([hidden])) .up { right: calc(var(--tray-w) + var(--s5)); }
 }
 .up-link:hover i { transform: rotate(45deg) translate(1px, -1px); }
 body:has(#bin-bar:not([hidden])) #undo-say { bottom: 76px; }
+
+/* --- the downloads tab ---------------------------------------------------
+   the card is the same .up shape everything else in keeper that talks off
+   the machine uses, just living in the tab's own flow instead of pinned to
+   a corner over a wall of photographs. */
+.dl { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: var(--s6) var(--s4); overflow-y: auto; }
+.dl-card { position: relative; right: auto; bottom: auto; width: min(480px, 100%); }
+
+.dl-guts[hidden] { display: none; }
+.dl-guts { margin-top: var(--s3); display: flex; flex-direction: column; gap: var(--s3); }
+
+.dl-steps { display: flex; flex-direction: column; gap: var(--s2); }
+.dl-step { display: flex; align-items: center; gap: var(--s2); font-size: .9rem; }
+.dl-step i { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--ink-3); }
+.dl-step[data-state="wait"] i { background: var(--ink-3); }
+.dl-step[data-state="doing"] i { background: var(--warn); }
+.dl-step[data-state="doing"] { color: var(--warn); }
+.dl-step[data-state="ok"] i { background: var(--ok); }
+.dl-step[data-state="no"] i { background: var(--hot-ink); }
+.dl-step[data-state="no"] { color: var(--hot-ink); }
+.dl-say { color: var(--ink-3); font-size: .82rem; }
+
+.dl-form { display: flex; flex-direction: column; gap: var(--s3); }
+.dl-url {
+  font: inherit; font-size: .92rem; color: var(--ink); background: var(--chrome);
+  border: 1px solid var(--line-strong); border-radius: var(--r); padding: var(--s3);
+  width: 100%;
+}
+.dl-url:focus-visible { outline: 2px solid #e1062c8a; outline-offset: 1px; }
+.dl-url::placeholder { color: var(--ink-3); }
+
+.dl-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.dl-path { font-family: var(--mono); font-size: .8rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.dl-note { margin: 0; font-size: .78rem; color: var(--ink-3); }
+/* amber, because it is the one thing on this card somebody has to go and do */
+.dl-warn {
+  margin: 0; font-size: .8rem; line-height: 1.45; color: var(--warn);
+  border-left: 2px solid #e0a4583d; padding-left: var(--s3);
+}
+
+.dl-log {
+  font-family: var(--mono); font-size: .78rem; line-height: 1.5; color: var(--ink-2);
+  background: var(--chrome); border: 1px solid var(--line);
+  border-radius: var(--r); padding: var(--s2) var(--s3);
+  max-height: 160px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+}
+.dl-line { opacity: .85; }
+
+.dl-files { display: flex; flex-direction: column; gap: var(--s2); }
+.dl-file { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.dl-file .dl-path { flex: 1; min-width: 0; }
 
 /* the drop state. the accent, one hairline in from the edge, so the panel
    lights up without the layout moving by a pixel. the lift is the second
